@@ -106,7 +106,12 @@ extern uint32_t systemUniqueId[3];
 #define UART_TX_BUFFER_ATTRIBUTE
 #define UART_RX_BUFFER_ATTRIBUTE
 
+#if defined RP2350A
 #define MAX_SPI_PIN_SEL 4
+#elif defined RP2350B
+#define MAX_SPI_PIN_SEL 6
+#endif
+
 #define SERIAL_TRAIT_PIN_CONFIG 1
 
 #define xDMA_GetCurrDataCounter(dma_resource) (((dma_channel_hw_t *)(dma_resource))->transfer_count)

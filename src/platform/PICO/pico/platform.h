@@ -12,7 +12,6 @@
  *
  * This header may be included by assembly code
  */
-
 #ifndef _PICO_PLATFORM_H
 #define _PICO_PLATFORM_H
 

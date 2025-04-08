@@ -128,13 +128,15 @@
 #define FLASH_CONFIG_STREAMER_BUFFER_SIZE   256
 #define FLASH_CONFIG_BUFFER_TYPE            uint8_t
 
-/* to be moved to a config file once target if working */
+/* to be moved to a config file once target if working
+   defaults as per Laurel board for now */
+
 #define LED0_PIN             P6
 #define LED1_PIN             P7
 
-#define SPI0_SCK_PIN         P5
-#define SPI0_SDI_PIN         P6
-#define SPI0_SDO_PIN         P7
+#define SPI0_SCK_PIN         P2
+#define SPI0_SDI_PIN         P4
+#define SPI0_SDO_PIN         P3
 
 #define SPI1_SCK_PIN         P26
 #define SPI1_SDI_PIN         P24

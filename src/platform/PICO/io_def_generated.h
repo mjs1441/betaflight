@@ -38,6 +38,7 @@
 #undef DEFIO_TAG_MAKE
 #define DEFIO_TAG_MAKE(pin) ((ioTag_t)(((1) << DEFIO_PORT_BITSHIFT) | (pin)))
 
+// GPIOID for potential different banks ("ports")  of GPIO pins - e.g. for RP2350 there's only one
 #undef DEFIO_TAG_GPIOID
 #define DEFIO_TAG_GPIOID(tag) (((tag) >> DEFIO_PORT_BITSHIFT) - 1)
 
