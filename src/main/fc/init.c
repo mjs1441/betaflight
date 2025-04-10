@@ -262,6 +262,11 @@ static void sdCardAndFSInit(void)
 }
 #endif
 
+// suggestion...
+#if defined(USE_SPI) && !defined(USE_SPI_DMA_ENABLE_LATE) && !defined(USE_SPI_DMA_ENABLE_EARLY)
+#error "USE_SPI requires either USE_SPI_DMA_ENABLE_LATE or USE_SPI_DMA_ENABLE_EARLY to be defined"
+#endif
+
 void init(void)
 {
 #if SERIAL_PORT_COUNT > 0

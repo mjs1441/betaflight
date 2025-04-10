@@ -24,4 +24,5 @@
 #define MAX_PERIPHERAL_DMA_OPTIONS  14
 #define MAX_TIMER_DMA_OPTIONS       22
 
-#define USE_DMA_MUX
+// TODO PICO : check need MUX or not?
+// #define USE_DMA_MUX

@@ -149,6 +149,13 @@ static spi_inst_t *getSpiInstanceByDevice(SPI0_Type *spi)
 
 void spiInitDevice(SPIDevice device)
 {
+  // maybe here set getSpiInstanceByDevice(spi->dev) SPI device with
+  // settings like
+  // STM does
+  //SetRXFIFOThreshold ...QF (1/4 full presumably)
+  //         Init -> full duplex, master, 8biut, baudrate, MSBfirst, no CRC,
+  //                  Clock = PolarityHigh, Phase_2Edge
+  
     const spiDevice_t *spi = &spiDevice[device];
 
     if (!spi->dev) {
@@ -160,6 +167,13 @@ void spiInitDevice(SPIDevice device)
     gpio_set_function(IO_PINBYTAG(spi->miso), GPIO_FUNC_SPI);
     gpio_set_function(IO_PINBYTAG(spi->mosi), GPIO_FUNC_SPI);
     gpio_set_function(IO_PINBYTAG(spi->sck), GPIO_FUNC_SPI);
+}
+
+void spiInitBusDMA(void)
+{
+  //TODO: implement
+  // if required to set up mappings of peripherals to DMA instances?
+  // can just start off with dma_claim_unused_channel in spiInternalInitStream?
 }
 
 void spiInternalResetStream(dmaChannelDescriptor_t *descriptor)
