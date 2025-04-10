@@ -66,8 +66,9 @@ dmaChannelDescriptor_t* dmaGetDescriptorByIdentifier(const dmaIdentifier_e ident
     return &dmaDescriptors[DMA_IDENTIFIER_TO_INDEX(identifier)];
 }
 
-uint32_t dmaGetChannel(const uint8_t channel)
-{
-    return ((uint32_t)channel*2)<<24;
-}
+// UNUSED
+// uint32_t dmaGetChannel(const uint8_t channel)
+// {
+//     return ((uint32_t)channel*2)<<24;
+// }
 #endif
