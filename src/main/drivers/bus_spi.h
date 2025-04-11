@@ -77,7 +77,7 @@ SPI_TypeDef *spiInstanceByDevice(SPIDevice device);
 
 // Mark a device's associated bus as being SPI
 bool spiSetBusInstance(extDevice_t *dev, uint32_t device);
-// Determine the divisor to use for a given bus frequency
+// Determine the setting (typically a divider value) to use for a given bus frequency
 uint16_t spiCalculateDivider(uint32_t freq);
 // Return the SPI clock based on the given divisor
 uint32_t spiCalculateClock(uint16_t spiClkDivisor);

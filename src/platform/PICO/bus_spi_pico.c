@@ -19,6 +19,13 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * Clock divider code based on pico-sdk/src/rp2_common/hardware_spi.c
+ * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -227,12 +234,57 @@ void spiSequenceStart(const extDevice_t *dev)
 uint16_t spiCalculateDivider(uint32_t freq)
 {
     /*
-        Divider is probably not needed for the PICO as the baud rate on the
-        SPI bus can be set directly.
+      SPI clock is set in BetaFlight code by calling spiSetClkDivisor, which records a uint16_t value into a .speed field.
+      In order to maintain this code (for simplicity), record the prescale and postdiv numbers as calculated in
+      pico-sdk/src/rp2_common/hardware_spi.c: spi_set_baudrate()
 
-        In anycase max SPI clock is half the system clock frequency.
-        Therefore the minimum divider is 2.
+      prescale and postdiv are in range 1..255 and are packed into the return value.
     */
-    return MAX(2, (((clock_get_hz(clk_sys) + (freq / 2)) / freq) + 1) & ~1);
+
+    uint32_t spiClock = clock_get_hz(clk_peri);
+    uint32_t prescale, postdiv;
+    // Find smallest prescale value which puts output frequency in range of
+    // post-divide. Prescale is an even number from 2 to 254 inclusive.
+    for (prescale = 2; prescale <= 254; prescale += 2) {
+        if (spiClock < prescale * 256 * (uint64_t) freq)
+            break;
+    }
+    if (prescale > 254) {
+      prescale = 254;
+    }
+
+    // Find largest post-divide which makes output <= freq. Post-divide is
+    // an integer in the range 1 to 256 inclusive.
+    for (postdiv = 256; postdiv > 1; --postdiv) {
+        if (spiClock / (prescale * (postdiv - 1)) > freq)
+            break;
+    }
+
+    // Store prescale, (postdiv - 1), both in range 0 to 255.
+    return (uint16_t)((prescale << 8) + (postdiv - 1));
 }
+
+uint32_t spiCalculateClock(uint16_t speed)
+{
+    /*
+      speed contains packed values of prescale and postdiv.
+      Retrieve a frequency which will recreate the same prescale and postdiv on a call to spi_set_baudrate().
+    */
+    uint32_t spiClock = clock_get_hz(clk_peri);
+    uint32_t prescale = speed >> 8;
+    uint32_t postdivMinusOne = speed & 0xFF;
+
+    // Set freq to reverse the calculation, so that we would end up with the same prescale and postdiv,
+    // hence the same frequency as if we had requested directly from spiCalculateDivider().
+    uint32_t freq = 1 + (spiClock/prescale)/(postdivMinusOne + 1);
+
+    return freq;
+}
+
+static void spiSetClockFromSpeed(spi_inst_t *spi, uint16_t speed)
+{
+    uint32_t freq = spiCalculateClock(speed);
+    spi_set_baudrate(spi, freq);
+}
+
 #endif
