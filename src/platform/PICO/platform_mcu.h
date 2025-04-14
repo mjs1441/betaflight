@@ -19,9 +19,26 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 #pragma once
 
+#include "RP2350.h"
+
+// Can't include hardware/regs/addressmap.h (which would be via #include "pico.h"),
+// because it would redefine e.g. SYSINFO_BASE (defined in RP2350.h).
+// Extract the required definitions and prevent addressmap.h from being processed.
+
+// Register address offsets for atomic RMW aliases
+#define REG_ALIAS_RW_BITS  (_u(0x0) << _u(12))
+#define REG_ALIAS_XOR_BITS (_u(0x1) << _u(12))
+#define REG_ALIAS_SET_BITS (_u(0x2) << _u(12))
+#define REG_ALIAS_CLR_BITS (_u(0x3) << _u(12))
+
 #define _ADDRESSMAP_H
+
+#include "pico/stdlib.h"
+#include "hardware/spi.h"
+#include "hardware/dma.h"
 
 #define NVIC_PriorityGroup_2         0x500
 
@@ -30,18 +47,6 @@
 #define SPI_IO_AF_SCK_CFG_LOW   0
 #define SPI_IO_AF_SDI_CFG       0
 #define SPI_IO_CS_CFG           0
-
-// Register address offsets for atomic RMW aliases
-#define REG_ALIAS_RW_BITS  (_u(0x0) << _u(12))
-#define REG_ALIAS_XOR_BITS (_u(0x1) << _u(12))
-#define REG_ALIAS_SET_BITS (_u(0x2) << _u(12))
-#define REG_ALIAS_CLR_BITS (_u(0x3) << _u(12))
-
-#include "RP2350.h"
-
-#include "pico/stdlib.h"
-#include "hardware/spi.h"
-#include "hardware/dma.h"
 
 
 #if defined(RP2350A) || defined(RP2350B)
