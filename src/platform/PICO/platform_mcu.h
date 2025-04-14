@@ -43,14 +43,6 @@
 #include "hardware/spi.h"
 #include "hardware/dma.h"
 
-#ifdef SPI0
-#undef SPI0
-#endif
-#ifdef SPI1
-#undef SPI1
-#endif
-#define SPI0 spi0
-#define SPI1 spi1
 
 #if defined(RP2350A) || defined(RP2350B)
 
@@ -65,7 +57,7 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
 #define DMA_TypeDef          void*
 #define DMA_InitTypeDef      void*
 //#define DMA_Channel_TypeDef
-#define SPI_TypeDef          spi_inst_t
+#define SPI_TypeDef          void
 #define ADC_TypeDef          void*
 #define USART_TypeDef        uart_inst_t
 #define TIM_OCInitTypeDef    void*
@@ -80,11 +72,9 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
 //#define EXTI_InitTypeDef
 //#define IRQn_Type           void*
 
-//#define SPI_INST(spi) ((spi_inst_t *)(spi))
-
 // SPI_INST to go from SPI_TypeDef to spi_inst_t,
-// but SPI_TypeDef is spi_inst_t by definition
-#define SPI_INST(spi) (spi)
+// If SPI_TypeDef is void, this doesn't really add anything in terms of tytpe safety
+#define SPI_INST(spi) ((spi_inst_t *)(spi))
 
 
 #endif
