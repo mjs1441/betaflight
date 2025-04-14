@@ -38,9 +38,19 @@
 #define REG_ALIAS_CLR_BITS (_u(0x3) << _u(12))
 
 #include "RP2350.h"
+
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 #include "hardware/dma.h"
+
+#ifdef SPI0
+#undef SPI0
+#endif
+#ifdef SPI1
+#undef SPI1
+#endif
+#define SPI0 spi0
+#define SPI1 spi1
 
 #if defined(RP2350A) || defined(RP2350B)
 
@@ -55,7 +65,7 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
 #define DMA_TypeDef          void*
 #define DMA_InitTypeDef      void*
 //#define DMA_Channel_TypeDef
-#define SPI_TypeDef          SPI0_Type
+#define SPI_TypeDef          spi_inst_t
 #define ADC_TypeDef          void*
 #define USART_TypeDef        uart_inst_t
 #define TIM_OCInitTypeDef    void*
@@ -70,7 +80,11 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
 //#define EXTI_InitTypeDef
 //#define IRQn_Type           void*
 
-#define SPI_INST(spi) ((spi_inst_t *)(spi))
+//#define SPI_INST(spi) ((spi_inst_t *)(spi))
+
+// SPI_INST to go from SPI_TypeDef to spi_inst_t,
+// but SPI_TypeDef is spi_inst_t by definition
+#define SPI_INST(spi) (spi)
 
 
 #endif
