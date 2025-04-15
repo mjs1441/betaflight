@@ -106,10 +106,6 @@ bool spiInit(SPIDevice device)
     switch (device) {
     case SPIINVALID:
 
-#if !defined(USE_SPI_DEVICE_0)
-    case SPIDEV_0:
-#endif
-
 #if !defined(USE_SPI_DEVICE_1)
     case SPIDEV_1:
 #endif
