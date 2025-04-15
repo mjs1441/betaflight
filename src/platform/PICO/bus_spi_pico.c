@@ -50,7 +50,7 @@
 
 #include "pg/bus_spi.h"
 
-#define SPI_SPEED_20MHZ 2000000
+#define SPI_SPEED_20MHZ 20000000
 
 const spiHardware_t spiHardware[] = {
 #ifdef RP2350B
