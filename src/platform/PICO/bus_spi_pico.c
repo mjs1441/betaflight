@@ -240,7 +240,7 @@ void spiInternalResetStream(dmaChannelDescriptor_t *descriptor)
     UNUSED(descriptor);
 }
 
-static bool spiInternalReadWriteBufPolled(SPI_TypeDef *instance, const uint8_t *txData, uint8_t *rxData, int len)
+bool spiInternalReadWriteBufPolled(SPI_TypeDef *instance, const uint8_t *txData, uint8_t *rxData, int len)
 {
     // TODO optimise with 16-bit transfers as per stm bus_spi_ll code
     int bytesProcessed = spi_write_read_blocking(instance, txData, rxData, len);
@@ -258,7 +258,7 @@ void spiInternalInitStream(const extDevice_t *dev, bool preInit)
     dev->bus->dmaTx->channel = dma_tx;
     dev->bus->dmaRx->channel = dma_rx;
     dev->bus->dmaTx->irqHandlerCallback = NULL;
-    dev->bus->dmaRx->irqHandlerCallback = spiInternalResetStream;
+    dev->bus->dmaRx->irqHandlerCallback = spiInternalResetStream; // TODO
 
     const spiDevice_t *spi = &spiDevice[spiDeviceByInstance(dev->bus->busType_u.spi.instance)];
     dma_channel_config config = dma_channel_get_default_config(dma_tx);
@@ -337,10 +337,13 @@ void spiSequenceStart(const extDevice_t *dev)
 
     // Use DMA if possible
     // If there are more than one segments, or a single segment with negateCS negated in the list terminator then force DMA irrespective of length
-    bool useDMA = bus->useDMA && dmaSafe && ((segmentCount > 1) ||
-                                             (xferLen >= SPI_DMA_THRESHOLD) ||
-                                             !bus->curSegment[segmentCount].negateCS);
-    spiProcessSegments(dev, useDMA, spiInternalReadWriteBufPolled);
+    if (bus->useDMA && dmaSafe && ((segmentCount > 1) ||
+                                   (xferLen >= SPI_DMA_THRESHOLD) ||
+                                   !bus->curSegment[segmentCount].negateCS)) {
+        spiProcessSegmentsDMA(dev);
+    } else {
+        spiProcessSegmentsPolled(dev);
+    }
 }
 
 uint16_t spiCalculateDivider(uint32_t freq)
