@@ -33,6 +33,7 @@
 #include "platform.h"
 
 #ifdef USE_SPI
+#define TESTING_NO_DMA 1
 
 #include "common/maths.h"
 #include "drivers/bus.h"
@@ -51,6 +52,8 @@
 #include "pg/bus_spi.h"
 
 #define SPI_SPEED_20MHZ 20000000
+#define SPI_DATAWIDTH 8
+#define SPI_DMA_THRESHOLD 8
 
 const spiHardware_t spiHardware[] = {
 #ifdef RP2350B
@@ -237,6 +240,13 @@ void spiInternalResetStream(dmaChannelDescriptor_t *descriptor)
     UNUSED(descriptor);
 }
 
+static bool spiInternalReadWriteBufPolled(SPI_TypeDef *instance, const uint8_t *txData, uint8_t *rxData, int len)
+{
+    // TODO optimise with 16-bit transfers as per stm bus_spi_ll code
+    int bytesProcessed = spi_write_read_blocking(instance, txData, rxData, len);
+    return bytesProcessed == len;
+}
+
 // Initialise DMA before first segment transfer
 void spiInternalInitStream(const extDevice_t *dev, bool preInit)
 {
@@ -267,14 +277,14 @@ void spiInternalInitStream(const extDevice_t *dev, bool preInit)
 // Start DMA transfer for the current segment
 void spiInternalStartDMA(const extDevice_t *dev)
 {
-    // TODO check correct len + 1 => len
+    // TODO check correct, was len + 1 now len
     dma_channel_set_trans_count(dev->bus->dmaTx->channel, dev->bus->curSegment->len, false);
     dma_channel_set_trans_count(dev->bus->dmaRx->channel, dev->bus->curSegment->len, false);
 
     dma_channel_start(dev->bus->dmaTx->channel);
     dma_channel_start(dev->bus->dmaRx->channel);
 }
-
+    
 // DMA transfer setup and start
 void spiSequenceStart(const extDevice_t *dev)
 {
@@ -283,8 +293,11 @@ void spiSequenceStart(const extDevice_t *dev)
   
     busDevice_t *bus = dev->bus;
     spi_inst_t *instance = SPI_INST(bus->busType_u.spi.instance);
-    ////////    spiDevice_t *spi = &spiDevice[spiDeviceByInstance(instance)];
+    spiDevice_t *spi = &spiDevice[spiDeviceByInstance(instance)];
     bool dmaSafe = dev->useDMA;
+#if TESTING_NO_DMA
+    dmaSafe = false;
+#endif
     uint32_t xferLen = 0;
     uint32_t segmentCount = 0;
 
@@ -298,174 +311,42 @@ void spiSequenceStart(const extDevice_t *dev)
         bus->busType_u.spi.speed = dev->busType_u.spi.speed;
     }
 
-    #if 1
-    UNUSED(segmentCount);
-    UNUSED(xferLen);
-    UNUSED(dmaSafe);
-    #else
     // Switch SPI clock polarity/phase if necessary
     if (dev->busType_u.spi.leadingEdge != bus->busType_u.spi.leadingEdge) {
+        uint8_t sckPin = IO_PINBYTAG(spi->sck);
+        gpio_set_slew_rate(sckPin, GPIO_SLEW_RATE_FAST);
+        // Betaflight busDevice / SPI supports modes 0 (leadingEdge True), 3 (leadingEdge False)
+        // 0: (CPOL 0, CPHA 0)
+        // 3: (CPOL 1, CPHA 1)
         if (dev->busType_u.spi.leadingEdge) {
-            IOConfigGPIOAF(IOGetByTag(spi->sck), SPI_IO_AF_SCK_CFG_LOW, spi->sckAF);
-            LL_SPI_SetClockPhase(instance, LL_SPI_PHASE_1EDGE);
-            LL_SPI_SetClockPolarity(instance, LL_SPI_POLARITY_LOW);
+            spi_set_format(instance, SPI_DATAWIDTH, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
         }
         else {
-            IOConfigGPIOAF(IOGetByTag(spi->sck), SPI_IO_AF_SCK_CFG_HIGH, spi->sckAF);
-            LL_SPI_SetClockPhase(instance, LL_SPI_PHASE_2EDGE);
-            LL_SPI_SetClockPolarity(instance, LL_SPI_POLARITY_HIGH);
+            spi_set_format(instance, SPI_DATAWIDTH, SPI_CPOL_1, SPI_CPHA_1, SPI_MSB_FIRST);
         }
 
         bus->busType_u.spi.leadingEdge = dev->busType_u.spi.leadingEdge;
     }
 
-#if !defined(STM32H7)
-    LL_SPI_Enable(instance);
-#endif
-
-    /* Where data is being read into a buffer which is cached, where the start or end of that
-     * buffer is not cache aligned, there is a risk of corruption of other data in that cache line.
-     * After the read is complete, the cache lines covering the structure will be invalidated to ensure
-     * that the processor sees the read data, not what was in cache previously. Unfortunately if
-     * there is any other data in the area covered by those cache lines, at the start or end of the
-     * buffer, it too will be invalidated, so had the processor written to those locations during the DMA
-     * operation those written values will be lost.
-     */
-
-    // Check that any reads are cache aligned and of multiple cache lines in length
+    // NB for RP2350 targets, heap and stack will be in SRAM (single-cycle),
+    // so there are no cache issues with DMA.
     for (busSegment_t *checkSegment = (busSegment_t *)bus->curSegment; checkSegment->len; checkSegment++) {
-        // Check there is no receive data as only transmit DMA is available
-        if ((checkSegment->u.buffers.rxData) && (bus->dmaRx == (dmaChannelDescriptor_t *)NULL)) {
-            dmaSafe = false;
-            break;
-        }
-#ifdef STM32H7
-        // Check if RX data can be DMAed
-        if ((checkSegment->u.buffers.rxData) &&
-            // DTCM can't be accessed by DMA1/2 on the H7
-            (IS_DTCM(checkSegment->u.buffers.rxData) ||
-             // Memory declared as DMA_RAM will have an address between &_dmaram_start__ and &_dmaram_end__
-             (((checkSegment->u.buffers.rxData < &_dmaram_start__) || (checkSegment->u.buffers.rxData >= &_dmaram_end__)) &&
-             (((uint32_t)checkSegment->u.buffers.rxData & (CACHE_LINE_SIZE - 1)) || (checkSegment->len & (CACHE_LINE_SIZE - 1)))))) {
-            dmaSafe = false;
-            break;
-        }
-        // Check if TX data can be DMAed
-        else if ((checkSegment->u.buffers.txData) && IS_DTCM(checkSegment->u.buffers.txData)) {
-            dmaSafe = false;
-            break;
-        }
-#elif defined(STM32F7)
-        if ((checkSegment->u.buffers.rxData) &&
-            // DTCM is accessible and uncached on the F7
-            (!IS_DTCM(checkSegment->u.buffers.rxData) &&
-            (((uint32_t)checkSegment->u.buffers.rxData & (CACHE_LINE_SIZE - 1)) || (checkSegment->len & (CACHE_LINE_SIZE - 1))))) {
-            dmaSafe = false;
-            break;
-        }
-#elif defined(STM32G4)
-        // Check if RX data can be DMAed
-        if ((checkSegment->u.buffers.rxData) &&
-            // CCM can't be accessed by DMA1/2 on the G4
-            IS_CCM(checkSegment->u.buffers.rxData)) {
-            dmaSafe = false;
-            break;
-        }
-        if ((checkSegment->u.buffers.txData) &&
-            // CCM can't be accessed by DMA1/2 on the G4
-            IS_CCM(checkSegment->u.buffers.txData)) {
-            dmaSafe = false;
-            break;
-        }
-#endif
-        // Note that these counts are only valid if dmaSafe is true
         segmentCount++;
         xferLen += checkSegment->len;
     }
 
     // Use DMA if possible
     // If there are more than one segments, or a single segment with negateCS negated in the list terminator then force DMA irrespective of length
-    if (bus->useDMA && dmaSafe && ((segmentCount > 1) ||
-                                   (xferLen >= SPI_DMA_THRESHOLD) ||
-                                   !bus->curSegment[segmentCount].negateCS)) {
-        // Intialise the init structures for the first transfer
-        spiInternalInitStream(dev, false);
-
-        // Assert Chip Select
-        IOLo(dev->busType_u.spi.csnPin);
-
-        // Start the transfers
-        spiInternalStartDMA(dev);
-    } else {
-        busSegment_t *lastSegment = NULL;
-        bool segmentComplete;
-
-        // Manually work through the segment list performing a transfer for each
-        while (bus->curSegment->len) {
-            if (!lastSegment || lastSegment->negateCS) {
-                // Assert Chip Select if necessary - it's costly so only do so if necessary
-                IOLo(dev->busType_u.spi.csnPin);
-            }
-
-            spiInternalReadWriteBufPolled(
-                    bus->busType_u.spi.instance,
-                    bus->curSegment->u.buffers.txData,
-                    bus->curSegment->u.buffers.rxData,
-                    bus->curSegment->len);
-
-            if (bus->curSegment->negateCS) {
-                // Negate Chip Select
-                IOHi(dev->busType_u.spi.csnPin);
-            }
-
-            segmentComplete = true;
-            if (bus->curSegment->callback) {
-                switch(bus->curSegment->callback(dev->callbackArg)) {
-                case BUS_BUSY:
-                    // Repeat the last DMA segment
-                    segmentComplete = false;
-                    break;
-
-                case BUS_ABORT:
-                    bus->curSegment = (busSegment_t *)BUS_SPI_FREE;
-                    segmentComplete = false;
-                    return;
-
-                case BUS_READY:
-                default:
-                    // Advance to the next DMA segment
-                    break;
-                }
-            }
-            if (segmentComplete) {
-                lastSegment = (busSegment_t *)bus->curSegment;
-                bus->curSegment++;
-            }
-        }
-
-        // If a following transaction has been linked, start it
-        if (bus->curSegment->u.link.dev) {
-            busSegment_t *endSegment = (busSegment_t *)bus->curSegment;
-            const extDevice_t *nextDev = endSegment->u.link.dev;
-            busSegment_t *nextSegments = (busSegment_t *)endSegment->u.link.segments;
-            bus->curSegment = nextSegments;
-            endSegment->u.link.dev = NULL;
-            endSegment->u.link.segments = NULL;
-            spiSequenceStart(nextDev);
-        } else {
-            // The end of the segment list has been reached, so mark transactions as complete
-            bus->curSegment = (busSegment_t *)BUS_SPI_FREE;
-        }
-    }
-
-    #endif 
-   UNUSED(dev);
+    bool useDMA = bus->useDMA && dmaSafe && ((segmentCount > 1) ||
+                                             (xferLen >= SPI_DMA_THRESHOLD) ||
+                                             !bus->curSegment[segmentCount].negateCS);
+    spiProcessSegments(dev, useDMA, spiInternalReadWriteBufPolled);
 }
 
 uint16_t spiCalculateDivider(uint32_t freq)
 {
     /*
-      SPI clock is set in BetaFlight code by calling spiSetClkDivisor, which records a uint16_t value into a .speed field.
+      SPI clock is set in Betaflight code by calling spiSetClkDivisor, which records a uint16_t value into a .speed field.
       In order to maintain this code (for simplicity), record the prescale and postdiv numbers as calculated in
       pico-sdk/src/rp2_common/hardware_spi.c: spi_set_baudrate()
 

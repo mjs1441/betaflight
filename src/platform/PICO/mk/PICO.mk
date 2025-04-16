@@ -23,6 +23,7 @@ STDPERIPH_SRC  := \
             rp2_common/hardware_timer/timer.c \
             rp2_common/hardware_clocks/clocks.c \
             rp2_common/hardware_pll/pll.c \
+            rp2_common/hardware_dma/dma.c \
             rp2_common/hardware_spi/spi.c \
             rp2_common/hardware_i2c/i2c.c \
             rp2_common/hardware_adc/adc.c \
