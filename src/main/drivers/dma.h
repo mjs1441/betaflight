@@ -69,5 +69,5 @@ void dmaSetHandler(dmaIdentifier_e identifier, dmaCallbackHandlerFuncPtr callbac
 dmaIdentifier_e dmaGetIdentifier(const dmaResource_t* channel);
 const resourceOwner_t *dmaGetOwner(dmaIdentifier_e identifier);
 dmaChannelDescriptor_t* dmaGetDescriptorByIdentifier(const dmaIdentifier_e identifier);
-uint32_t dmaGetChannel(const uint8_t channel);
+// UNUSED uint32_t dmaGetChannel(const uint8_t channel);
 
