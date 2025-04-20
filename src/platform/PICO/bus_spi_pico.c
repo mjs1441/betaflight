@@ -258,7 +258,7 @@ void spiInternalInitStream(const extDevice_t *dev, bool preInit)
     dev->bus->dmaTx->channel = dma_tx;
     dev->bus->dmaRx->channel = dma_rx;
     dev->bus->dmaTx->irqHandlerCallback = NULL;
-    dev->bus->dmaRx->irqHandlerCallback = spiInternalResetStream; // TODO
+    dev->bus->dmaRx->irqHandlerCallback = spiInternalResetStream; // TODO: implement - correct callback
 
     const spiDevice_t *spi = &spiDevice[spiDeviceByInstance(dev->bus->busType_u.spi.instance)];
     dma_channel_config config = dma_channel_get_default_config(dma_tx);
