@@ -181,7 +181,7 @@ OPTIMISE_SPEED  = -O2
 ###STDPERIPH_SRC += \
 ###            common/RP2350/pico_platform/platform.c
 
-STDPERIPH_SRC += \
+STDPERIPH_SRC_blah = \
               common/pico_sync/sem.c \
               common/pico_time/timeout_helper.c \
               common/pico_util/datetime.c \
@@ -210,6 +210,10 @@ STDPERIPH_SRC += \
 #              rp2_common/pico_standard_binary_info/standard_binary_info.c \
               rp2_common/pico_stdio_uart/stdio_uart.c \
               rp2_common/pico_stdlib/stdlib.c
+
+STDPERIPH_SRC += \
+              rp2_common/pico_stdio_uart/stdio_uart.c
+
 
 MCU_SRC += \
             system_RP2350.c

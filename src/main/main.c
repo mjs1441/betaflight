@@ -26,11 +26,14 @@
 #include "fc/init.h"
 
 #include "scheduler/scheduler.h"
+#include <stdio.h>
 
 void run(void);
 
 int main(int argc, char * argv[])
 {
+    stdio_init_all();
+    printf("hi\n");
 #ifdef SIMULATOR_BUILD
     targetParseArgs(argc, argv);
 #else
