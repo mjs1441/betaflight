@@ -23,7 +23,7 @@
 
 MEMORY
 {
-    INCLUDE "pico_flash_region.ld"
+    FLASH (rx)        : ORIGIN = 0x10008000, LENGTH = 992K
     RAM(rwx) : ORIGIN =  0x20000000, LENGTH = 512k
     SCRATCH_X(rwx) : ORIGIN = 0x20080000, LENGTH = 4k
     SCRATCH_Y(rwx) : ORIGIN = 0x20081000, LENGTH = 4k
@@ -298,5 +298,14 @@ SECTIONS
     ASSERT( __embedded_block_end - __logical_binary_start <= 4096, "Embedded block must be in first 4096 bytes of the binary")
 
     /* todo assert on extra code */
+
+  /* Remove information from the standard libraries */
+  /DISCARD/ :
+  {
+    libc.a ( * )
+    libm.a ( * )
+    libgcc.a ( * )
+  }
+
 }
 

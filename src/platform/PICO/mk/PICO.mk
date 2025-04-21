@@ -212,7 +212,8 @@ STDPERIPH_SRC_blah = \
               rp2_common/pico_stdlib/stdlib.c
 
 STDPERIPH_SRC += \
-              rp2_common/pico_stdio_uart/stdio_uart.c
+              rp2_common/pico_stdio_uart/stdio_uart.c \
+              rp2_common/pico_bootrom/bootrom.c 
 
 
 MCU_SRC += \
