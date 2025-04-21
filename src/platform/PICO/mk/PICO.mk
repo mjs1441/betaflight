@@ -51,9 +51,6 @@ TINYUSB_SRC := \
 
 VPATH := $(VPATH):$(STDPERIPH_DIR)
 
-DEVICE_STDPERIPH_SRC := \
-            $(STDPERIPH_SRC) \
-            $(TINYUSB_SRC)
 
 ifeq ($(TARGET_MCU),RP2350B)
 TARGET_MCU_LIB_LOWER = rp2350
@@ -181,8 +178,38 @@ MCU_FLASH_SIZE  = 4096
 # Performance is only slightly affected but around 50 kB of flash are saved.
 OPTIMISE_SPEED  = -O2
 
+###STDPERIPH_SRC += \
+###            common/RP2350/pico_platform/platform.c
+
 STDPERIPH_SRC += \
-            common/RP2350/pico_platform/platform.c
+              common/pico_sync/sem.c \
+              common/pico_time/timeout_helper.c \
+              common/pico_util/datetime.c \
+              common/pico_util/pheap.c \
+              common/pico_util/queue.c \
+              rp2350/pico_platform/platform.c \
+              rp2_common/hardware_boot_lock/boot_lock.c \
+              rp2_common/hardware_divider/divider.c \
+              rp2_common/hardware_ticks/ticks.c \
+              rp2_common/hardware_vreg/vreg.c \
+              rp2_common/hardware_xosc/xosc.c \
+              rp2_common/pico_atomic/atomic.c \
+              rp2_common/pico_bootrom/bootrom.c \
+              rp2_common/pico_bootrom/bootrom_lock.c \
+              rp2_common/pico_clib_interface/newlib_interface.c \
+              rp2_common/pico_divider/divider_compiler.c \
+              rp2_common/pico_double/double_math.c \
+              rp2_common/pico_flash/flash.c \
+              rp2_common/pico_float/float_math.c \
+              rp2_common/pico_malloc/malloc.c \
+              rp2_common/pico_printf/printf.c \
+              rp2_common/pico_runtime_init/runtime_init.c \
+              rp2_common/pico_runtime_init/runtime_init_clocks.c \
+              rp2_common/pico_runtime_init/runtime_init_stack_guard.c \
+              rp2_common/pico_runtime/runtime.c \
+#              rp2_common/pico_standard_binary_info/standard_binary_info.c \
+              rp2_common/pico_stdio_uart/stdio_uart.c \
+              rp2_common/pico_stdlib/stdlib.c
 
 MCU_SRC += \
             system_RP2350.c
@@ -218,3 +245,7 @@ MCU_COMMON_SRC = \
             PICO/usb/usb_descriptors.c
 
 DEVICE_FLAGS +=
+
+DEVICE_STDPERIPH_SRC := \
+            $(STDPERIPH_SRC) \
+            $(TINYUSB_SRC)

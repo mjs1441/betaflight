@@ -1,3 +1,4 @@
+#if 1
 /*
  * This file is part of Betaflight.
  *
@@ -82,3 +83,5 @@ int _write(int handle, char *buffer, int length)
     UNUSED(length);
     return -1;
 }
+
+#endif
