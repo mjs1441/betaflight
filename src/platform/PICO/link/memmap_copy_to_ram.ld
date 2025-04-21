@@ -33,6 +33,11 @@ ENTRY(_entry_point)
 
 SECTIONS
 {
+    /* Second stage bootloader is prepended to the image. It must be 256 bytes big
+       and checksummed. It is usually built by the boot_stage2 target
+       in the Raspberry Pi Pico SDK
+    */
+
     .flash_begin : {
         __flash_binary_start = .;
     } > FLASH
@@ -47,7 +52,7 @@ SECTIONS
        cold boot.
     */
 
-    .text : {
+    .flashtext : {
         __logical_binary_start = .;
         KEEP (*(.vectors))
         KEEP (*(.binary_info_header))
@@ -55,48 +60,6 @@ SECTIONS
         KEEP (*(.embedded_block))
         __embedded_block_end = .;
         KEEP (*(.reset))
-        /* TODO revisit this now memset/memcpy/float in ROM */
-        /* bit of a hack right now to exclude all floating point and time critical (e.g. memset, memcpy) code from
-         * FLASH ... we will include any thing excluded here in .data below by default */
-        *(.init)
-        *libgcc.a:cmse_nonsecure_call.o
-        *(EXCLUDE_FILE(*libgcc.a: *libc.a:*lib_a-mem*.o *libm.a:) .text*)
-        *(.fini)
-        /* Pull all c'tors into .text */
-        *crtbegin.o(.ctors)
-        *crtbegin?.o(.ctors)
-        *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
-        *(SORT(.ctors.*))
-        *(.ctors)
-        /* Followed by destructors */
-        *crtbegin.o(.dtors)
-        *crtbegin?.o(.dtors)
-        *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
-        *(SORT(.dtors.*))
-        *(.dtors)
-
-        . = ALIGN(4);
-        /* preinit data */
-        PROVIDE_HIDDEN (__preinit_array_start = .);
-        KEEP(*(SORT(.preinit_array.*)))
-        KEEP(*(.preinit_array))
-        PROVIDE_HIDDEN (__preinit_array_end = .);
-
-        . = ALIGN(4);
-        /* init data */
-        PROVIDE_HIDDEN (__init_array_start = .);
-        KEEP(*(SORT(.init_array.*)))
-        KEEP(*(.init_array))
-        PROVIDE_HIDDEN (__init_array_end = .);
-
-        . = ALIGN(4);
-        /* finit data */
-        PROVIDE_HIDDEN (__fini_array_start = .);
-        *(SORT(.fini_array.*))
-        *(.fini_array)
-        PROVIDE_HIDDEN (__fini_array_end = .);
-
-        *(.eh_frame*)
         . = ALIGN(4);
     } > FLASH
 
@@ -122,9 +85,7 @@ SECTIONS
         "ERROR: Pico second stage bootloader must be no more than 256 bytes in size")
 
     .rodata : {
-        *(EXCLUDE_FILE(*libgcc.a: *libc.a:*lib_a-mem*.o *libm.a:) .rodata*)
-        *(.srodata*)
-        . = ALIGN(4);
+        /* segments not marked as .flashdata are instead pulled into .data (in RAM) to avoid accidental flash accesses */
         *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.flashdata*)))
         . = ALIGN(4);
     } > FLASH
@@ -152,6 +113,7 @@ SECTIONS
     __binary_info_end = .;
     . = ALIGN(4);
 
+    /* Vector table goes first in RAM, to avoid large alignment hole */
     .ram_vector_table (NOLOAD): {
         *(.ram_vector_table)
     } > RAM
@@ -161,16 +123,40 @@ SECTIONS
         *(.uninitialized_data*)
     } > RAM
 
+    .text : {
+        __ram_text_start__ = .;
+        *(.init)
+        *(.text*)
+        *(.fini)
+        /* Pull all c'tors into .text */
+        *crtbegin.o(.ctors)
+        *crtbegin?.o(.ctors)
+        *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
+        *(SORT(.ctors.*))
+        *(.ctors)
+        /* Followed by destructors */
+        *crtbegin.o(.dtors)
+        *crtbegin?.o(.dtors)
+        *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
+        *(SORT(.dtors.*))
+        *(.dtors)
+
+        *(.eh_frame*)
+        . = ALIGN(4);
+        __ram_text_end__ = .;
+    } > RAM AT> FLASH
+    __ram_text_source__ = LOADADDR(.text);
+    . = ALIGN(4);
+
     .data : {
         __data_start__ = .;
         *(vtable)
 
         *(.time_critical*)
 
-        /* remaining .text and .rodata; i.e. stuff we exclude above because we want it in RAM */
-        *(.text*)
         . = ALIGN(4);
         *(.rodata*)
+        *(.srodata*)
         . = ALIGN(4);
 
         *(.data*)
@@ -184,6 +170,27 @@ SECTIONS
         KEEP(*(SORT(.mutex_array.*)))
         KEEP(*(.mutex_array))
         PROVIDE_HIDDEN (__mutex_array_end = .);
+
+        . = ALIGN(4);
+        /* preinit data */
+        PROVIDE_HIDDEN (__preinit_array_start = .);
+        KEEP(*(SORT(.preinit_array.*)))
+        KEEP(*(.preinit_array))
+        PROVIDE_HIDDEN (__preinit_array_end = .);
+
+        . = ALIGN(4);
+        /* init data */
+        PROVIDE_HIDDEN (__init_array_start = .);
+        KEEP(*(SORT(.init_array.*)))
+        KEEP(*(.init_array))
+        PROVIDE_HIDDEN (__init_array_end = .);
+
+        . = ALIGN(4);
+        /* finit data */
+        PROVIDE_HIDDEN (__fini_array_start = .);
+        *(SORT(.fini_array.*))
+        *(.fini_array)
+        PROVIDE_HIDDEN (__fini_array_end = .);
 
         *(.jcr)
         . = ALIGN(4);
@@ -210,7 +217,7 @@ SECTIONS
         __tls_end = .;
     } > RAM
 
-    .bss (NOLOAD) : {
+    .bss  : {
         . = ALIGN(4);
         __tbss_end = .;
 
