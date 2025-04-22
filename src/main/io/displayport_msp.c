@@ -207,8 +207,11 @@ displayPort_t *displayPortMspInit(void)
 #endif
 
     if (vcdProfile()->video_system == VIDEO_SYSTEM_HD) {
+#ifdef USE_OSD
+        // TODO: Debug testing
         mspDisplayPort.rows = osdConfig()->canvas_rows;
         mspDisplayPort.cols = osdConfig()->canvas_cols;
+#endif
     } else {
         const uint8_t displayRows = (vcdProfile()->video_system == VIDEO_SYSTEM_PAL) ? VIDEO_LINES_PAL : VIDEO_LINES_NTSC;
         mspDisplayPort.rows = displayRows + displayPortProfileMsp()->rowAdjust;
