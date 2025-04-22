@@ -213,7 +213,8 @@ STDPERIPH_SRC_blah = \
 
 STDPERIPH_SRC += \
               rp2_common/pico_stdio_uart/stdio_uart.c \
-              rp2_common/pico_bootrom/bootrom.c 
+              rp2_common/pico_bootrom/bootrom.c \
+              rp2_common/pico_crt0/crt0.S
 
 
 MCU_SRC += \
@@ -224,6 +225,8 @@ $(error Unknown MCU for Raspberry PICO target)
 endif
 
 DEVICE_FLAGS    += -DHSE_VALUE=$(HSE_VALUE) -DPICO
+
+DEVICE_FLAGS    += -DPICO_STDIO_TEST
 
 MCU_COMMON_SRC = \
             drivers/accgyro/accgyro_mpu.c \

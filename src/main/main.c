@@ -32,7 +32,9 @@ void run(void);
 
 int main(int argc, char * argv[])
 {
+#ifdef PICO_STDIO_TEST
     stdio_init_all();
+#endif
     printf("hi\n");
 #ifdef SIMULATOR_BUILD
     targetParseArgs(argc, argv);
