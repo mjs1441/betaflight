@@ -23,7 +23,9 @@
 
 MEMORY
 {
-    FLASH (rx)        : ORIGIN = 0x10000000, LENGTH = 992K
+    /* TODO: Assuming for now that target has >= 1MB boot flash */
+    FLASH (rx)        : ORIGIN = 0x10000000, LENGTH = 960K
+    FLASH_CONFIG (r)  : ORIGIN = 0x100F0000, LENGTH = 16K
     RAM(rwx) : ORIGIN =  0x20000000, LENGTH = 512k
     SCRATCH_X(rwx) : ORIGIN = 0x20080000, LENGTH = 4k
     SCRATCH_Y(rwx) : ORIGIN = 0x20081000, LENGTH = 4k
@@ -267,10 +269,34 @@ SECTIONS
         KEEP(*(.stack*))
     } > SCRATCH_Y
 
+    /* keep embedded end block as final entry into FLASH 
+     * - helps protect against partial/corrupt load into flash
+     */
     .flash_end : {
         KEEP(*(.embedded_end_block*))
         PROVIDE(__flash_binary_end = .);
     } > FLASH =0xaa
+
+
+    /* Base address where the config is stored. */
+    __config_start = ORIGIN(FLASH_CONFIG);
+    __config_end = ORIGIN(FLASH_CONFIG) + LENGTH(FLASH_CONFIG);
+
+    .pg_registry :
+    {
+      PROVIDE_HIDDEN (__pg_registry_start = .);
+      KEEP (*(.pg_registry))
+      KEEP (*(SORT(.pg_registry.*)))
+      PROVIDE_HIDDEN (__pg_registry_end = .);
+    } >FLASH_CONFIG
+
+    .pg_resetdata :
+    {
+      PROVIDE_HIDDEN (__pg_resetdata_start = .);
+      KEEP (*(.pg_resetdata))
+      PROVIDE_HIDDEN (__pg_resetdata_end = .);
+    } >FLASH_CONFIG
+
 
     /* stack limit is poorly named, but historically is maximum heap ptr */
     __StackLimit = ORIGIN(RAM) + LENGTH(RAM);
