@@ -42,6 +42,13 @@ void Default_Handler(void);
 // cycles per microsecond
 static uint32_t usTicks = 0;
 
+/////////////////////////////////////////////////
+
+
+// TODO: check: don't define functions here provided by pico-sdk crt0
+#if 0
+
+
 void (* const vector_table[])() __attribute__((section(".vectors"))) = {
     (void (*)())0x20000000, // Initial Stack Pointer
     Reset_Handler,           // Interrupt Handler for reset
@@ -89,6 +96,19 @@ void Default_Handler(void)
 {
     while (1); // Infinite loop on default handler
 }
+
+void __unhandled_user_irq(void)
+{
+    // TODO
+}
+
+
+/////////////////////
+
+#endif
+
+/////////////////////////////////////////////////////
+
 
 void systemReset(void)
 {
@@ -198,10 +218,6 @@ void failureMode(failureMode_e mode)
 #endif
 }
 
-void __unhandled_user_irq(void)
-{
-    // TODO
-}
 
 static void unusedPinInit(IO_t io)
 {
