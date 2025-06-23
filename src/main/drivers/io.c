@@ -51,6 +51,7 @@ void IOInit(IO_t io, resourceOwner_e owner, uint8_t index)
         return;
     }
     ioRec_t *ioRec = IO_Rec(io);
+    bprintf("IOInit %d owner %d index %d", IO_Pin(io), owner, index);
     ioRec->owner = owner;
     ioRec->index = index;
 }

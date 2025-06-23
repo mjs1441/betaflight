@@ -423,6 +423,17 @@ void init(void)
     EXTIInit();
 #endif
 
+#ifdef TEST_EEPROM
+    resetEEPROM();
+    systemReset();
+    delay(100);LED0_TOGGLE;delay(300);LED0_TOGGLE;
+    delay(100);LED0_TOGGLE;delay(300);LED0_TOGGLE;
+    delay(300);LED0_TOGGLE;delay(100);LED0_TOGGLE;
+    delay(300);LED0_TOGGLE;delay(100);LED0_TOGGLE;
+    delay(100);LED0_TOGGLE;delay(300);LED0_TOGGLE;
+    delay(100);LED0_TOGGLE;delay(300);LED0_TOGGLE;
+#endif
+
 #if defined(USE_BUTTONS)
 
     buttonsInit();
@@ -671,6 +682,7 @@ void init(void)
         if (isSystemConfigured()) {
             indicateFailure(FAILURE_MISSING_ACC, 2);
         }
+        bprintf("** failed sensorsAutodetect, setting ARMING_DISABLED_NO_GYRO ***");
         setArmingDisabled(ARMING_DISABLED_NO_GYRO);
     }
 
@@ -747,6 +759,7 @@ void init(void)
 
     failsafeInit();
 
+    bprintf("====== init.c -> rxInit");
     rxInit();
 
 #ifdef USE_GPS

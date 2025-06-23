@@ -387,6 +387,7 @@ static gyroSpiDetectFn_t gyroSpiDetectFnTable[] = {
 
 static bool detectSPISensorsAndUpdateDetectionResult(gyroDev_t *gyro, const gyroDeviceConfig_t *config)
 {
+    bprintf("accgyro_mpu: detectSPISensorsAndUpdateDetectionResult");
     if (!config->csnTag || !spiSetBusInstance(&gyro->dev, config->spiBus)) {
         return false;
     }
@@ -409,22 +410,26 @@ static bool detectSPISensorsAndUpdateDetectionResult(gyroDev_t *gyro, const gyro
     // May need a bitmap of hardware to detection function to do it right?
 
     for (size_t index = 0 ; gyroSpiDetectFnTable[index] ; index++) {
+        bprintf("detectSPISensors trying detectfn %d", index);
         uint8_t sensor = (gyroSpiDetectFnTable[index])(&gyro->dev);
         if (sensor != MPU_NONE) {
             gyro->mpuDetectionResult.sensor = sensor;
             busDeviceRegister(&gyro->dev);
+            bprintf("detectSPISensorsAndUpdateDetectionResult True");
             return true;
         }
     }
 
     // Detection failed, disable CS pin again
     ioPreinitByIO(gyro->dev.busType_u.spi.csnPin, IOCFG_IPU, PREINIT_PIN_STATE_HIGH);
+    bprintf("** detectSPISensorsAndUpdateDetectionResult False");
     return false;
 }
 #endif
 
 void mpuPreInit(const struct gyroDeviceConfig_s *config)
 {
+    bprintf("accgyro_mpu mpuPreInit");
 #ifdef USE_SPI_GYRO
     ioPreinitByTag(config->csnTag, IOCFG_IPU, PREINIT_PIN_STATE_HIGH);
 #else
@@ -434,6 +439,7 @@ void mpuPreInit(const struct gyroDeviceConfig_s *config)
 
 bool mpuDetect(gyroDev_t *gyro, const gyroDeviceConfig_t *config)
 {
+    bprintf("mpuDetect");
     static busDevice_t bus;
     gyro->dev.bus = &bus;
 

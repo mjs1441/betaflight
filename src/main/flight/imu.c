@@ -306,11 +306,23 @@ STATIC_UNIT_TESTED void imuUpdateEulerAngles(void)
        attitude.values.roll = lrintf(atan2_approx((+2.0f * (buffer.wx + buffer.yz)), (+1.0f - 2.0f * (buffer.xx + buffer.yy))) * (1800.0f / M_PIf));
        attitude.values.pitch = lrintf(((0.5f * M_PIf) - acos_approx(+2.0f * (buffer.wy - buffer.xz))) * (1800.0f / M_PIf));
        attitude.values.yaw = lrintf((-atan2_approx((+2.0f * (buffer.wz + buffer.xy)), (+1.0f - 2.0f * (buffer.yy + buffer.zz))) * (1800.0f / M_PIf)));
+/*
+  bprintf("imuUpdateEulerAngles HeadFreeMode to %d,%d,%d",
+               attitude.values.roll,
+               attitude.values.pitch,
+               attitude.values.yaw);
+*/
        imuAttitudeQuaternion = headfree; 
     } else {
        attitude.values.roll = lrintf(atan2_approx(rMat.m[2][1], rMat.m[2][2]) * (1800.0f / M_PIf));
        attitude.values.pitch = lrintf(((0.5f * M_PIf) - acos_approx(-rMat.m[2][0])) * (1800.0f / M_PIf));
        attitude.values.yaw = lrintf((-atan2_approx(rMat.m[1][0], rMat.m[0][0]) * (1800.0f / M_PIf)));
+/*
+  bprintf("imuUpdateEulerAngles Not HeadFreeMode to %d,%d,%d",
+               attitude.values.roll,
+               attitude.values.pitch,
+               attitude.values.yaw);
+*/
        imuAttitudeQuaternion = q; //using current q quaternion  for blackbox log
     }
 
@@ -638,6 +650,7 @@ static void updateGpsHeadingUsable(float groundspeedGain, float imuCourseError, 
 
 static void imuCalculateEstimatedAttitude(timeUs_t currentTimeUs)
 {
+//    bprintf("imuCalculateEstimatedAttitude");
 #if defined(SIMULATOR_BUILD) && defined(SIMULATOR_IMU_SYNC)
     // Simulator-based timing
     //  printf("[imu]deltaT = %u, imuDeltaT = %u, currentTimeUs = %u, micros64_real = %lu\n", deltaT, imuDeltaT, currentTimeUs, micros64_real());
@@ -742,6 +755,7 @@ static int calculateThrottleAngleCorrection(void)
 
 void imuUpdateAttitude(timeUs_t currentTimeUs)
 {
+//    bprintf("imuUpdateAttitude");
     if (sensors(SENSOR_ACC) && acc.isAccelUpdatedAtLeastOnce) {
         IMU_LOCK;
 #if defined(SIMULATOR_BUILD) && defined(SIMULATOR_IMU_SYNC)

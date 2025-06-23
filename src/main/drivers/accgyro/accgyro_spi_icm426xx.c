@@ -264,6 +264,7 @@ static void icm426xxSoftReset(const extDevice_t *dev)
 
 uint8_t icm426xxSpiDetect(const extDevice_t *dev)
 {
+    bprintf("icm426xxSpiDetect on %p",&dev->busType_u.spi);
     delay(1);                          // power-on time
     icm426xxSoftReset(dev);
     spiWriteReg(dev, ICM426XX_RA_PWR_MGMT0, 0x00);
@@ -302,11 +303,13 @@ uint8_t icm426xxSpiDetect(const extDevice_t *dev)
         }
     } while (attemptsRemaining--);
 
+    bprintf("returning %d after %d attempt(s)",icmDetected, 21-attemptsRemaining);
     return icmDetected;
 }
 
 void icm426xxAccInit(accDev_t *acc)
 {
+    bprintf("icm426xxAccInit");
     switch (acc->mpuDetectionResult.sensor) {
     case IIM_42653_SPI:
     case IIM_42652_SPI:
@@ -320,6 +323,7 @@ void icm426xxAccInit(accDev_t *acc)
 
 bool icm426xxSpiAccDetect(accDev_t *acc)
 {
+    bprintf("icm426xxSpiAccDetect %p",acc);
     switch (acc->mpuDetectionResult.sensor) {
     case ICM_42605_SPI:
     case ICM_42688P_SPI:
@@ -332,6 +336,7 @@ bool icm426xxSpiAccDetect(accDev_t *acc)
 
     acc->initFn = icm426xxAccInit;
     acc->readFn = mpuAccReadSPI;
+    bprintf("icm426xxSpiAccDetect true",acc);
 
     return true;
 }
@@ -352,6 +357,7 @@ static void turnGyroAccOn(const extDevice_t *dev)
 
 void icm426xxGyroInit(gyroDev_t *gyro)
 {
+    bprintf("icm426xxGyroInit");
     const extDevice_t *dev = &gyro->dev;
 
     spiSetClkDivisor(dev, spiCalculateDivider(ICM426XX_MAX_SPI_CLK_HZ));
@@ -427,6 +433,7 @@ void icm426xxGyroInit(gyroDev_t *gyro)
 
 bool icm426xxSpiGyroDetect(gyroDev_t *gyro)
 {
+    bprintf("icm426xxSpiGyroDetect %p",gyro);
     switch (gyro->mpuDetectionResult.sensor) {
     case ICM_42605_SPI:
     case ICM_42688P_SPI:
@@ -442,6 +449,8 @@ bool icm426xxSpiGyroDetect(gyroDev_t *gyro)
 
     gyro->initFn = icm426xxGyroInit;
     gyro->readFn = mpuGyroReadSPI;
+
+    bprintf("icm426xxSpiGyroDetect true");
 
     return true;
 }

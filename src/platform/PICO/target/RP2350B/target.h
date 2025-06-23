@@ -50,6 +50,24 @@
 #define USE_UART0
 #define USE_UART1
 
+#define USE_UART2
+#define USE_UART3
+
+#define uart2test
+#ifdef uart2test
+#define UART2_TX_PIN         PA20
+#define UART2_RX_PIN         PA21
+#endif
+
+#if 0
+// testing
+#define UART2_TX_PIN PA33
+//#define UART2_RX_PIN PA34
+//#define UART3_TX_PIN PA35
+#define UART3_RX_PIN PA36
+#endif
+
+
 #define USE_SPI
 #define USE_SPI_DEVICE_0
 #define USE_SPI_DEVICE_1
@@ -128,7 +146,6 @@
 #undef USE_VTX_RTC6705
 #undef USE_VTX_RTC6705_SOFTSPI
 #undef USE_SRXL
-#undef USE_OSD
 #undef USE_SPEKTRUM
 #undef USE_SPEKTRUM_BIND
 
@@ -180,10 +197,15 @@
 
 #undef USE_SERVOS
 #undef USE_LED_STRIP
-#undef USE_OSD
-#undef USE_OSD_SD
-#undef USE_OSD_HD
-#undef USE_OSD_QUICK_MENU
+
+// OSD
+//#undef USE_OSD
+//#undef USE_OSD_SD
+//#undef USE_OSD_HD
+//#undef USE_OSD_QUICK_MENU
+
+
+
 #undef USE_POSITION_HOLD
 
 //#define FLASH_PAGE_SIZE                     0x1
@@ -226,8 +248,10 @@
 
 // PA20, PA21 on laurel are set aside for jumper to connect to Radio RX on UART2 (software PIO uart)
 // but let's assign them for h/w UART1 for now [UART1 TX at 20 and RX at 21 are available on RP2350]
+#ifndef uart2test
 #define UART1_TX_PIN         PA20
 #define UART1_RX_PIN         PA21
+#endif
 // [target.mk] Switch PICO_DEFAULT_UART to 0 and change PICO_DEFAULT_UART_TX,RX_PINs to 34, 35
 // which are available to UART0, and appear on spare UART connector J10
 

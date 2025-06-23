@@ -32,6 +32,7 @@ static unsigned preinitIndex = 0;
 
 void ioPreinitByIO(const IO_t io, uint8_t iocfg, ioPreinitPinState_e init)
 {
+    bprintf("ioPreinitByIO io_t: %p iocfg: %d state: %d",io,iocfg,init);
     if (!io) {
         return;
     }

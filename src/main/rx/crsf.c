@@ -346,6 +346,13 @@ STATIC_UNIT_TESTED uint8_t crsfFrameCmdCRC(void)
 // Receive ISR callback, called back from serial port
 STATIC_UNIT_TESTED void crsfDataReceive(uint16_t c, void *data)
 {
+#ifdef PICO_TRACE
+    static int crsfRec;
+    if (!(crsfRec % 10000)) {
+        bprintf("crsfDataReceive counter: %d", crsfRec);
+    }
+    crsfRec++;
+#endif
     rxRuntimeState_t *const rxRuntimeState = (rxRuntimeState_t *const)data;
 
     static uint8_t crsfFramePosition = 0;
@@ -367,6 +374,7 @@ STATIC_UNIT_TESTED void crsfDataReceive(uint16_t c, void *data)
             crsfFrameErrorCnt++;
         }
 #endif
+        //bprintf("crsfDataRecieve - reckon it's a new frame start");
         crsfFramePosition = 0;
     }
 
@@ -631,12 +639,12 @@ bool crsfRxInit(const rxConfig_t *rxConfig, rxRuntimeState_t *rxRuntimeState)
     rxRuntimeState->rcFrameStatusFn = crsfFrameStatus;
 
     const serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_RX_SERIAL);
+    bprintf("crsfRxInit portConfig %p", portConfig);
     if (!portConfig) {
         return false;
     }
 
     uint32_t crsfBaudrate = CRSF_BAUDRATE;
-
 #if defined(USE_CRSF_V3)
     crsfBaudrate = rxConfig->crsf_use_negotiated_baud ? getCrsfCachedBaudrate() : CRSF_BAUDRATE;
 #endif
@@ -650,6 +658,7 @@ bool crsfRxInit(const rxConfig_t *rxConfig, rxRuntimeState_t *rxRuntimeState)
         CRSF_PORT_OPTIONS | (rxConfig->serialrx_inverted ? SERIAL_INVERTED : 0)
         );
 
+    bprintf("crsfRxInit opened serialPort %p with baudrate %d", serialPort, crsfBaudrate);
     if (rssiSource == RSSI_SOURCE_NONE) {
         rssiSource = RSSI_SOURCE_RX_PROTOCOL_CRSF;
     }
@@ -682,6 +691,7 @@ bool crsfRxIsActive(void)
 
 void crsfRxBind(void)
 {
+    bprintf("crsfRxBind");
     if (serialPort != NULL) {
         uint8_t bindFrame[] = {
             CRSF_SYNC_BYTE,
@@ -694,6 +704,7 @@ void crsfRxBind(void)
             0x9E,  // Command CRC8
             0xE8,  // Packet CRC8
         };
+        bprintf("crsfRxBind sending frame of 9 chars");
         serialWriteBuf(serialPort, bindFrame, 9);
     }
 }

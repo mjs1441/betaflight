@@ -155,6 +155,7 @@ static bool queueContains(const task_t *task)
 
 STATIC_UNIT_TESTED bool queueAdd(task_t *task)
 {
+    bprintf("queueAdd task %s",task->attribute->taskName);
     if ((taskQueueSize >= TASK_COUNT) || queueContains(task)) {
         return false;
     }
@@ -171,6 +172,7 @@ STATIC_UNIT_TESTED bool queueAdd(task_t *task)
 
 STATIC_UNIT_TESTED bool queueRemove(task_t *task)
 {
+    bprintf("queueRemove task %s",task->attribute->taskName);
     for (int ii = 0; ii < taskQueueSize; ++ii) {
         if (taskQueueArray[ii] == task) {
             memmove(&taskQueueArray[ii], &taskQueueArray[ii+1], sizeof(task) * (taskQueueSize - ii));
@@ -366,7 +368,11 @@ void schedulerInit(void)
     queueClear();
     queueAdd(getTask(TASK_SYSTEM));
 
+#ifdef TEST_SLOW_SCHEDULE
+    schedLoopStartMinCycles = 100;
+#else
     schedLoopStartMinCycles = clockMicrosToCycles(SCHED_START_LOOP_MIN_US);
+#endif
     schedLoopStartMaxCycles = clockMicrosToCycles(SCHED_START_LOOP_MAX_US);
     schedLoopStartCycles = schedLoopStartMinCycles;
     schedLoopStartDeltaDownCycles = clockMicrosToCycles(1) / SCHED_START_LOOP_DOWN_STEP;
@@ -379,6 +385,7 @@ void schedulerInit(void)
     taskGuardDeltaUpCycles = clockMicrosToCycles(1) / TASK_GUARD_MARGIN_UP_STEP;
 
     desiredPeriodCycles = (int32_t)clockMicrosToCycles((uint32_t)getTask(TASK_GYRO)->attribute->desiredPeriodUs);
+    bprintf("--------> schedulerInit desiredPeriodCycles = %d",desiredPeriodCycles);
 
     lastTargetCycles = getCycleCounter();
 
@@ -483,8 +490,71 @@ static void readSchedulerLocals(task_t *selectedTask, uint8_t selectedTaskDynami
 }
 #endif
 
+//#define sbprintf bprintf
+#define sbprintf(x,...)
+
 FAST_CODE void scheduler(void)
 {
+#ifdef SCHEDULER_TIGHT_LOOP // tight loop at up to e.g. 10kHz, all tasks
+    // only manages about 500-800Hz though
+    timeUs_t taskExecutionTimeUs = 0;    
+    timeUs_t currentTimeUs = micros();
+    task_t *gyroTask = getTask(TASK_GYRO);
+    static int refunused = 0;
+    if (!refunused) {
+        refunused = lastFailsafeCheckMs + skippedRxAttempts + 1;
+    }
+    taskExecutionTimeUs += schedulerExecuteTask(gyroTask, currentTimeUs);
+    if (gyroFilterReady()) {
+        taskExecutionTimeUs += schedulerExecuteTask(getTask(TASK_FILTER), currentTimeUs);
+    }
+    if (pidLoopReady()) {
+        taskExecutionTimeUs += schedulerExecuteTask(getTask(TASK_PID), currentTimeUs);
+    }
+
+    rxFrameCheck(currentTimeUs, cmpTimeUs(currentTimeUs, getTask(TASK_RX)->lastExecutedAtUs));
+
+    // Check for failsafe conditions without reliance on the RX task being well behaved
+    if (cmp32(millis(), lastFailsafeCheckMs) > PERIOD_RXDATA_FAILURE) {
+        // This is very low cost taking less that 4us every 10ms
+        failsafeCheckDataFailurePeriod();
+        failsafeUpdateState();
+        lastFailsafeCheckMs = millis();
+    }
+
+    for (task_t *task = queueFirst(); task != NULL; task = queueNext()) {
+        schedulerExecuteTask(task, currentTimeUs);                
+    }
+
+    while (cmpTimeUs(micros(),currentTimeUs) < 100) { // 10000) {
+//        delayMicroseconds(1000);
+        delayMicroseconds(33);
+    }
+
+#if 0
+#define nlt 10
+    static timeUs_t lasttimes[nlt];
+    static int stlcount;
+    lasttimes[stlcount%nlt] = currentTimeUs;
+    if (!(stlcount % 5000)) {
+        bprintf("stlcount: %d",stlcount);
+        for (int i=0; i<nlt; ++i) {
+            bprintf("t-%d: %u", i, lasttimes[(nlt-i)%nlt]);
+        }
+    }
+    stlcount++;
+#elif 1
+    static int stlcount;
+    if (!(stlcount % 5000)) {
+        bprintf("stlcount: %d",stlcount);
+    }
+    stlcount++;
+#endif
+    
+
+
+
+#else
     static uint32_t checkCycles = 0;
     static uint32_t scheduleCount = 0;
 #if defined(USE_LATE_TASK_STATISTICS)
@@ -506,6 +576,8 @@ FAST_CODE void scheduler(void)
     int32_t schedLoopRemainingCycles;
     bool firstSchedulingOpportunity = false;
 
+    static timeUs_t periodTime;
+    static int pcount;
 #if defined(UNIT_TEST)
     if (nextTargetCycles == 0) {
         lastTargetCycles = getCycleCounter();
@@ -513,9 +585,49 @@ FAST_CODE void scheduler(void)
     }
 #endif
 
+    if (!scheduleCount) {
+        lastTargetCycles = getCycleCounter();
+//        bprintf("micros %u", micros());
+        periodTime = micros();
+//        bprintf("micros %u", micros());
+//        bprintf("first one, periodTime = %u", periodTime);
+//        bprintf("micros %u", micros());
+    }
+
+    timeUs_t newPeriodTime = micros();
+    int np = newPeriodTime - periodTime;
+//    bprintf("*******sched %u [%u] %d", newPeriodTime, periodTime, np);
+//    delayMicroseconds(100);
+
+#if 1
+    if (np > 1000000) {
+        bprintf("..... count %d delta %d", pcount, newPeriodTime - periodTime);
+        pcount++;
+        periodTime = newPeriodTime;
+    } else {
+        pcount++;
+    }
+#elif 1
+    if (np > 1000000 || ((pcount+4) % 1000000 == 0)) {
+        bprintf("..... count %d delta %d", pcount, newPeriodTime - periodTime);
+        bprintf("micros %u", micros());
+        pcount++;
+        periodTime = newPeriodTime;
+    } else {
+        pcount++;
+    }
+#else
+    if (np > 1000000 || (pcount % 10000 == 0)) {
+        bprintf("..... count %d delta %d", pcount, newPeriodTime - periodTime);
+        pcount++;
+        periodTime = newPeriodTime;
+    }
+#endif
+
     if (gyroEnabled) {
         // Realtime gyro/filtering/PID tasks get complete priority
         task_t *gyroTask = getTask(TASK_GYRO);
+        sbprintf("got gyroTask %p",gyroTask);
         nowCycles = getCycleCounter();
 #if defined(UNIT_TEST)
         lastTargetCycles = clockMicrosToCycles(gyroTask->lastExecutedAtUs);
@@ -524,6 +636,8 @@ FAST_CODE void scheduler(void)
         schedLoopRemainingCycles = cmpTimeCycles(nextTargetCycles, nowCycles);
 
         if (schedLoopRemainingCycles < -desiredPeriodCycles) {
+            sbprintf("**** --> slrc %d vs -dpc -(%d) with ntc = %u",
+                    schedLoopRemainingCycles, desiredPeriodCycles, nextTargetCycles);
             /* A task has so grossly overrun that at entire gyro cycle has been skipped
              * This is most likely to occur when connected to the configurator via USB as the serial
              * task is non-deterministic
@@ -531,6 +645,7 @@ FAST_CODE void scheduler(void)
              */
             nextTargetCycles += desiredPeriodCycles * (1 + (schedLoopRemainingCycles / -desiredPeriodCycles));
             schedLoopRemainingCycles = cmpTimeCycles(nextTargetCycles, nowCycles);
+            sbprintf("****** adjusted nextTargetCycles %d slrc %d",nextTargetCycles, schedLoopRemainingCycles);
         }
 
         // Tune out the time lost between completing the last task execution and re-entering the scheduler
@@ -539,16 +654,27 @@ FAST_CODE void scheduler(void)
             schedLoopStartCycles += schedLoopStartDeltaUpCycles;
         }
 
+        sbprintf("schedLoopRemainingCycles < schedLoopStartCycles %d vs %d",
+                schedLoopRemainingCycles, schedLoopStartCycles);
         // Once close to the timing boundary, poll for it's arrival
         if (schedLoopRemainingCycles < schedLoopStartCycles) {
+
+/////////////////////////////            need to get in here to execute gyroTask
+            
             if (schedLoopStartCycles > schedLoopStartMinCycles) {
                 schedLoopStartCycles -= schedLoopStartDeltaDownCycles;
             }
+
 #if !defined(UNIT_TEST)
+
             while (schedLoopRemainingCycles > 0) {
+///////////////////////////                and we are in here to execute gyroTask
+
                 nowCycles = getCycleCounter();
                 schedLoopRemainingCycles = cmpTimeCycles(nextTargetCycles, nowCycles);
             }
+
+///////////////////////////            so now slrc ~ 0, now ~ nexttargetcycles ????
 #endif
             currentTimeUs = micros();
             taskExecutionTimeUs += schedulerExecuteTask(gyroTask, currentTimeUs);
@@ -699,12 +825,18 @@ FAST_CODE void scheduler(void)
 
     nowCycles = getCycleCounter();
     schedLoopRemainingCycles = cmpTimeCycles(nextTargetCycles, nowCycles);
+    sbprintf("------> non-real time tasks slrc = %d vs %d",schedLoopRemainingCycles, (int32_t)clockMicrosToCycles(CHECK_GUARD_MARGIN_US));
 
+#ifdef TEST_SLOW_SCHEDULE
+    if (1) { //!gyroEnabled || (schedLoopRemainingCycles > (int32_t)clockMicrosToCycles(CHECK_GUARD_MARGIN_US))) {
+#else
     if (!gyroEnabled || (schedLoopRemainingCycles > (int32_t)clockMicrosToCycles(CHECK_GUARD_MARGIN_US))) {
+#endif
         currentTimeUs = micros();
 
         // Update task dynamic priorities
         for (task_t *task = queueFirst(); task != NULL; task = queueNext()) {
+////            sbprintf("taskqueue: %s",task->attribute->taskName);
             if (task->attribute->staticPriority != TASK_PRIORITY_REALTIME) {
                 // Task has checkFunc - event driven
                 if (task->attribute->checkFunc) {
@@ -745,11 +877,11 @@ FAST_CODE void scheduler(void)
                         ((scheduleCount & SCHED_TASK_DEFER_MASK) == 0) ||
                         ((task - tasks) == TASK_SERIAL)) {
                         selectedTaskDynamicPriority = task->dynamicPriority;
+                        sbprintf("selected task %s",task->attribute->taskName);
                         selectedTask = task;
                     }
                 }
             }
-
         }
 
         // The number of cycles taken to run the checkers is quite consistent with some higher spikes, but
@@ -827,6 +959,7 @@ FAST_CODE void scheduler(void)
 #endif
 
     scheduleCount++;
+#endif
 }
 
 void schedulerEnableGyro(void)

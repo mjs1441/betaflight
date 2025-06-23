@@ -66,7 +66,7 @@ void sensorsPreInit(void)
 
 bool sensorsAutodetect(void)
 {
-
+    bprintf("sensorsAutodetect");
     // gyro must be initialised before accelerometer
 
     bool gyroDetected = gyroInit();

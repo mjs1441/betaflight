@@ -381,6 +381,7 @@ static FAST_CODE_NOINLINE void checkForYawSpin(timeUs_t currentTimeUs)
 static FAST_CODE void gyroUpdateSensor(gyroSensor_t *gyroSensor)
 {
     if (!gyroSensor->gyroDev.readFn(&gyroSensor->gyroDev)) {
+        bprintf("*** gyroUpdateSensor failed readFn");
         return;
     }
     gyroSensor->gyroDev.dataReady = false;

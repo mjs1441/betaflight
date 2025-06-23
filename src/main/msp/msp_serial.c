@@ -48,6 +48,7 @@ static void resetMspPort(mspPort_t *mspPortToReset, serialPort_t *serialPort, bo
 {
     memset(mspPortToReset, 0, sizeof(mspPort_t));
 
+    bprintf("resetMspPort %p to %p", mspPortToReset->port, serialPort);
     mspPortToReset->port = serialPort;
     mspPortToReset->sharedWithTelemetry = sharedWithTelemetry;
     mspPortToReset->descriptor = mspDescriptorAlloc();
@@ -55,8 +56,10 @@ static void resetMspPort(mspPort_t *mspPortToReset, serialPort_t *serialPort, bo
 
 void mspSerialAllocatePorts(void)
 {
+    bprintf("mspSerialAllocatePorts");
     uint8_t portIndex = 0;
     const serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_MSP);
+    bprintf("found FUNCTION_MSP -> %p",portConfig);
     while (portConfig && portIndex < ARRAYLEN(mspPorts)) {
         mspPort_t *mspPort = &mspPorts[portIndex];
 
@@ -77,7 +80,9 @@ void mspSerialAllocatePorts(void)
 #endif
         }
 
+        bprintf("going to open serial port for msp");
         serialPort_t *serialPort = openSerialPort(portConfig->identifier, FUNCTION_MSP, NULL, NULL, baudRates[portConfig->msp_baudrateIndex], MODE_RXTX, options);
+        bprintf("got %p for msp",serialPort);
         if (serialPort) {
             bool sharedWithTelemetry = isSerialPortShared(portConfig, FUNCTION_MSP, TELEMETRY_PORT_FUNCTIONS_MASK);
             resetMspPort(mspPort, serialPort, sharedWithTelemetry);
@@ -522,19 +527,44 @@ static void mspProcessPacket(mspPort_t *mspPort, mspProcessCommandFnPtr mspProce
  */
 void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessCommandFnPtr mspProcessCommandFn, mspProcessReplyFnPtr mspProcessReplyFn)
 {
+//    bprintf("mspSerialProcess");
     for (mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
         if (!mspPort->port) {
             continue;
         }
+//        bprintf("mspSerialProcess port %p -> %p",mspPort, mspPort->port);
 
         // whilst port is idle, poll incoming until portState changes or no more bytes
         while (mspPort->portState == PORT_IDLE && serialRxBytesWaiting(mspPort->port)) {
 
+/////////////            bprintf("mspSerialProcess port %p -> %p incoming",mspPort, mspPort->port);
             // There are bytes incoming - abort pending request
             mspPort->lastActivityMs = millis();
             mspPort->pendingRequest = MSP_PENDING_NONE;
 
             const uint8_t c = serialRead(mspPort->port);
+#ifdef TEST_MSP_ECHO
+            bprintf("mspSerialProcess port read %x",c);
+            unsigned const char * echochar = &c;
+            serialWriteBuf(mspPort->port, echochar, 1);
+            if (c=='\r') {
+                unsigned char lf = '\n';
+                serialWriteBuf(mspPort->port, &lf, 1);
+            }
+            bprintf("echoed char %x",c);
+#endif            
+#ifdef TEST_DSHOT_ETC
+            if (c == '*') {
+                extern void dshotTestWrites(void);
+                extern void motorShutdown(void);
+                bprintf("* * * * * * *");
+                bprintf("going to shutdown motors");
+                motorShutdown();
+                bprintf("going to dshotTestWrites");
+                dshotTestWrites();
+                bprintf("done     dshotTestWrites");
+            }
+#endif
             if (c == '$') {
                 mspPort->portState = PORT_MSP_PACKET;
                 mspPort->packetState = MSP_HEADER_START;
@@ -549,6 +579,7 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
                     mspPort->pendingRequest = MSP_PENDING_BOOTLOADER_ROM;
 #ifdef USE_CLI
                 } else if (c == '#') {
+                    bprintf("* got #, setting pendingRequest to MSP_PENDING_CLI (%d)",MSP_PENDING_CLI);
                     mspPort->pendingRequest = MSP_PENDING_CLI;
                 } else if (c == 0x2) {
                     mspPort->portState = PORT_CLI_CMD;
@@ -558,6 +589,7 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
             }
         }
 
+//        bprintf("mspport state %d",mspPort->portState);
         switch (mspPort->portState) {
         case PORT_IDLE:
             mspProcessPendingRequest(mspPort);
@@ -596,6 +628,7 @@ bool mspSerialWaiting(void)
 
 void mspSerialInit(void)
 {
+    bprintf("mspSerialInit");
     memset(mspPorts, 0, sizeof(mspPorts));
     mspSerialAllocatePorts();
 }

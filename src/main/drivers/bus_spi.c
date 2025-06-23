@@ -407,6 +407,7 @@ void spiBusDeviceRegister(const extDevice_t *dev)
     UNUSED(dev);
 
     spiRegisteredDeviceCount++;
+    bprintf("spiBusDeviceRegister %p, dev count %d",dev,spiRegisteredDeviceCount);
 }
 
 uint8_t spiGetRegisteredDeviceCount(void)

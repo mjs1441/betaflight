@@ -37,6 +37,12 @@ int main(int argc, char * argv[])
     UNUSED(argc);
     UNUSED(argv);
 #endif
+
+#ifdef RXTEST
+    extern void rxtest();
+    rxtest();
+#endif
+
     init();
 
     run();

@@ -75,6 +75,12 @@ void pgResetFn_motorConfig(motorConfig_t *motorConfig)
     motorConfig->mincommand = 1000;
     motorConfig->kv = 1960;
 
+    bprintf("set motor ioTags here. currently %x, %x, %x, %x",
+            motorConfig->dev.ioTags[0],
+            motorConfig->dev.ioTags[1],
+            motorConfig->dev.ioTags[2],
+            motorConfig->dev.ioTags[3]);
+
 #ifdef MOTOR1_PIN
     motorConfig->dev.ioTags[0] = IO_TAG(MOTOR1_PIN);
 #endif
@@ -99,6 +105,12 @@ void pgResetFn_motorConfig(motorConfig_t *motorConfig)
 #ifdef MOTOR8_PIN
     motorConfig->dev.ioTags[7] = IO_TAG(MOTOR8_PIN);
 #endif
+
+    bprintf("motor ioTags now %x, %x, %x, %x",
+            motorConfig->dev.ioTags[0],
+            motorConfig->dev.ioTags[1],
+            motorConfig->dev.ioTags[2],
+            motorConfig->dev.ioTags[3]);
 
     motorConfig->motorPoleCount = 14;   // Most brushless motors that we use are 14 poles
 

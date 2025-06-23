@@ -59,7 +59,7 @@ FAST_DATA_ZERO_INIT dshotTelemetryCycleCounters_t dshotDMAHandlerCycleCounters;
 typedef struct motorOutput_s {
     int offset;              // NB current code => offset same for all motors
     dshotProtocolControl_t protocolControl;
-    int pinIndex;            // pinIndex of this motor output within a group that bbPort points to
+    int pinIndex;            // pinIndex of this motor output
     IO_t io;                 // IO_t for this output
     bool configured;
     bool enabled;
@@ -208,6 +208,7 @@ static const struct pio_program dshot_bidir_program = {
 
 static void dshot_program_bidir_init(PIO pio, uint sm, int offset, uint pin)
 {
+    bprintf("db on pin %d (MOTOR_PIN1 is %s -> %d)",pin, STR(MOTOR1_PIN), IO_TAG(MOTOR1_PIN));
     pio_sm_config config = pio_get_default_sm_config();
 
     // Wrap to = offset + 0, Wrap after instruction = offset + length - 1
@@ -216,7 +217,9 @@ static void dshot_program_bidir_init(PIO pio, uint sm, int offset, uint pin)
     sm_config_set_set_pins(&config, pin, 1);
     sm_config_set_in_pins(&config, pin);
     sm_config_set_jmp_pin (&config, pin);
+    bprintf("db on pin %d init PIO->gpio for pio",pin);
     pio_gpio_init(pio, pin);
+    bprintf("db on pin %d done init gpio for pio",pin);
     pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true); // set pin to output
 
     gpio_set_pulls(pin, true, false); // Pull up - idle 1 when awaiting bidir telemetry input (PIO pindirs 0).
@@ -241,10 +244,15 @@ static void dshot_program_bidir_init(PIO pio, uint sm, int offset, uint pin)
     sm_config_set_clkdiv(&config, getPeriodTiming() / DSHOT_BIT_PERIOD * clocks_per_us);
 #endif
 
-    pio_sm_init(pio, sm, offset, &config);
+    int ret = pio_sm_init(pio, sm, offset, &config);
+    bprintf("pio_sm_init returned %d",ret); // TODO ret < 0 => bad
+    if (ret < 0) { bprintf("*** that was bad ***"); }
 }
 
 #else
+
+#define dshot_600_wrap_target 0
+#define dshot_600_wrap 12
 
 static const uint16_t dshot_600_program_instructions[] = {
             //     .wrap_target
@@ -270,13 +278,17 @@ static const struct pio_program dshot_600_program = {
     .origin = -1,
 };
 
-// TODO DSHOT150, 300
-static void dshot_program_init(PIO pio, uint sm, int offset, uint pin)
-{
-    pio_sm_config config = pio_get_default_sm_config();
+static inline pio_sm_config dshot_600_program_get_default_config(uint offset) {
+    pio_sm_config c = pio_get_default_sm_config();
+    sm_config_set_wrap(&c, offset + dshot_600_wrap_target, offset + dshot_600_wrap);
+    return c;
+}
 
-    // Wrap to = offset + 0, Wrap after instruction = offset + length - 1
-    sm_config_set_wrap(&config, offset, offset + ARRAYLEN(dshot_600_program_instructions) - 1);
+// TODO DSHOT150, 300
+static bool dshot_program_init(PIO pio, uint sm, int offset, uint pin)
+{
+    bprintf("dshot_program_init on pin %d (MOTOR_PIN1 is %s -> %d)",pin, STR(MOTOR1_PIN), IO_TAG(MOTOR1_PIN));
+    pio_sm_config config = dshot_600_program_get_default_config(offset);
 
     sm_config_set_set_pins(&config, pin, 1);
     pio_gpio_init(pio, pin);
@@ -295,7 +307,7 @@ static void dshot_program_init(PIO pio, uint sm, int offset, uint pin)
     sm_config_set_clkdiv(&config, getPeriodTiming() / DSHOT_BIT_PERIOD * clocks_per_us);
 #endif
 
-    pio_sm_init(pio, sm, offset, &config);
+    return PICO_OK == pio_sm_init(pio, sm, offset, &config);
 }
 
 #endif
@@ -325,6 +337,7 @@ static bool dshotTelemetryWait(void)
     bool telemetryPending;
     const timeUs_t startTimeUs = micros();
 
+    bprintf("dshotTelemetryWait");
     do {
         telemetryPending = false;
         for (unsigned motorIndex = 0; motorIndex < dshotMotorCount && !telemetryPending; motorIndex++) {
@@ -344,6 +357,7 @@ static bool dshotTelemetryWait(void)
         DEBUG_SET(DEBUG_DSHOT_TELEMETRY_COUNTS, 2, debug[2] + 1);
     }
 
+    bprintf("dshotTelemetryWait returning %d",telemetryWait);
 #endif
     return telemetryWait; // TODO what should the return value be? (don't think it's used)
 }
@@ -355,8 +369,10 @@ static void dshotUpdateInit(void)
 
 static bool dshotDecodeTelemetry(void)
 {
+    bprintf("dshotDecodeTeleemtry");
 #ifdef USE_DSHOT_TELEMETRY
     if (!useDshotTelemetry) {
+        bprintf("!useDshotTelemetry, returning true");
         return true;
     }
 
@@ -409,12 +425,14 @@ static void dshotWriteInt(uint8_t motorIndex, uint16_t value)
     motorOutput_t *const motor = &dshotMotors[motorIndex];
 
     if (!motor->configured) {
+        bprintf("dshotWriteInt motor %d not configured", motorIndex);
         return;
     }
 
     /*If there is a command ready to go overwrite the value and send that instead*/
     if (dshotCommandIsProcessing()) {
         value = dshotCommandGetCurrent(motorIndex);
+        bprintf("dshotWriteInt retrieved value %d (%x)", value, value);
         if (value) {
             // Request telemetry on other return wire (this isn't DSHOT bidir)
             motor->protocolControl.requestTelemetry = true;
@@ -425,14 +443,11 @@ static void dshotWriteInt(uint8_t motorIndex, uint16_t value)
 
     uint16_t packet = prepareDshotPacket(&motor->protocolControl);
 
-// TODO what to do if TX buffer is full? (unlikely at standard scheduler loop rates?)
-#ifdef TEST_DSHOT_ETC
     // for testing, can be convenient to block, not lose any writes
-    pio_sm_put_blocking(motor->pio, motor->pio_sm, packet);
-////    pio_sm_put(motor->pio, motor->pio_sm, packet);
-#else    
+    // pio_sm_put_blocking(motor->pio, motor->pio_sm, packet);
+    // TODO what to do if TX buffer is full? (unlikely at standard scheduler loop rates?) Just drop this motor write?
+
     pio_sm_put(motor->pio, motor->pio_sm, packet);
-#endif
 }
 
 static void dshotWrite(uint8_t motorIndex, float value)
@@ -455,9 +470,11 @@ static void dshotUpdateComplete(void)
 
 static bool dshotEnableMotors(void)
 {
+    bprintf("pico dshotEnableMotors");
     for (int i = 0; i < dshotMotorCount; i++) {
         const motorOutput_t *motor = &dshotMotors[i];
         if (motor->configured) {
+            bprintf("pico dshotEnableMotors setting motor %d direction to IN for starters",i);
             // TODO is this valid on a PIO pin
             // no, it only affects the pin when configured as "SIO"
             // gpio_set_dir(ioPin, (cfg & 0x01)); // 0 = in, 1 = out
@@ -465,6 +482,8 @@ static bool dshotEnableMotors(void)
 
             // if we want to set the direction in a PIO mode, we do
             // pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true); // set pin to output
+        } else {
+            bprintf("pico dshotEnableMotors motor %d not 'configured'", i);
         }
     }
     return true;
@@ -473,6 +492,7 @@ static bool dshotEnableMotors(void)
 static void dshotDisableMotors(void)
 {
     // TODO: implement?
+    bprintf("pico dshotDisableMotors");
     return;
 }
 
@@ -481,12 +501,16 @@ void dshotTestWrites(void)
 {
 //    const int mnum = 0;
     const int mval = DSHOT_MIN_THROTTLE;
+    //bprintf("* going to test writing %d to motor %d", mval, mnum);
+    bprintf("just checking, pio0 gpio base is %d",pio_get_gpio_base(pio0));
     for (int ii = mval; ii< DSHOT_MAX_THROTTLE; ii += 123) {
+        bprintf("going to dshotwriteint %d (%x)",ii,ii);
 //        dshotWriteInt(mnum, ii);
         dshotWriteInt(0, ii);
         dshotWriteInt(1, ii);
         dshotWriteInt(2, ii);
         dshotWriteInt(3, ii);
+        bprintf("done     dshotwriteint %d (%x)",ii,ii);
     }
 }
 #endif
@@ -494,6 +518,7 @@ void dshotTestWrites(void)
 static void dshotShutdown(void)
 {
     // TODO: implement?
+    bprintf("pico dshotShutdown");
     return;
 }
 
@@ -519,10 +544,12 @@ static bool dshotIsMotorIdle(unsigned motorIndex)
 
 static void dshotRequestTelemetry(unsigned index)
 {
+    bprintf("* called dshotRequestTelemetry on %d", index);
 #ifndef USE_DSHOT_TELEMETRY
     UNUSED(index);
 #else
     if (index < dshotMotorCount) {
+        bprintf("* setting requestTelemetry on %d", index);
         dshotMotors[index].protocolControl.requestTelemetry = true;
     }
 #endif
@@ -559,7 +586,8 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig)
     if (motorCountProvisional > 4) {
         // Currently support 4 motors with one PIO block, four state machines
         // TODO (possible future) support more than 4 motors
-        // (by reconfiguring state machines perhaps? batching if required)
+        // (more than one pio? by reconfiguring state machines perhaps? batching if required)
+        bprintf("*** dshot Pico %d motors unsupported", motorCountProvisional);
         return false;
     }
 
@@ -569,15 +597,32 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig)
     useDshotTelemetry = motorConfig->useDshotTelemetry;
 #endif
 
-    // TODO somehow configure which PIO block to use for dshot? pio0 for now.
-    const PIO pio = pio0;
+    const PIO pio = PIO_INSTANCE(DSHOT_PIO_INDEX);
 
-#ifdef TEST_DSHOT_ETC
-    pio_set_gpio_base(pio, 16);
-#endif
+    int pinIndexMin = 48;
+    int pinIndexMax = -1;
+    for (int motorIndex = 0; motorIndex < MAX_SUPPORTED_MOTORS && motorIndex < motorCountProvisional; motorIndex++) {
+        int pinIndex = DEFIO_TAG_PIN(motorConfig->ioTags[motorIndex]);
+        pinIndexMin = pinIndex < pinIndexMin ? pinIndex : pinIndexMin;
+        pinIndexMax = pinIndex > pinIndexMax ? pinIndex : pinIndexMax;
+    }
+
+    int pioBase = 0;
+    if (pinIndexMax >= 32) {
+        if (pinIndexMin < 16) {
+            bprintf("* dshot PIO can't span motor pins min %d max %d", pinIndexMin, pinIndexMax);
+            return false;
+        } else {
+            pioBase = 16;
+        }
+    }
+
+    bprintf("dshot pio%d pin min, max = %d, %d; setting gpio base to %d", PIO_NUM(pio), pinIndexMin, pinIndexMax, pioBase);
+    pio_set_gpio_base(pio, pioBase);
     
     // Use one program for all motors.
     // NB the PIO block is limited to 32 instructions (shared across 4 state machines)
+    // The GPIO base must be set before adding the program.
 #ifdef USE_DSHOT_TELEMETRY
     int offset = pio_add_program(pio, &dshot_bidir_program);
 #else
@@ -585,12 +630,16 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig)
 #endif
     if (offset < 0) {
         /* error loading PIO */
+        bprintf("*** dshot pio failed to add program");
         return false;
     }
 
     for (int motorIndex = 0; motorIndex < MAX_SUPPORTED_MOTORS && motorIndex < motorCountProvisional; motorIndex++) {
+        int pinIndex = DEFIO_TAG_PIN(motorConfig->ioTags[motorIndex]);
         IO_t io = IOGetByTag(motorConfig->ioTags[motorIndex]);
+        bprintf("dshot motor index %d on pin %d",motorIndex, IO_Pin(io));
         if (!IOIsFreeOrPreinit(io)) {
+            bprintf("io pin not free");
             return false;
         }
 
@@ -599,10 +648,9 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig)
         const int pio_sm = pio_claim_unused_sm(pio, false);
 
         if (pio_sm < 0) {
+            bprintf("dshotPwmDevInit: failed to claim state machine");
             return false;
         }
-
-        int pinIndex = DEFIO_TAG_PIN(motorConfig->ioTags[motorIndex]);
 
         // TODO: take account of motor reordering,
         // cf. versions of  pwmDshotMotorHardwareConfig(const timerHardware_t *timerHardware, uint8_t motorIndex, uint8_t reorderedMotorIndex, motorProtocolTypes_e pwmProtocolType, uint8_t output)
@@ -615,22 +663,25 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig)
         IOInit(io, OWNER_MOTOR, RESOURCE_INDEX(motorIndex));
         // uint8_t iocfg = 0;
         // IOConfigGPIO(io, iocfg); // TODO: don't need this? assigned and dir in program init
-        
+
 #ifdef USE_DSHOT_TELEMETRY
         dshot_program_bidir_init(pio, pio_sm, dshotMotors[motorIndex].offset, pinIndex);
 #else
-        dshot_program_init(pio, pio_sm, dshotMotors[motorIndex].offset, pinIndex);
+        bool ret = dshot_program_init(pio, pio_sm, dshotMotors[motorIndex].offset, pinIndex);
+        if (!ret) {
+            bprintf("dshot failed to init pio program for motor index %d, pin %d", motorIndex, pinIndex);
+            return false;
+        }
 #endif
 
         // TODO pio_sm_set_enabled for pio_sm of dshotMotors[0..3] maybe
-        // better in vTable functions dshotEnable/DisableMotors
+        // ? better in vTable functions dshotEnable/DisableMotors
         pio_sm_set_enabled(pio, pio_sm, true);
-
         dshotMotors[motorIndex].configured = true;
-
     }
 
     device->vTable = &dshotVTable;
+    bprintf("pico dshot: Set device %p vtable (at %p) to pico dshotvtable %p", device, &device->vTable, device->vTable);
     dshotMotorCount = motorCountProvisional;
     return true;
 }

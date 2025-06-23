@@ -169,6 +169,7 @@ const uint32_t baudRates[BAUD_COUNT] = {
 
 static serialPortConfig_t* findInPortConfigs_identifier(const serialPortConfig_t cfgs[], size_t count, serialPortIdentifier_e identifier)
 {
+    bprintf("findInPortConfigs_identifier looking for %d", identifier);
     if (identifier == SERIAL_PORT_NONE || identifier == SERIAL_PORT_ALL) {
         return NULL;
     }
@@ -176,6 +177,7 @@ static serialPortConfig_t* findInPortConfigs_identifier(const serialPortConfig_t
     for (unsigned i = 0; i < count; i++) {
         if (cfgs[i].identifier == identifier) {
             // drop const on return - wrapper function will add it back if necessary
+            bprintf("findInPortConfigs %d -> %p at index %d", identifier, &cfgs[i], i);
             return (serialPortConfig_t*)&cfgs[i];
         }
     }
@@ -198,7 +200,7 @@ PG_REGISTER_WITH_RESET_FN(serialConfig_t, serialConfig, PG_SERIAL_CONFIG, 1);
 void pgResetFn_serialConfig(serialConfig_t *serialConfig)
 {
     memset(serialConfig, 0, sizeof(serialConfig_t));
-
+    bprintf("serialConfig reset function");
     for (int i = 0; i < SERIAL_PORT_COUNT; i++) {
         serialPortConfig_t* pCfg = &serialConfig->portConfigs[i];
         pCfg->identifier = serialPortIdentifiers[i];
@@ -208,6 +210,7 @@ void pgResetFn_serialConfig(serialConfig_t *serialConfig)
         pCfg->blackbox_baudrateIndex = BAUD_115200;
     }
 
+    bprintf("setting portConfig 0 functionMask to FUNCTION_MSP (%d)",FUNCTION_MSP);
     serialConfig->portConfigs[0].functionMask = FUNCTION_MSP;
 
 #ifdef MSP_UART
@@ -501,10 +504,12 @@ serialPort_t *openSerialPort(
     UNUSED(mode);
     UNUSED(options);
 #endif
+    bprintf("openSerialPort id %d, fn %d",identifier, function);
 
     serialPortUsage_t *serialPortUsage = findSerialPortUsageByIdentifier(identifier);
     if (!serialPortUsage || serialPortUsage->function != FUNCTION_NONE) {
         // not available / already in use
+        bprintf("*** serialPortUsage = %d, function = %d", serialPortUsage, serialPortUsage ? serialPortUsage->function : 12345);
         return NULL;
     }
 
@@ -514,6 +519,7 @@ serialPort_t *openSerialPort(
 #if defined(USE_VCP)
     case SERIALTYPE_USB_VCP:
         serialPort = usbVcpOpen();
+        bprintf("opening a serial port for USB_VCP, got %p",serialPort);
         break;
 #endif
 #if defined(USE_UART)

@@ -44,6 +44,8 @@ serialType_e serialType(serialPortIdentifier_e identifier)
         if (BIT(idx) & SERIAL_UART_MASK) {
             return SERIALTYPE_UART;
         } else {
+            bprintf("identifier %d idx 0x%x vs mask 0x%x [SPUFIrST = %d, SUMAX = %d)",
+                    identifier, idx, SERIAL_UART_MASK, SERIAL_PORT_UART_FIRST, SERIAL_UART_MAX);
             // no other type in this range
             return SERIALTYPE_INVALID;
         }
@@ -124,6 +126,7 @@ int serialResourceIndex(serialPortIdentifier_e identifier)
 {
     const struct SerialTypeInfo* inf = serialTypeInfo(identifier);
     if (!inf || inf->resourceOffset < 0) {
+        bprintf("serialResourceIndex ident = %d, inf = %p, inf->resourceOffset = %d", identifier, inf, inf->resourceOffset);
         return -1;
     }
     return identifier - inf->firstId + inf->resourceOffset;

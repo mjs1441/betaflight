@@ -140,7 +140,6 @@ static void taskHandleSerial(timeUs_t currentTimeUs)
     DEBUG_SET(DEBUG_USB, 0, usbCableIsInserted());
     DEBUG_SET(DEBUG_USB, 1, usbVcpIsConnected());
 #endif
-
     bool evaluateMspData = ARMING_FLAG(ARMED) ? MSP_SKIP_NON_MSP_DATA : MSP_EVALUATE_NON_MSP_DATA;
     mspSerialProcess(evaluateMspData, mspFcProcessCommand, mspFcProcessReply);
 }

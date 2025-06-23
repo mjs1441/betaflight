@@ -74,6 +74,7 @@ void motorShutdown(void)
 
 void motorWriteAll(float *values)
 {
+//    bprintf("motorWriteAll %3.3f %3.3f %3.3f %3.3f", (double)values[0], (double)values[1], (double)values[2], (double)values[3]);
 #ifdef USE_PWM_OUTPUT
     if (motorDevice.enabled) {
 #ifdef USE_DSHOT_BITBANG
@@ -271,9 +272,11 @@ void motorNullDevInit(motorDevice_t *device);
 
 void motorDevInit(unsigned motorCount)
 {
+    bprintf("m1");
 #if defined(USE_PWM_OUTPUT) || defined(USE_DSHOT)
     const motorDevConfig_t *motorDevConfig = &motorConfig()->dev;
 #endif
+    bprintf("m2");
 
 #if defined(USE_PWM_OUTPUT)
     uint16_t idlePulse = motorConfig()->mincommand;
@@ -284,6 +287,7 @@ void motorDevInit(unsigned motorCount)
         idlePulse = 0; // brushed motors
     }
 #endif
+    bprintf("m3");
 
     bool success = false;
     motorDevice.count = motorCount;
@@ -291,21 +295,28 @@ void motorDevInit(unsigned motorCount)
         do {
             if (!isMotorProtocolDshot()) {
 #ifdef USE_PWM_OUTPUT
+                bprintf("m3.1");
                 success = motorPwmDevInit(&motorDevice, motorDevConfig, idlePulse);
+                bprintf("m3.2");
 #endif
                 break;
             }
 #ifdef USE_DSHOT
 #ifdef USE_DSHOT_BITBANG
             if (isDshotBitbangActive(motorDevConfig)) {
+                bprintf("m3.3");
                 success = dshotBitbangDevInit(&motorDevice, motorDevConfig);
+                bprintf("m3.4");
                 break;
             }
 #endif
+            bprintf("m3.5 count is %d",motorCount);
             success = dshotPwmDevInit(&motorDevice, motorDevConfig);
+                bprintf("m3.6");
 #endif
         } while(0);
     }
+    bprintf("m4");
 
     // if the VTable has been populated, the device is initialized.
     if (success) {
@@ -315,10 +326,13 @@ void motorDevInit(unsigned motorCount)
     } else {
         motorNullDevInit(&motorDevice);
     }
+    bprintf("m5");
+
 }
 
 void motorDisable(void)
 {
+    bprintf("motorDisable, motorDevice at %p, disable at %p",&motorDevice, motorDevice.vTable->disable);
     motorDevice.vTable->disable();
     motorDevice.enabled = false;
     motorDevice.motorEnableTimeMs = 0;

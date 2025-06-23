@@ -77,7 +77,10 @@ static bool isUsbVcpTransmitBufferEmpty(const serialPort_t *instance)
 static uint32_t usbVcpRxBytesAvailable(const serialPort_t *instance)
 {
     UNUSED(instance);
-    return cdc_usb_bytes_available();
+    uint32_t x = cdc_usb_bytes_available();
+    //bprintf("usbVcpRxBytesAvailable on %p returning %d",instance,x);
+    return x;
+    //return cdc_usb_bytes_available();
 }
 
 static uint8_t usbVcpRead(serialPort_t *instance)
@@ -88,6 +91,7 @@ static uint8_t usbVcpRead(serialPort_t *instance)
 
     while (true) {
         if (cdc_usb_read(buf, 1)) {
+//            bprintf("usbVcpRead read %d",buf[0]);
             return buf[0];
         }
     }
@@ -97,6 +101,7 @@ static void usbVcpWriteBuf(serialPort_t *instance, const void *data, int count)
 {
     UNUSED(instance);
 
+//    bprintf("usbVcpWriteBuf on %p bytes %d, first is %d",instance, count, *((uint8_t*)data));
     if (!(cdc_usb_connected() && cdc_usb_configured())) {
         return;
     }
@@ -110,12 +115,14 @@ static void usbVcpWriteBuf(serialPort_t *instance, const void *data, int count)
         }
         count -= txed;
         p += txed;
+//        bprintf("written %d, remaining %d",txed,count);
     }
 }
 
 static bool usbVcpFlush(vcpPort_t *port)
 {
     uint32_t count = port->txAt;
+//    bprintf("usbVcpFlush on %p count %d",port,count);
     port->txAt = 0;
 
     if (count == 0) {
@@ -135,6 +142,7 @@ static bool usbVcpFlush(vcpPort_t *port)
         }
         count -= txed;
         p += txed;
+//        bprintf("written %d, remaining %d",txed,count);
     }
     return count == 0;
 }
@@ -187,6 +195,7 @@ static const struct serialPortVTable usbVTable[] = {
 
 serialPort_t *usbVcpOpen(void)
 {
+    bprintf("pico usbVcpOpen");
     cdc_usb_init();
 
     vcpPort_t *s = &vcpPort;

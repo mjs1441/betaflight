@@ -129,6 +129,8 @@ const spiHardware_t spiHardware[] = {
 void spiPinConfigure(const struct spiPinConfig_s *pConfig)
 {
     for (size_t hwindex = 0 ; hwindex < ARRAYLEN(spiHardware) ; hwindex++) {
+        bprintf("spiPinConfigure trying to match sck %d, miso %d, mosi %d to device %d",
+                pConfig[hwindex].ioTagSck, pConfig[hwindex].ioTagMiso, pConfig[hwindex].ioTagMosi, hwindex);
         const spiHardware_t *hw = &spiHardware[hwindex];
 
         if (!hw->reg) {
@@ -151,6 +153,8 @@ void spiPinConfigure(const struct spiPinConfig_s *pConfig)
         }
 
         if (pDev->sck && pDev->miso && pDev->mosi) {
+            bprintf("detected pin match sck 0x%x, miso 0x%x, mosi 0x%x to device %d",
+                    pDev->sck, pDev->miso, pDev->mosi, hwindex);
             pDev->dev = hw->reg;
             pDev->leadingEdge = false;
         }
@@ -172,6 +176,7 @@ void spiPinConfigure(const struct spiPinConfig_s *pConfig)
 static void spiSetClockFromSpeed(spi_inst_t *spi, uint16_t speed)
 {
     uint32_t freq = spiCalculateClock(speed);
+    bprintf("spiSetClockFromSpeed %p %d -> %d",spi, speed, freq);
     spi_set_baudrate(spi, freq);
 }
 
@@ -216,6 +221,7 @@ Must be SPI_MSB_FIRST, no other values supported on the PL022
 
 void spiInitDevice(SPIDevice device)
 {
+    bprintf("pico spiInitDevice %d",device);
   // maybe here set getSpiInstanceByDevice(spi->dev) SPI device with
   // settings like
   // STM does
@@ -231,6 +237,8 @@ void spiInitDevice(SPIDevice device)
     }
 
     // Set owners
+    bprintf("pico spiInitDevice, going to set owners, init device, and set pin functions (%d,%d,%d)",
+           IO_PINBYTAG(spi->sck),IO_PINBYTAG(spi->miso),IO_PINBYTAG(spi->mosi));
     IOInit(IOGetByTag(spi->sck),  OWNER_SPI_SCK,  RESOURCE_INDEX(device));
     IOInit(IOGetByTag(spi->miso), OWNER_SPI_SDI, RESOURCE_INDEX(device));
     IOInit(IOGetByTag(spi->mosi), OWNER_SPI_SDO, RESOURCE_INDEX(device));

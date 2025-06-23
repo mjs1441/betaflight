@@ -282,6 +282,7 @@ void rxInit(void)
     } else if (featureIsEnabled(FEATURE_RX_PPM)) {
         rxRuntimeState.rxProvider = RX_PROVIDER_PPM;
     } else if (featureIsEnabled(FEATURE_RX_SERIAL)) {
+        bprintf("rxInit featureIsEnabled(FEATURE_RX_SERIAL");
         rxRuntimeState.rxProvider = RX_PROVIDER_SERIAL;
     } else if (featureIsEnabled(FEATURE_RX_MSP)) {
         rxRuntimeState.rxProvider = RX_PROVIDER_MSP;
@@ -322,6 +323,7 @@ void rxInit(void)
         }
     }
 
+    bprintf("rxInit rxRuntimeState.rxProvider is %d", rxRuntimeState.rxProvider);
     switch (rxRuntimeState.rxProvider) {
     default:
 
@@ -330,7 +332,9 @@ void rxInit(void)
     case RX_PROVIDER_SERIAL:
         {
             const bool enabled = serialRxInit(rxConfig(), &rxRuntimeState);
+            bprintf("rxInit RX_PROVIDER_SERIAL enabled = %d",enabled);
             if (!enabled) {
+                bprintf("**** rxInit RX_PROVIDER_SERIAL serialRxinit not enabled");
                 rxRuntimeState.rcReadRawFn = nullReadRawRC;
                 rxRuntimeState.rcFrameStatusFn = nullFrameStatus;
             }
@@ -502,6 +506,7 @@ bool rxUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
 
 FAST_CODE_NOINLINE void rxFrameCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
 {
+//    bprintf("~~~~~~~ rxFrameCheck");
     bool rxDataReceived = false;
     bool useDataDrivenProcessing = true;
     timeDelta_t needRxSignalMaxDelayUs = RXLOSS_TRIGGER_INTERVAL;
@@ -542,6 +547,7 @@ FAST_CODE_NOINLINE void rxFrameCheck(timeUs_t currentTimeUs, timeDelta_t current
             const uint8_t frameStatus = rxRuntimeState.rcFrameStatusFn(&rxRuntimeState);
             DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 1, (frameStatus & RX_FRAME_FAILSAFE));
             rxDataReceived = (frameStatus & RX_FRAME_COMPLETE) && !(frameStatus & (RX_FRAME_FAILSAFE | RX_FRAME_DROPPED));
+///////            bprintf("~~~~~~~ rxFrameCheck frameStatus %d rxDataReceived %d",frameStatus, rxDataReceived);
             setLinkQuality(rxDataReceived, currentDeltaTimeUs);
             auxiliaryProcessingRequired |= (frameStatus & RX_FRAME_PROCESSING_REQUIRED);
         }
@@ -563,6 +569,7 @@ FAST_CODE_NOINLINE void rxFrameCheck(timeUs_t currentTimeUs, timeDelta_t current
             // initial time to rxDataReceived failure is RXLOSS_TRIGGER_INTERVAL (150ms),
             // after that, we check every RX_FRAME_RECHECK_INTERVAL (50ms)
             rxSignalReceived = false; // results in `RXLOSS` message etc
+///////            bprintf("~~~~~~ rxFrameCheck didn't receive packet in time, will check again after %d", reCheckRxSignalInterval);
             needRxSignalBefore += reCheckRxSignalInterval;
             rxDataProcessingRequired = true;
         }

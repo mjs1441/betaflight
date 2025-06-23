@@ -50,7 +50,10 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
 //#define DMA_Channel_TypeDef
 
 #define ADC_TypeDef          void*
-#define USART_TypeDef        uart_inst_t
+
+#define USART_TypeDef        void
+#define UART_INST(uart)      ((uart_inst_t *)uart)
+
 #define TIM_OCInitTypeDef    void*
 #define TIM_ICInitTypeDef    void*
 //#define TIM_OCStructInit
@@ -123,3 +126,13 @@ extern uint32_t systemUniqueId[3];
 #define SERIAL_TRAIT_PIN_CONFIG 1
 
 #define xDMA_GetCurrDataCounter(dma_resource) (((dma_channel_hw_t *)(dma_resource))->transfer_count)
+
+// 0, 1 or 2 for pio0, pio1, pio2
+// maybe these more dynamic, or config/target configurable
+// Four state machines (sm) per pio block
+// pio0 -> dshot for motors 1,2,3,4
+// pio1 -> UART2, UART3
+#define DSHOT_PIO_INDEX 0
+#define UART_PIO_INDEX 1
+
+

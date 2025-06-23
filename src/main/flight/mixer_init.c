@@ -414,19 +414,22 @@ static void loadLaunchControlMixer(void)
 static void mixerConfigureOutput(void)
 {
     mixerRuntime.motorCount = 0;
-
+    bprintf("mixerConfigureOutput");
     if (currentMixerMode == MIXER_CUSTOM || currentMixerMode == MIXER_CUSTOM_TRI || currentMixerMode == MIXER_CUSTOM_AIRPLANE) {
         // load custom mixer into currentMixer
         for (int i = 0; i < MAX_SUPPORTED_MOTORS; i++) {
+            bprintf("mixerConfigureOutput custom loading %d of %d",i,MAX_SUPPORTED_MOTORS);
             // check if done
             if (customMotorMixer(i)->throttle == 0.0f) {
                 break;
             }
             mixerRuntime.currentMixer[i] = *customMotorMixer(i);
             mixerRuntime.motorCount++;
+            bprintf("mixerConfigureOutput now count is %d",mixerRuntime.motorCount);
         }
     } else {
         mixerRuntime.motorCount = mixers[currentMixerMode].motorCount;
+        bprintf("mixer loaded count %d from current mode %d",mixerRuntime.motorCount,currentMixerMode);
         if (mixerRuntime.motorCount > MAX_SUPPORTED_MOTORS) {
             mixerRuntime.motorCount = MAX_SUPPORTED_MOTORS;
         }

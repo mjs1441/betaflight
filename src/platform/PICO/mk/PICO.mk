@@ -21,6 +21,23 @@ ifneq ($(PICO_TRACE),)
 include $(PICO_MK_DIR)/PICO_trace.mk
 endif
 
+ifneq ($(TEST_EEPROM),)
+DEVICE_FLAGS += -DTEST_EEPROM
+endif
+
+ifneq ($(TEST_RX),)
+DEVICE_FLAGS += -DRXTEST
+endif
+
+ifneq ($(TEST_VARIOUS),)
+#####DEVICE_FLAGS += -DTEST_MSP_ECHO
+DEVICE_FLAGS += -DTEST_DSHOT_ETC
+#####DEVICE_FLAGS += -DTEST_DSHOT_SLOW
+###############DEVICE_FLAGS += -DTEST_SLOW_SCHEDULE
+DEVICE_FLAGS += -DGYRO_ONLY_ICM42688
+#####DEVICE_FLAGS += -DSCHEDULER_TIGHT_LOOP
+endif
+
 RP2350_TARGETS = RP2350A RP2350B
 ifneq ($(filter $(TARGET_MCU), $(RP2350_TARGETS)),)
 RP2350_TARGET = $(TARGET_MCU)
@@ -390,7 +407,6 @@ MCU_COMMON_SRC = \
             drivers/bus_spi_config.c \
             drivers/bus_i2c_utils.c \
             drivers/serial_pinconfig.c \
-            drivers/serial_uart_pinconfig.c \
             drivers/usb_io.c \
             drivers/dshot.c \
             PICO/bus_i2c_pico.c \

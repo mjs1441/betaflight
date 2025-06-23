@@ -137,8 +137,11 @@ SPI_IO_CS_HIGH_CFG (as defined)
     }
 
     uint16_t ioPin = IO_Pin(io);
+    bprintf("pico IOConfigGPIO pin %d for %d (0=in, 1=out)",ioPin, cfg);
     if (gpio_get_function(ioPin) == GPIO_FUNC_NULL) {
         gpio_init(ioPin);
+    } else {
+        bprintf("Not gpio_init because already gpio function %d",gpio_get_function(ioPin));
     }
     gpio_set_dir(ioPin, (cfg & 0x01)); // 0 = in, 1 = out
 }

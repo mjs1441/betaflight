@@ -19,6 +19,8 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "platform.h"
+#include "drivers/io.h"
 #include "drivers/exti.h"
 #include "common/utils.h"
 
@@ -33,6 +35,7 @@ void EXTIConfig(IO_t io, extiCallbackRec_t *cb, int irqPriority, ioConfig_t conf
 
 void EXTIInit(void)
 {
+    bprintf("*** Pico TODO EXTInit");
     //TODO: implement
     // NOOP
 }
@@ -45,5 +48,6 @@ void EXTIHandlerInit(extiCallbackRec_t *self, extiHandlerCallback *fn)
 void EXTIEnable(IO_t io)
 {
     //TODO: implement
+    bprintf("*** Pico TODO EXTIEnable on %d",IO_Pin(io));
     UNUSED(io);
 }
