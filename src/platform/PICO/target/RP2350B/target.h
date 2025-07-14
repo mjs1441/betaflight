@@ -144,7 +144,8 @@
 #define DMA_IRQ_CORE_NUM 1 // Use core 1 for DMA IRQs
 #undef USE_DMA_SPEC // not yet required - possibly won't be used at all
 
-#undef USE_DSHOT_TELEMETRY
+#undef USE_DSHOT_BITBANG
+#define USE_DSHOT_TELEMETRY
 #undef USE_ESC_SENSOR
 
 #undef USE_PWM_OUTPUT

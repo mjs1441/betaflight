@@ -123,5 +123,16 @@ extern uint32_t systemUniqueId[3];
 
 #define xDMA_GetCurrDataCounter(dma_resource) (((dma_channel_hw_t *)(dma_resource))->transfer_count)
 
+// 0, 1 or 2 for pio0, pio1, pio2
+// maybe make these more dynamic, or config/target configurable
+// Four state machines (sm) per pio block
+// e.g.
+// pio0 -> dshot for motors 1,2,3,4
+// pio1 -> UART2, UART3
+// pio2 -> LED strip, ...
+#define DSHOT_PIO_INDEX 0
+// #define UART_PIO_INDEX 1
+
+
 #define USE_LATE_TASK_STATISTICS
 
