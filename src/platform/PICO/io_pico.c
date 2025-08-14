@@ -59,6 +59,7 @@ void IOInitGlobal(void)
     gpio_init(pin5);
     gpio_set_dir(pin5, 1);
     gpio_put(pin5, 0);
+    bprintf("5V enable pin: %d set low", pin5);
     ioRecs[pin5].owner = OWNER_SYSTEM;
 #endif
 
@@ -67,6 +68,7 @@ void IOInitGlobal(void)
     gpio_init(pin9);
     gpio_set_dir(pin9, 1);
     gpio_put(pin9, 0);
+    bprintf("9V enable pin: %d set low", pin9);
     ioRecs[pin9].owner = OWNER_SYSTEM;
 #endif
 }
@@ -137,9 +139,12 @@ SPI_IO_CS_HIGH_CFG (as defined)
     }
 
     uint16_t ioPin = IO_Pin(io);
-    if (gpio_get_function(ioPin) == GPIO_FUNC_NULL) {
-        gpio_init(ioPin);
+    bprintf("pico IOConfigGPIO pin %d for %d (0=in, 1=out)",ioPin, cfg);
+    if (gpio_get_function(ioPin) != GPIO_FUNC_NULL && gpio_get_function(ioPin) != GPIO_FUNC_SIO) {
+        bprintf("*** warning redefining gpio function type from %d to SIO\n",gpio_get_function(ioPin));
     }
+
+    gpio_init(ioPin);
     gpio_set_dir(ioPin, (cfg & 0x01)); // 0 = in, 1 = out
     gpio_set_pulls(ioPin, (cfg >> 5) & GPIO_PULLUP, (cfg >> 5) & GPIO_PULLDOWN);
 }
