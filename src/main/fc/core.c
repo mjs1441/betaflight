@@ -555,6 +555,7 @@ void tryArm(void)
             if (!featureIsEnabled(FEATURE_ESC_SENSOR) && useDshotTelemetry) {
                 dshotCleanTelemetryData();
                 if (motorConfig()->dev.useDshotEdt) {
+                    bprintf("\n*** tryArm -> useDshotEdt -> send request to enable extended telemetry\n");
                     dshotCommandWrite(ALL_MOTORS, getMotorCount(), DSHOT_CMD_EXTENDED_TELEMETRY_ENABLE, DSHOT_CMD_TYPE_INLINE);
                 }
             }
@@ -640,6 +641,12 @@ void tryArm(void)
                 lastArmingDisabledReason = armingDisabledReason;
 
                 beeperWarningBeeps(armingDisabledReason);
+#ifdef PICO_TRACE
+                extern const char *armingDisableFlagNames[];
+                uint32_t flags = getArmingDisableFlags();
+                bprintf("\n*** arming disabled %08x, primary: %s last: %s",
+                        flags, armingDisableFlagNames[ffs(flags)], getArmingDisableFlagName(flags));
+#endif
             }
         }
     }
