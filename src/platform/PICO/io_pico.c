@@ -43,11 +43,11 @@ void IOInitGlobal(void)
     }
 
 #ifdef PICO_TRACE
-#ifdef PICO_DEFAULT_UART_TX_PIN
-    ioRecs[PICO_DEFAULT_UART_TX_PIN].owner = OWNER_SYSTEM;
+#ifdef PICO_TRACE_TX_GPIO
+    ioRecs[PICO_TRACE_TX_GPIO].owner = OWNER_SYSTEM;
 #endif
-#ifdef PICO_DEFAULT_UART_RX_PIN
-    ioRecs[PICO_DEFAULT_UART_RX_PIN].owner = OWNER_SYSTEM;
+#ifdef PICO_TRACE_RX_GPIO
+    ioRecs[PICO_TRACE_RX_GPIO].owner = OWNER_SYSTEM;
 #endif
 #endif
 
