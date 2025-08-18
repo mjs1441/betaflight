@@ -42,17 +42,17 @@ int main(int argc, char * argv[])
     init();
 
 #if 0
-    bprintf("SCB CCR starts of as %08x", SCB->CCR);
-//    SCB->CCR |= ( SCB_CCR_DIV_0_TRP_Msk | SCB_CCR_UNALIGN_TRP_Msk | SCB_CCR_BFHFNMIGN_Msk);
-//    bprintf("SCB CCR now set to %08x", SCB->CCR);
-    
-#if 0
     uint8_t buffer[10];
     memset(&buffer[1], 0, 4);
     memset(&buffer[2], 0, 4);
     bprintf("%d , buffer1 %d, buffer2 %d\n", buffer, &buffer[1], &buffer[2]);
 #endif
 
+#if 1
+    bprintf("SCB CCR starts of as %08x", SCB->CCR);
+//    SCB->CCR |= ( SCB_CCR_DIV_0_TRP_Msk | SCB_CCR_UNALIGN_TRP_Msk | SCB_CCR_BFHFNMIGN_Msk);
+//    bprintf("SCB CCR now set to %08x", SCB->CCR);
+    
     static char buf1[128];
     static char buf2[128];
     for (int i=0; i<100; ++i) {

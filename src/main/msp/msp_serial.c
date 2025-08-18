@@ -410,7 +410,7 @@ static mspPostProcessFnPtr mspSerialProcessReceivedCommand(mspPort_t *msp, mspPr
 {
     static uint8_t mspSerialOutBuf[MSP_PORT_OUTBUF_SIZE];
 //    bprintf("going to want to use mspSerialOutBuf at %p", mspSerialOutBuf);
-//    static int cc;
+    static int cc;
     
     mspPacket_t reply = {
         .buf = { .ptr = mspSerialOutBuf, .end = ARRAYEND(mspSerialOutBuf), },
@@ -430,12 +430,39 @@ static mspPostProcessFnPtr mspSerialProcessReceivedCommand(mspPort_t *msp, mspPr
     };
 
     mspPostProcessFnPtr mspPostProcessFn = NULL;
-#if 0
+#if 1
     bprintf("msoutbuf at %p of len %d in", mspSerialOutBuf, MSP_PORT_OUTBUF_SIZE);
     bprintf("msinbuf is at %p len %d", msp->inBuf, msp->dataSize);
     bprintf("SCB CCR now set to %08x", SCB->CCR);    
     if (++cc == 4) {
         bprintf("fourth");
+
+#if 1
+    bprintf("SCB CCR starts off as %08x", SCB->CCR);
+//    SCB->CCR |= ( SCB_CCR_DIV_0_TRP_Msk | SCB_CCR_UNALIGN_TRP_Msk | SCB_CCR_BFHFNMIGN_Msk);
+//    bprintf("SCB CCR now set to %08x", SCB->CCR);
+    
+    static char buf1[128];
+    static char buf2[128];
+    for (int i=0; i<100; ++i) {
+        buf2[i] = i;
+    }
+
+    char * p = (&buf2[0] + 3);
+    char * q = &buf1[0];
+    p = p - ((int)p % 4);
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+            bprintf("look from %p to %p", p, q);
+            memcpy(q, p, 11);
+            q++;
+        }
+        p++;
+    }
+
+    bprintf("didit");
+#endif
+
     }
 #endif
     
