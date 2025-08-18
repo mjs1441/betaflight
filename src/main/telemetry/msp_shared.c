@@ -206,8 +206,10 @@ bool handleMspFrame(uint8_t *const payload, uint8_t const payloadLength, uint8_t
                     return false;   // prevent analyzing garbage data
                 }
                 mspPayloadSize = *(uint16_t*)&payload[MSP_INDEX_SIZE_JUMBO_LO];
+                
                 sbufInit(&sbufInput, payload + MSP_INDEX_PAYLOAD_JUMBO, payload + payloadLength);
             } else {
+                
                 sbufInit(&sbufInput, payload + MSP_INDEX_PAYLOAD_V1, payload + payloadLength);
             }
         } else { // MSPv2
@@ -217,6 +219,7 @@ bool handleMspFrame(uint8_t *const payload, uint8_t const payloadLength, uint8_t
             requestPacket.flags = payload[MSP_INDEX_FLAG_V2];
             requestPacket.cmd = *(uint16_t*)&payload[MSP_INDEX_ID_LO];
             mspPayloadSize = *(uint16_t*)&payload[MSP_INDEX_SIZE_V2_LO];
+            
             sbufInit(&sbufInput, payload + MSP_INDEX_PAYLOAD_V2, payload + payloadLength);
         }
         if (mspPayloadSize <= sizeof(requestBuffer)) { // prevent buffer overrun
@@ -238,6 +241,7 @@ bool handleMspFrame(uint8_t *const payload, uint8_t const payloadLength, uint8_t
                 return false;
             }
         }
+        
         sbufInit(&sbufInput, payload + 1, payload + payloadLength);
     }
 

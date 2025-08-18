@@ -123,6 +123,7 @@ void mspSerialReleaseSharedTelemetryPorts(void)
 
 static void mspSerialProcessReceivedPacketData(mspPort_t *mspPort, uint8_t c)
 {
+    bprintf("msprpd %d", c);
     switch (mspPort->packetState) {
         default:
         case MSP_IDLE:
@@ -408,7 +409,9 @@ static int mspSerialEncode(mspPort_t *msp, mspPacket_t *packet, mspVersion_e msp
 static mspPostProcessFnPtr mspSerialProcessReceivedCommand(mspPort_t *msp, mspProcessCommandFnPtr mspProcessCommandFn)
 {
     static uint8_t mspSerialOutBuf[MSP_PORT_OUTBUF_SIZE];
-
+//    bprintf("going to want to use mspSerialOutBuf at %p", mspSerialOutBuf);
+//    static int cc;
+    
     mspPacket_t reply = {
         .buf = { .ptr = mspSerialOutBuf, .end = ARRAYEND(mspSerialOutBuf), },
         .cmd = -1,
@@ -427,12 +430,23 @@ static mspPostProcessFnPtr mspSerialProcessReceivedCommand(mspPort_t *msp, mspPr
     };
 
     mspPostProcessFnPtr mspPostProcessFn = NULL;
+#if 0
+    bprintf("msoutbuf at %p of len %d in", mspSerialOutBuf, MSP_PORT_OUTBUF_SIZE);
+    bprintf("msinbuf is at %p len %d", msp->inBuf, msp->dataSize);
+    bprintf("SCB CCR now set to %08x", SCB->CCR);    
+    if (++cc == 4) {
+        bprintf("fourth");
+    }
+#endif
+    
     const mspResult_e status = mspProcessCommandFn(msp->descriptor, &command, &reply, &mspPostProcessFn);
 
     if (status != MSP_RESULT_NO_REPLY) {
+        bprintf("switcheroo");
         sbufSwitchToReader(&reply.buf, outBufHead); // change streambuf direction
         mspSerialEncode(msp, &reply, msp->mspVersion);
     }
+//    bprintf("we did use mspSerialOutBuf at %p", mspSerialOutBuf);
 
     return mspPostProcessFn;
 }
@@ -494,8 +508,10 @@ static void mspProcessPacket(mspPort_t *mspPort, mspProcessCommandFnPtr mspProce
 
         if (mspPort->packetState == MSP_COMMAND_RECEIVED) {
             if (mspPort->packetType == MSP_PACKET_COMMAND) {
+                bprintf("going to mspSProcRecCom");
                 mspPostProcessFn = mspSerialProcessReceivedCommand(mspPort, mspProcessCommandFn);
             } else if (mspPort->packetType == MSP_PACKET_REPLY) {
+                bprintf("going to msprr");
                 mspSerialProcessReceivedReply(mspPort, mspProcessReplyFn);
             }
 
@@ -510,6 +526,8 @@ static void mspProcessPacket(mspPort_t *mspPort, mspProcessCommandFnPtr mspProce
     }
 
     if (mspPostProcessFn) {
+        bprintf("going to mspPostProcFn");
+                
         waitForSerialPortToFinishTransmitting(mspPort->port);
         mspPostProcessFn(mspPort->port);
     }

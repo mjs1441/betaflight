@@ -753,7 +753,10 @@ static bool mspCommonProcessOutCommand(int16_t cmdMSP, sbuf_t *dst, mspPostProce
     }
 
     case MSP_BUILD_INFO:
+        bprintf("want to write build date %s from %p of length %d to %p", buildDate, buildDate, BUILD_DATE_LENGTH, dst->ptr);
+        bprintf("SCB CCR now set to %08x", SCB->CCR);
         sbufWriteData(dst, buildDate, BUILD_DATE_LENGTH);
+        bprintf("did that");
         sbufWriteData(dst, buildTime, BUILD_TIME_LENGTH);
         sbufWriteData(dst, shortGitRevision, GIT_SHORT_REVISION_LENGTH);
         // Added in API version 1.46
@@ -2322,6 +2325,7 @@ static void writePidfs(pidProfile_t* pidProfile, sbuf_t *dst)
 static mspResult_e mspFcProcessOutCommandWithArg(mspDescriptor_t srcDesc, int16_t cmdMSP, sbuf_t *src, sbuf_t *dst, mspPostProcessFnPtr *mspPostProcessFn)
 {
 
+//    bprintf("mspFcProcessOutCommandWithArg %d", cmdMSP);
     switch (cmdMSP) {
     case MSP_BOXNAMES:
         {
@@ -2376,12 +2380,14 @@ static mspResult_e mspFcProcessOutCommandWithArg(mspDescriptor_t srcDesc, int16_
         break;
     case MSP_MULTIPLE_MSP:
         {
+//            bprintf("MSP_MULTIPLE_MSP");
             uint8_t maxMSPs = 0;
             if (sbufBytesRemaining(src) == 0) {
                 return MSP_RESULT_ERROR;
             }
             int bytesRemaining = sbufBytesRemaining(dst);
             mspPacket_t packetIn, packetOut;
+            
             sbufInit(&packetIn.buf, src->end, src->end); // there is no paramater for MSP_MULTIPLE_MSP
             uint8_t* initialInputPtr = src->ptr;
             while (sbufBytesRemaining(src) && bytesRemaining > 0) {
@@ -2396,6 +2402,7 @@ static mspResult_e mspFcProcessOutCommandWithArg(mspDescriptor_t srcDesc, int16_
                 }
             }
             src->ptr = initialInputPtr;
+            
             sbufInit(&packetOut.buf, dst->ptr, dst->end);
             for (int i = 0; i < maxMSPs; i++) {
                 uint8_t* sizePtr = sbufPtr(&packetOut.buf);

@@ -29,6 +29,8 @@
 
 void run(void);
 
+#include <string.h>
+
 int main(int argc, char * argv[])
 {
 #ifdef USE_MAIN_ARGS
@@ -39,6 +41,39 @@ int main(int argc, char * argv[])
 #endif
     init();
 
+#if 0
+    bprintf("SCB CCR starts of as %08x", SCB->CCR);
+//    SCB->CCR |= ( SCB_CCR_DIV_0_TRP_Msk | SCB_CCR_UNALIGN_TRP_Msk | SCB_CCR_BFHFNMIGN_Msk);
+//    bprintf("SCB CCR now set to %08x", SCB->CCR);
+    
+#if 0
+    uint8_t buffer[10];
+    memset(&buffer[1], 0, 4);
+    memset(&buffer[2], 0, 4);
+    bprintf("%d , buffer1 %d, buffer2 %d\n", buffer, &buffer[1], &buffer[2]);
+#endif
+
+    static char buf1[128];
+    static char buf2[128];
+    for (int i=0; i<100; ++i) {
+        buf2[i] = i;
+    }
+
+    char * p = (&buf2[0] + 3);
+    char * q = &buf1[0];
+    p = p - ((int)p % 4);
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+            bprintf("look from %p to %p", p, q);
+            memcpy(q, p, 11);
+            q++;
+        }
+        p++;
+    }
+
+    bprintf("didit");
+#endif
+    
     run();
 
     return 0;
