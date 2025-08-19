@@ -406,6 +406,11 @@ static int mspSerialEncode(mspPort_t *msp, mspPacket_t *packet, mspVersion_e msp
     return mspSerialSendFrame(msp, hdrBuf, hdrLen, sbufPtr(&packet->buf), dataLen, crcBuf, crcLen);
 }
 
+static void little(char * to, const char*from, int len)
+{
+    memcpy(to, from, len);
+}
+
 static mspPostProcessFnPtr mspSerialProcessReceivedCommand(mspPort_t *msp, mspProcessCommandFnPtr mspProcessCommandFn)
 {
     static uint8_t mspSerialOutBuf[MSP_PORT_OUTBUF_SIZE];
@@ -454,7 +459,7 @@ static mspPostProcessFnPtr mspSerialProcessReceivedCommand(mspPort_t *msp, mspPr
     for (int i=0; i<4; ++i) {
         for (int j=0; j<4; ++j) {
             bprintf("look from %p to %p", p, q);
-            memcpy(q, p, 11);
+            little(q,p,11); //memcpy(q, p, 11);
             q++;
         }
         p++;

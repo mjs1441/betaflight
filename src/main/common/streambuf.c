@@ -74,7 +74,15 @@ void sbufFill(sbuf_t *dst, uint8_t data, int len)
 
 void sbufWriteData(sbuf_t *dst, const void *data, int len)
 {
+//    bprintf("sbufWriteData %p -> %p, %p, %d", dst, dst->ptr,  data, len);
+#if 0
+    uint8_t * p = dst->ptr; const uint8_t * q = data;
+    for (int i=0; i<len; ++i) {
+        *p++ = *q++;
+    }
+#else
     memcpy(dst->ptr, data, len);
+#endif
     dst->ptr += len;
 }
 
