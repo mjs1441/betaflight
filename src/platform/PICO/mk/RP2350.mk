@@ -42,6 +42,8 @@ ifeq ($(DEBUG_HARDFAULTS),PICO)
 CFLAGS          += -DDEBUG_HARDFAULTS
 endif
 
+#####CFLAGS += -mno-unaligned-access
+
 SDK_DIR         = $(LIB_MAIN_DIR)/pico-sdk/src
 
 #CMSIS

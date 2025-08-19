@@ -22,6 +22,10 @@
 
 #include "build/version.h"
 
+#ifndef bprintf
+#define bprintf(fmt,...)
+#endif
+
 /*
 
     The purpose of this file is to enable / disable any firmware "gates" for features and drivers

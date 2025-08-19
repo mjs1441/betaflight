@@ -48,7 +48,7 @@ int main(int argc, char * argv[])
     bprintf("%d , buffer1 %d, buffer2 %d\n", buffer, &buffer[1], &buffer[2]);
 #endif
 
-#if 1
+#if 0
     bprintf("SCB CCR starts of as %08x", SCB->CCR);
 //    SCB->CCR |= ( SCB_CCR_DIV_0_TRP_Msk | SCB_CCR_UNALIGN_TRP_Msk | SCB_CCR_BFHFNMIGN_Msk);
 //    bprintf("SCB CCR now set to %08x", SCB->CCR);
