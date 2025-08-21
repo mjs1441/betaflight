@@ -39,10 +39,10 @@ extern const char* const shortGitRevision;
 extern const char* const shortConfigGitRevision;
 
 #define BUILD_DATE_LENGTH           11
-extern const char* const buildDate;  // "MMM DD YYYY" MMM = Jan/Feb/...
+extern  char* buildDate;  // "MMM DD YYYY" MMM = Jan/Feb/...
 
 #define BUILD_TIME_LENGTH           8
-extern const char* const buildTime;  // "HH:MM:SS"
+extern  char* buildTime;  // "HH:MM:SS"
 
 #define MSP_API_VERSION_STRING STR(API_VERSION_MAJOR) "." STR(API_VERSION_MINOR)
 

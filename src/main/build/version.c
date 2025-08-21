@@ -27,8 +27,8 @@ const char * const shortGitRevision = __REVISION__;
 #if defined(__CONFIG_REVISION__)
 const char * const shortConfigGitRevision = __CONFIG_REVISION__;
 #endif
-const char * const buildDate = __DATE__;
-const char * const buildTime = __TIME__;
+ char *  buildDate = __DATE__;
+ char *  buildTime = __TIME__;
 
 #ifdef BUILD_KEY
     const char * const buildKey = STR(BUILD_KEY);
