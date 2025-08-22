@@ -186,6 +186,7 @@ bool ws2811LedStripHardwareInit(void)
     dmaSetHandler(dma_id, ws2811LedStripDmaHandler, NVIC_PRIO_WS2811_DMA, 0);
 
     IOInit(io, OWNER_LED_STRIP, 0);
+    IOConfigGPIO(io, IOCFG_OUT_PP);
     ledStripIO = io;
     return true;
 }
