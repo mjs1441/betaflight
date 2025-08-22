@@ -753,7 +753,9 @@ static bool mspCommonProcessOutCommand(int16_t cmdMSP, sbuf_t *dst, mspPostProce
     }
 
     case MSP_BUILD_INFO:
+        buildDate+=1;
         bprintf("want to write build date %s from %p of length %d to %p", buildDate, buildDate, BUILD_DATE_LENGTH, dst->ptr);
+        buildDate-=1;
         bprintf("SCB CCR now set to %08x", SCB->CCR);
         sbufWriteData(dst, buildDate, BUILD_DATE_LENGTH);
         bprintf("did that, next btl from %p to %p", buildTime, dst->ptr);
