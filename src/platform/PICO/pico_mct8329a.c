@@ -54,7 +54,7 @@ void i2cMuxEnableDevice(int device)
 #endif
 }
 
-bool HWReadMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t *result)
+bool readMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t *result)
 {
     // Read in 32-bit words, no CRC
     uint8_t control_word[3] = {0x90, (mctAddress&0x00000F00)>>8, mctAddress&0x000000FF};
@@ -85,7 +85,7 @@ bool HWReadMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t *res
     return res == 4;
 }
 
-bool HWWriteMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t data)
+bool writeMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t data)
 {
     // Write in 32-bit words, no CRC
     uint8_t control_word[3] = {0x10, (mctAddress&0x00000F00)>>8, mctAddress&0x000000FF};
@@ -119,18 +119,18 @@ static void i2cHardTestRW(unsigned long mct_addr, uint32_t val1, uint32_t val2)
 {
     uint32_t result;
     bool res;
-    res = HWReadMCTRegister32(MCTi2cLocation, mct_addr, &result);
+    res = readMCTRegister32(MCTi2cLocation, mct_addr, &result);
 #ifndef PICO_TRACE
     UNUSED(res);
 #endif
     bprintf("[result %d] MCT register %x (i2c location %x), contents read as %08x", res, mct_addr, MCTi2cLocation, result);
-    res = HWWriteMCTRegister32(MCTi2cLocation, mct_addr, val2);
+    res = writeMCTRegister32(MCTi2cLocation, mct_addr, val2);
     bprintf("[result %d] MCT register %x (i2c location %x), wrote %08x", res, mct_addr, MCTi2cLocation, val2);
-    res = HWReadMCTRegister32(MCTi2cLocation, mct_addr, &result);
+    res = readMCTRegister32(MCTi2cLocation, mct_addr, &result);
     bprintf("[result %d] MCT register %x (i2c location %x), contents read as %08x", res, mct_addr, MCTi2cLocation, result);
-    res = HWWriteMCTRegister32(MCTi2cLocation, mct_addr, val1);
+    res = writeMCTRegister32(MCTi2cLocation, mct_addr, val1);
     bprintf("[result %d] MCT register %x (i2c location %x), wrote %08x", res, mct_addr, MCTi2cLocation, val1);
-    res = HWReadMCTRegister32(MCTi2cLocation, mct_addr, &result);
+    res = readMCTRegister32(MCTi2cLocation, mct_addr, &result);
     bprintf("[result %d] MCT register %x (i2c location %x), contents read as %08x", res, mct_addr, MCTi2cLocation, result);
 }
 #endif
@@ -142,7 +142,7 @@ static void i2cHardTestRead(unsigned long mct_addr)
 #ifndef PICO_TRACE
     UNUSED(res);
 #endif
-    res = HWReadMCTRegister32(MCTi2cLocation, mct_addr, &result);
+    res = readMCTRegister32(MCTi2cLocation, mct_addr, &result);
     bprintf("[%s] %x: %08x", res ? "success" : "fail   ", mct_addr, result);
 }
 
@@ -155,14 +155,14 @@ static void i2cMuxReset(bool enable)
         gpio_put(muxResetPin, 1);
 }
 
-static bool HWmctWriteReg(uint32_t mctAddress, uint32_t data)
+static bool mctWriteReg(uint32_t mctAddress, uint32_t data)
 {
-    bool result = HWWriteMCTRegister32(MCTi2cLocation, mctAddress, data);
+    bool result = writeMCTRegister32(MCTi2cLocation, mctAddress, data);
     uint32_t buf;
-    result = result && HWReadMCTRegister32(MCTi2cLocation, mctAddress, &buf) && buf == data;
+    result = result && readMCTRegister32(MCTi2cLocation, mctAddress, &buf) && buf == data;
     return result;
 }
-static bool HWmctSetRegs(int device)
+static bool mctSetRegs(int device)
 {
     bprintf("[hw] Setting registers for device %d", device);
     if (device<0 || device>3) {
@@ -174,99 +174,99 @@ static bool HWmctSetRegs(int device)
     bool result = true;
     int numRegs = 0; int succeeded = 0;
 #ifdef MCT8329A_ISD_CONFIG
-    result = result && HWmctWriteReg(0x80, MCT8329A_ISD_CONFIG);
+    result = result && mctWriteReg(0x80, MCT8329A_ISD_CONFIG);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_MOTOR_STARTUP1
-    result = result && HWmctWriteReg(0x82, MCT8329A_MOTOR_STARTUP1);
+    result = result && mctWriteReg(0x82, MCT8329A_MOTOR_STARTUP1);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_MOTOR_STARTUP2
-    result = result && HWmctWriteReg(0x84, MCT8329A_MOTOR_STARTUP2);
+    result = result && mctWriteReg(0x84, MCT8329A_MOTOR_STARTUP2);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_CLOSED_LOOP1
-    result = result && HWmctWriteReg(0x86, MCT8329A_CLOSED_LOOP1);
+    result = result && mctWriteReg(0x86, MCT8329A_CLOSED_LOOP1);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_CLOSED_LOOP2
-    result = result && HWmctWriteReg(0x88, MCT8329A_CLOSED_LOOP2);
+    result = result && mctWriteReg(0x88, MCT8329A_CLOSED_LOOP2);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_CLOSED_LOOP3
-    result = result && HWmctWriteReg(0x8A, MCT8329A_CLOSED_LOOP3);
+    result = result && mctWriteReg(0x8A, MCT8329A_CLOSED_LOOP3);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_CLOSED_LOOP4
-    result = result && HWmctWriteReg(0x8C, MCT8329A_CLOSED_LOOP4);
+    result = result && mctWriteReg(0x8C, MCT8329A_CLOSED_LOOP4);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_CONST_SPEED
-    result = result && HWmctWriteReg(0x8E, MCT8329A_CONST_SPEED);
+    result = result && mctWriteReg(0x8E, MCT8329A_CONST_SPEED);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_CONST_PWR
-    result = result && HWmctWriteReg(0x90, MCT8329A_CONST_PWR);
+    result = result && mctWriteReg(0x90, MCT8329A_CONST_PWR);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_FAULT_CONFIG1
-    result = result && HWmctWriteReg(0x92, MCT8329A_FAULT_CONFIG1);
+    result = result && mctWriteReg(0x92, MCT8329A_FAULT_CONFIG1);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_FAULT_CONFIG2
-    result = result && HWmctWriteReg(0x94, MCT8329A_FAULT_CONFIG2);
+    result = result && mctWriteReg(0x94, MCT8329A_FAULT_CONFIG2);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_150_DEG_TWO_PH_PROFILE
-    result = result && HWmctWriteReg(0x96, MCT8329A_150_DEG_TWO_PH_PROFILE);
+    result = result && mctWriteReg(0x96, MCT8329A_150_DEG_TWO_PH_PROFILE);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_150_DEG_THREE_PH_PROFILE
-    result = result && HWmctWriteReg(0x98, MCT8329A_150_DEG_THREE_PH_PROFILE);
+    result = result && mctWriteReg(0x98, MCT8329A_150_DEG_THREE_PH_PROFILE);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_REF_PROFILES1
-    result = result && HWmctWriteReg(0x9A, MCT8329A_REF_PROFILES1);
+    result = result && mctWriteReg(0x9A, MCT8329A_REF_PROFILES1);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_REF_PROFILES2
-    result = result && HWmctWriteReg(0x9C, MCT8329A_REF_PROFILES2);
+    result = result && mctWriteReg(0x9C, MCT8329A_REF_PROFILES2);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_REF_PROFILES3
-    result = result && HWmctWriteReg(0x9E, MCT8329A_REF_PROFILES3);
+    result = result && mctWriteReg(0x9E, MCT8329A_REF_PROFILES3);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_REF_PROFILES4
-    result = result && HWmctWriteReg(0xA0, MCT8329A_REF_PROFILES4);
+    result = result && mctWriteReg(0xA0, MCT8329A_REF_PROFILES4);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_REF_PROFILES5
-    result = result && HWmctWriteReg(0xA2, MCT8329A_REF_PROFILES5);
+    result = result && mctWriteReg(0xA2, MCT8329A_REF_PROFILES5);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_REF_PROFILES6
-    result = result && HWmctWriteReg(0xA4, MCT8329A_REF_PROFILES6);
+    result = result && mctWriteReg(0xA4, MCT8329A_REF_PROFILES6);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_PIN_CONFIG1
-    result = result && HWmctWriteReg(0xA6, MCT8329A_PIN_CONFIG1);
+    result = result && mctWriteReg(0xA6, MCT8329A_PIN_CONFIG1);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_PIN_CONFIG2
-    result = result && HWmctWriteReg(0xA8, MCT8329A_PIN_CONFIG2);
+    result = result && mctWriteReg(0xA8, MCT8329A_PIN_CONFIG2);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_DEVICE_CONFIG
-    result = result && HWmctWriteReg(0xAA, MCT8329A_DEVICE_CONFIG);
+    result = result && mctWriteReg(0xAA, MCT8329A_DEVICE_CONFIG);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_GD_CONFIG1
-    result = result && HWmctWriteReg(0xAC, MCT8329A_GD_CONFIG1);
+    result = result && mctWriteReg(0xAC, MCT8329A_GD_CONFIG1);
     numRegs++; succeeded += result;
 #endif
 #ifdef MCT8329A_GD_CONFIG2
-    result = result && HWmctWriteReg(0xAE, MCT8329A_GD_CONFIG2);
+    result = result && mctWriteReg(0xAE, MCT8329A_GD_CONFIG2);
     numRegs++; succeeded += result;
 #endif
     bprintf("device %d, set %d of %d regs", device, succeeded, numRegs);
@@ -311,7 +311,7 @@ bool mctReadRegByName(int device, const char *name, uint32_t *result)
     for (int i=0; i<numMCTregs; ++i) {
         if (!strcasecmp(mctLookup[i].name, name)) {
             found = true;
-            success = HWReadMCTRegister32(MCTi2cLocation, mctLookup[i].reg, result);
+            success = readMCTRegister32(MCTi2cLocation, mctLookup[i].reg, result);
             break;
         }
     }
@@ -331,7 +331,7 @@ bool mctWriteRegByName(int device, const char *name, uint32_t data)
     for (int i=0; i<numMCTregs; ++i) {
         if (!strcasecmp(mctLookup[i].name, name)) {
             found = true;
-            success = HWWriteMCTRegister32(MCTi2cLocation, mctLookup[i].reg, data);
+            success = writeMCTRegister32(MCTi2cLocation, mctLookup[i].reg, data);
         }
     }
 
@@ -350,7 +350,7 @@ void pico_esc_mct8329a_init(bool isDshotProtocol)
 
     i2cMuxReset(true);
     for (int motorDevice = 0; motorDevice < 4; ++motorDevice) {
-        HWmctSetRegs(motorDevice);
+        mctSetRegs(motorDevice);
         for (int i=0; i<numTestRegs; ++i) {
             i2cHardTestRead(testReadRegs[i]);
         }
