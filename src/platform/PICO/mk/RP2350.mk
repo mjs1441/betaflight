@@ -401,6 +401,7 @@ MCU_COMMON_SRC = \
             PICO/exti_pico.c \
             PICO/io_pico.c \
             PICO/persistent.c \
+            PICO/pico_mct8329a.c \
             PICO/pwm_pico.c \
             PICO/pwm_beeper_pico.c \
             PICO/serial_uart_pico.c \

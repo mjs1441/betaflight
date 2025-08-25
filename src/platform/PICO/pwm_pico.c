@@ -46,6 +46,10 @@
 #include "hardware/pwm.h"
 #include "hardware/clocks.h"
 
+#ifdef PICO_ESC_MCT8329A
+#include "pico_mct8329a.h"
+#endif
+
 typedef struct picoPwmMotors_s {
     uint16_t slice;
     uint16_t channel;
@@ -98,8 +102,15 @@ static uint16_t pwmConvertToExternal(float motorValue)
     return (uint16_t)motorValue;
 }
 
+static void pwmMotorPostInit(void)
+{
+#ifdef PICO_ESC_MCT8329A
+    pico_esc_mct8329a_init(false);
+#endif
+}
+
 static motorVTable_t motorPwmVTable = {
-    .postInit = NULL,
+    .postInit = pwmMotorPostInit,
     .enable = pwmEnableMotors,
     .disable = pwmDisableMotors,
     .isMotorEnabled = pwmIsMotorEnabled,

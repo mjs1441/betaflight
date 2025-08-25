@@ -45,6 +45,8 @@
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 
+#include "pico_mct8329a.h"
+
 ////////FAST_DATA_ZERO_INIT timeUs_t dshotFrameUs;
 //static FAST_DATA_ZERO_INIT timeUs_t lastSendUs;
 
@@ -504,6 +506,10 @@ static bool dshotIsMotorEnabled(unsigned index)
 
 static void dshotPostInit(void)
 {
+#ifdef PICO_ESC_MCT8329A
+    pico_esc_mct8329a_init(true);
+#endif
+
     for (int motorIndex = 0; motorIndex < MAX_SUPPORTED_MOTORS && motorIndex < dshotMotorCount; motorIndex++) {
         dshotMotors[motorIndex].enabled = true;
     }
