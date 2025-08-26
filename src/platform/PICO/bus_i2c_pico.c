@@ -420,6 +420,7 @@ static void i2c_irq1_handler(void)
 
 void i2cInit(I2CDevice device)
 {
+    bprintf("+++ i2cInit %d", device);
     if (device == I2CINVALID) {
         return;
     }
@@ -453,6 +454,7 @@ void i2cInit(I2CDevice device)
     gpio_pull_up(sdaPin);
     gpio_pull_up(sclPin);
 
+    bprintf("+++ set function and pullup for sdc %d and scl %d", sdaPin, sclPin);
     i2c_contexts[device].i2c = I2C_INST(i2cHardware[device].reg);
     i2c_contexts[device].state = I2C_STATE_IDLE;
 

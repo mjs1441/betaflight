@@ -348,6 +348,8 @@ void pico_esc_mct8329a_init(bool isDshotProtocol)
     UNUSED(isDshotProtocol); // dshot or pwm type
     bprintf("pico_esc_mct8329a_init %d", isDshotProtocol);
 
+    irq_set_enabled(MCT8329A_MUX_I2C_INDEX == 0 ? I2C0_IRQ : I2C1_IRQ, false);
+
     i2cMuxReset(true);
     for (int motorDevice = 0; motorDevice < 4; ++motorDevice) {
         mctSetRegs(motorDevice);
@@ -355,6 +357,8 @@ void pico_esc_mct8329a_init(bool isDshotProtocol)
             i2cHardTestRead(testReadRegs[i]);
         }
     }
+
+    irq_set_enabled(MCT8329A_MUX_I2C_INDEX == 0 ? I2C0_IRQ : I2C1_IRQ, true);
 }
 
 #endif
