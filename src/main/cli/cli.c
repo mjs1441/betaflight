@@ -6519,19 +6519,26 @@ static void cliMsc(const char *cmdName, char *cmdline)
 
 // todo store to EEPROM? and reset from EEPROM
 
-static void listMctRegs(void)
+static void listMctRegs(int i)
 {
     uint32_t buf;
-    for (int i=0; i<4; ++i) {
-        cliPrintLinef("Registers from MCT8329A device %d", i);
-        for (int r=0; r<numMCTregs; ++r) {
-            bool res = mctReadRegByName(i, mctLookup[r].name, &buf);
-            if (res) {
-                cliPrintLinef(" %02x\t%s\t%08x", mctLookup[r].reg, mctLookup[r].name, buf);
-            } else {
-                cliPrintLinef(" %02x\t%s\tunavailable", mctLookup[r].reg, mctLookup[r].name);
-            }
+    cliPrintLinef("# Registers from MCT8329A device %d", i);
+    for (int r=0; r<numMCTregs; ++r) {
+        bool res = mctReadRegByName(i, mctLookup[r].name, &buf);
+        if (res) {
+            cliPrintLinef(" %02x\t%s\t%08x", mctLookup[r].reg, mctLookup[r].name, buf);
+        } else {
+            cliPrintLinef(" %02x\t%s\tunavailable", mctLookup[r].reg, mctLookup[r].name);
         }
+    }
+    
+    cliPrintLinef("");
+}
+
+static void listAllMctRegs(void)
+{
+    for (int i=0; i<4; ++i) {
+        listMctRegs(i);
     }
 }
 
@@ -6539,6 +6546,7 @@ static void setMctReg(const char *cmdline)
 {
     UNUSED(cmdline);
     bprintf("TODO setMctReg %s", cmdline);
+    cliPrintLinef("TODO setMctReg %s", cmdline);
     /*
       token -> name, token -> strtol for hex data
       
@@ -6556,12 +6564,25 @@ static void setMctReg(const char *cmdline)
     }
     */
 }
+
+static void setAllMctReg(const char *cmdline)
+{
+    UNUSED(cmdline);
+    bprintf("TODO setAllMctReg %s", cmdline);
+    cliPrintLinef("TODO setAllMctReg %s", cmdline);
+}
     
 static void cliMctRegs(const char *cmdName, char *cmdline)
 {
-    if (strcasecmp(cmdline, "list") == 0) {
-        listMctRegs();
-    } else if (strcasecmp(cmdline, "set") == 0) {
+    if (strcasecmp(cmdline, "listall") == 0) {
+        listAllMctRegs();
+    } else if (strncasecmp(cmdline, "list ", 5) == 0) {
+        int device = strtol(nextArg(cmdline), NULL, 10);
+        bprintf("cmdline %s, device %d", cmdline, device);
+        listMctRegs(device);
+    } else if (strcasecmp(cmdline, "setall") == 0) {
+        setAllMctReg(nextArg(cmdline));
+    } else if (strncasecmp(cmdline, "set ", 4) == 0) {
         setMctReg(nextArg(cmdline));
     } else {
         cliPrintErrorLinef(cmdName, "TRY 'HELP'");
@@ -6682,7 +6703,7 @@ const clicmd_t cmdTable[] = {
 #endif
     CLI_COMMAND_DEF("map", "configure rc channel order", "[<map>]", cliMap),
 #ifdef PICO_ESC_MCT8329A
-    CLI_COMMAND_DEF("mctreg", "read/write MCT8329A registers", "list | set <reg address> <hex value>", cliMctRegs),
+    CLI_COMMAND_DEF("mctreg", "read/write MCT8329A registers", "list <device number> | listall | set <device number> <reg address> <hex value> | setall", cliMctRegs),
 #endif
     CLI_COMMAND_DEF("mcu_id", "id of the microcontroller", NULL, cliMcuId),
 #ifndef USE_QUAD_MIXER_ONLY
