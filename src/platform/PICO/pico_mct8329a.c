@@ -25,13 +25,54 @@
 
 #include <strings.h>
 #include "drivers/time.h"
+#include "pico_mct8329a.h"
 
-#define TESTREGS
+mctLookup_t mctLookup[] =
+{
+    {0x80, "ISD_CONFIG"},
+    {0x82, "MOTOR_STARTUP1"},
+    {0x84, "MOTOR_STARTUP2"},
+    {0x86, "CLOSED_LOOP1"},
+    {0x88, "CLOSED_LOOP2"},
+    {0x8A, "CLOSED_LOOP3"},
+    {0x8C, "CLOSED_LOOP4"},
+    {0x8E, "CONST_SPEED"},
+    {0x90, "CONST_PWR"},
+    {0x92, "FAULT_CONFIG1"},
+    {0x94, "FAULT_CONFIG2"},
+    {0x96, "150_DEG_TWO_PH_PROFILE"},
+    {0x98, "150_DEG_THREE_PH_PROFILE"},
+    {0x9A, "REF_PROFILES1"},
+    {0x9C, "REF_PROFILES2"},
+    {0x9E, "REF_PROFILES3"},
+    {0xA0, "REF_PROFILES4"},
+    {0xA2, "REF_PROFILES5"},
+    {0xA4, "REF_PROFILES6"},
+    {0xA6, "PIN_CONFIG1"},
+    {0xA8, "PIN_CONFIG2"},
+    {0xAA, "DEVICE_CONFIG"},
+    {0xAC, "GD_CONFIG1"},
+    {0xAE, "GD_CONFIG2"},
+};
+
+const int numMCTregs = sizeof(mctLookup) / sizeof(mctLookup[0]);
+
+static void disableI2Cinterrupts(void)
+{
+    irq_set_enabled(MCT8329A_MUX_I2C_INDEX == 0 ? I2C0_IRQ : I2C1_IRQ, false);
+}
+
+static void reenableI2Cinterrupts(void)
+{
+    irq_set_enabled(MCT8329A_MUX_I2C_INDEX == 0 ? I2C0_IRQ : I2C1_IRQ, true);
+}
 
 static uint8_t muxAddr = MCT8329A_MUX_ADDR;
 static uint8_t muxResetPin = MCT8329A_MUX_RESET_GPIO;
 static i2c_inst_t *muxi2c = I2C_INSTANCE(MCT8329A_MUX_I2C_INDEX);
 static uint8_t MCTi2cLocation = MCT8329A_MCT_ADDR; // i2c location of MCT8329A
+
+#define TESTREGS
 
 static uint8_t testReadRegs[] = {
     0x80, 0x82, 0x84, 0x86, 0x88, 0x8A, 0x8C, 0x8E,
@@ -41,7 +82,7 @@ static uint8_t testReadRegs[] = {
 
 static const int numTestRegs = sizeof(testReadRegs) / sizeof(testReadRegs[0]);
 
-void i2cMuxEnableDevice(int device)
+static void i2cMuxEnableDevice(int device)
 {
     uint8_t buf = 1 << device;
     int wrote = i2c_write_blocking(muxi2c, muxAddr, &buf, 1, false);
@@ -54,7 +95,7 @@ void i2cMuxEnableDevice(int device)
 #endif
 }
 
-bool readMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t *result)
+static bool readMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t *result)
 {
     // Read in 32-bit words, no CRC
     uint8_t control_word[3] = {0x90, (mctAddress&0x00000F00)>>8, mctAddress&0x000000FF};
@@ -85,7 +126,7 @@ bool readMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t *resul
     return res == 4;
 }
 
-bool writeMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t data)
+static bool writeMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t data)
 {
     // Write in 32-bit words, no CRC
     uint8_t control_word[3] = {0x10, (mctAddress&0x00000F00)>>8, mctAddress&0x000000FF};
@@ -273,40 +314,13 @@ static bool mctSetRegs(int device)
     return result;
 }
 
-struct { uint8_t reg; const char *name; } mctLookup[] =
-{
-    {0x80, "ISD_CONFIG"},
-    {0x82, "MOTOR_STARTUP1"},
-    {0x84, "MOTOR_STARTUP2"},
-    {0x86, "CLOSED_LOOP1"},
-    {0x88, "CLOSED_LOOP2"},
-    {0x8A, "CLOSED_LOOP3"},
-    {0x8C, "CLOSED_LOOP4"},
-    {0x8E, "CONST_SPEED"},
-    {0x90, "CONST_PWR"},
-    {0x92, "FAULT_CONFIG1"},
-    {0x94, "FAULT_CONFIG2"},
-    {0x96, "150_DEG_TWO_PH_PROFILE"},
-    {0x98, "150_DEG_THREE_PH_PROFILE"},
-    {0x9A, "REF_PROFILES1"},
-    {0x9C, "REF_PROFILES2"},
-    {0x9E, "REF_PROFILES3"},
-    {0xA0, "REF_PROFILES4"},
-    {0xA2, "REF_PROFILES5"},
-    {0xA4, "REF_PROFILES6"},
-    {0xA6, "PIN_CONFIG1"},
-    {0xA8, "PIN_CONFIG2"},
-    {0xAA, "DEVICE_CONFIG"},
-    {0xAC, "GD_CONFIG1"},
-    {0xAE, "GD_CONFIG2"},
-};
-
-const int numMCTregs = sizeof(mctLookup) / sizeof(mctLookup[0]);
+// "api". Disable I2C interrupts at start and reenable at end of functions.
 
 bool mctReadRegByName(int device, const char *name, uint32_t *result)
 {
     bool success = false;
     bool found = false;
+    disableI2Cinterrupts();
     i2cMuxEnableDevice(device);
     for (int i=0; i<numMCTregs; ++i) {
         if (!strcasecmp(mctLookup[i].name, name)) {
@@ -320,6 +334,7 @@ bool mctReadRegByName(int device, const char *name, uint32_t *result)
         bprintf("mctReadRegByName unknown name '%s'", name);
     }
 
+    reenableI2Cinterrupts();
     return success;
 }
 
@@ -327,6 +342,7 @@ bool mctWriteRegByName(int device, const char *name, uint32_t data)
 {
     bool success = false;
     bool found = false;
+    disableI2Cinterrupts();
     i2cMuxEnableDevice(device);
     for (int i=0; i<numMCTregs; ++i) {
         if (!strcasecmp(mctLookup[i].name, name)) {
@@ -339,6 +355,7 @@ bool mctWriteRegByName(int device, const char *name, uint32_t data)
         bprintf("mctWriteRegByName unknown name '%s'", name);
     }
 
+    reenableI2Cinterrupts();
     return success;
 }
 
@@ -348,8 +365,7 @@ void pico_esc_mct8329a_init(bool isDshotProtocol)
     UNUSED(isDshotProtocol); // dshot or pwm type
     bprintf("pico_esc_mct8329a_init %d", isDshotProtocol);
 
-    irq_set_enabled(MCT8329A_MUX_I2C_INDEX == 0 ? I2C0_IRQ : I2C1_IRQ, false);
-
+    disableI2Cinterrupts();
     i2cMuxReset(true);
     for (int motorDevice = 0; motorDevice < 4; ++motorDevice) {
         mctSetRegs(motorDevice);
@@ -358,7 +374,7 @@ void pico_esc_mct8329a_init(bool isDshotProtocol)
         }
     }
 
-    irq_set_enabled(MCT8329A_MUX_I2C_INDEX == 0 ? I2C0_IRQ : I2C1_IRQ, true);
+    reenableI2Cinterrupts();
 }
 
 #endif

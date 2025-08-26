@@ -6514,6 +6514,61 @@ static void cliMsc(const char *cmdName, char *cmdline)
 }
 #endif
 
+#ifdef PICO_ESC_MCT8329A
+#include "pico_mct8329a.h"
+
+// todo store to EEPROM? and reset from EEPROM
+
+static void listMctRegs(void)
+{
+    uint32_t buf;
+    for (int i=0; i<4; ++i) {
+        cliPrintLinef("Registers from MCT8329A device %d", i);
+        for (int r=0; r<numMCTregs; ++r) {
+            bool res = mctReadRegByName(i, mctLookup[r].name, &buf);
+            if (res) {
+                cliPrintLinef(" %02x\t%s\t%08x", mctLookup[r].reg, mctLookup[r].name, buf);
+            } else {
+                cliPrintLinef(" %02x\t%s\tunavailable", mctLookup[r].reg, mctLookup[r].name);
+            }
+        }
+    }
+}
+
+static void setMctReg(const char *cmdline)
+{
+    UNUSED(cmdline);
+    bprintf("TODO setMctReg %s", cmdline);
+    /*
+      token -> name, token -> strtol for hex data
+      
+    uint32_t data = strtol(;
+    for (int i=0; i<4; ++i) {
+        cliPrintLinef("Registers from MCT8329A device %d", i);
+        for (int r=0; r<numMCTregs; ++r) {
+            bool res = mctReadRegByName(i, mctLookup[r].name, &buf);
+            if (res) {
+                cliPrintLinef(" %02x %s: %08x", mctLookup[r].reg, mctLookup[r].name, buf);
+            } else {
+                cliPrintLinef(" %02x %s: N/A", mctLookup[r].reg, mctLookup[r].name);
+            }
+        }
+    }
+    */
+}
+    
+static void cliMctRegs(const char *cmdName, char *cmdline)
+{
+    if (strcasecmp(cmdline, "list") == 0) {
+        listMctRegs();
+    } else if (strcasecmp(cmdline, "set") == 0) {
+        setMctReg(nextArg(cmdline));
+    } else {
+        cliPrintErrorLinef(cmdName, "TRY 'HELP'");
+    }
+}
+#endif
+
 typedef void cliCommandFn(const char* name, char *cmdline);
 
 typedef struct {
@@ -6626,6 +6681,9 @@ const clicmd_t cmdTable[] = {
     CLI_COMMAND_DEF("manufacturer_id", "get / set the id of the board manufacturer", "[manufacturer id]", cliManufacturerId),
 #endif
     CLI_COMMAND_DEF("map", "configure rc channel order", "[<map>]", cliMap),
+#ifdef PICO_ESC_MCT8329A
+    CLI_COMMAND_DEF("mctreg", "read/write MCT8329A registers", "list | set <reg address> <hex value>", cliMctRegs),
+#endif
     CLI_COMMAND_DEF("mcu_id", "id of the microcontroller", NULL, cliMcuId),
 #ifndef USE_QUAD_MIXER_ONLY
     CLI_COMMAND_DEF("mixer", "configure mixer", "list\r\n\t<name>", cliMixer),
