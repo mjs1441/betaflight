@@ -143,7 +143,7 @@ static void i2cHardTestRead(unsigned long mct_addr)
     UNUSED(res);
 #endif
     res = readMCTRegister32(MCTi2cLocation, mct_addr, &result);
-    bprintf("[%s] %x: %08x", res ? "success" : "fail   ", mct_addr, result);
+    bprintf("[%s] %x: %08x", res ? "successful read" : "failed read", mct_addr, result);
 }
 
 static void i2cMuxReset(bool enable)
