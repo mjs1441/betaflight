@@ -56,6 +56,7 @@ mctLookup_t mctLookup[] =
 };
 
 const int numMCTregs = sizeof(mctLookup) / sizeof(mctLookup[0]);
+const int numMCTdevices = 4; // 4 for now
 
 static void disableI2Cinterrupts(void)
 {
@@ -359,6 +360,15 @@ bool mctWriteRegByName(int device, const char *name, uint32_t data)
     return success;
 }
 
+bool mctWriteRegByAddress(int device, uint32_t reg, uint32_t data)
+{
+    disableI2Cinterrupts();
+    i2cMuxEnableDevice(device);
+    bool success = writeMCTRegister32(MCTi2cLocation, reg, data);
+    reenableI2Cinterrupts();
+    return success;
+}
+
 void pico_esc_mct8329a_init(bool isDshotProtocol)
 {
     // At end of motorDevInit, if successful
@@ -367,7 +377,7 @@ void pico_esc_mct8329a_init(bool isDshotProtocol)
 
     disableI2Cinterrupts();
     i2cMuxReset(true);
-    for (int motorDevice = 0; motorDevice < 4; ++motorDevice) {
+    for (int motorDevice = 0; motorDevice < numMCTdevices; ++motorDevice) {
         mctSetRegs(motorDevice);
         for (int i=0; i<numTestRegs; ++i) {
             i2cHardTestRead(testReadRegs[i]);
