@@ -2375,7 +2375,7 @@ static void cliServoMix(const char *cmdName, char *cmdline)
         }
 
         char *saveptr;
-        const char *ptr = strtok_r(ptr, " ", &saveptr);
+        ptr = strtok_r(ptr, " ", &saveptr);
         while (ptr != NULL && check < ARGS_COUNT - 1) {
             args[check++] = atoi(ptr);
             ptr = strtok_r(NULL, " ", &saveptr);
