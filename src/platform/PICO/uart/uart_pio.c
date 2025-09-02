@@ -37,6 +37,18 @@
 
 #define PIO_IRQ_INDEX(irqn) (irqn == PIO_IRQ_NUM(uartPio, 0) ? 0 : 1)
 
+typedef struct pioDetails_s {
+    irq_num_t irqn;
+    io_rw_32 *enableReg;
+    io_ro_32 *statusReg;
+    int rxPin;
+    int txPin;
+    uint16_t sm_rx; // sm number for rx (0..3)
+    uint16_t sm_tx; // sm number for tx (0..3)
+    uint32_t rx_intr_bit; // bit to check on interrupt enable and status registers for rx not empty
+    uint32_t tx_intr_bit; // bit to check on interrupt enable and status registers for tx not full
+} pioDetails_t;
+
 // Store for details, catering for UART2, UART3
 pioDetails_t uartPioDetails[2];
 
