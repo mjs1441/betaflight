@@ -24,7 +24,7 @@
 // The PIO block for software UARTs UART2, UART3
 #define UART_PIO_INSTANCE PIO_INSTANCE(PIO_UART_INDEX)
 
-#define UART_PIO_DETAILS_IDX(id) (id - SERIAL_PORT_UART2)
+#define UART_PIO_DETAILS_IDX(id) ((id) - SERIAL_PORT_UART2)
 #define UART_PIO_DETAILS_PTR(id) (&uartPioDetails[UART_PIO_DETAILS_IDX(id)])
 
 // Base for PIO pin counts (0 or 16)

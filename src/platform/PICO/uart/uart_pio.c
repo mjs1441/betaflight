@@ -35,7 +35,7 @@
 #include "uart_tx.pio.h"
 #include "uart_rx.pio.h"
 
-#define PIO_IRQ_INDEX(irqn) (irqn == PIO_IRQ_NUM(uartPio, 0) ? 0 : 1)
+#define PIO_IRQ_INDEX(irqn) ((irqn) == PIO_IRQ_NUM(uartPio, 0) ? 0 : 1)
 
 typedef struct pioDetails_s {
     irq_num_t irqn;
