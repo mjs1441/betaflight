@@ -392,6 +392,8 @@ MCU_COMMON_SRC = \
             drivers/serial_pinconfig.c \
             drivers/usb_io.c \
             drivers/dshot.c \
+            drivers/adc.c \
+            PICO/adc_pico.c \
             PICO/bus_i2c_pico.c \
             PICO/bus_spi_pico.c \
             PICO/config_flash.c \
@@ -404,9 +406,11 @@ MCU_COMMON_SRC = \
             PICO/pico_mct8329a.c \
             PICO/pwm_pico.c \
             PICO/pwm_beeper_pico.c \
-            PICO/serial_uart_pico.c \
             PICO/serial_usb_vcp_pico.c \
             PICO/system.c \
+            PICO/uart/serial_uart_pico.c \
+            PICO/uart/uart_hw.c \
+            PICO/uart/uart_pio.c \
             PICO/usb/usb_cdc.c \
             PICO/usb/usb_descriptors.c \
             PICO/usb/usb_msc_pico.c \
