@@ -72,12 +72,28 @@ void pwmDisableMotors(void)
     pwmShutdownPulsesForAllMotors();
 }
 
+#define testmctdevicectrl
+#ifdef testmctdevicectrl
+#include "pico_mct8329a.h"
+#endif
 static void pwmWriteStandard(uint8_t index, float value)
 {
+#ifdef testmctdevicectrl
+    UNUSED(index);
+    UNUSED(value);
+    static int once = 0;
+    uint32_t val = 0x199a8000;
+    if (value > 1000.1f && !once) {
+        bprintf("*** (%.3f) write device 0 reg 0xe8 val %08x", (double)value, val);
+        mctWriteRegByAddress(0, 0xe8, val);
+        once = 1;
+    }
+#else
     uint16_t dutyLevel = lrintf(MAX(0, (value + pwmMotors[index].pulseOffset) * pwmMotors[index].pulseScale));
 //    bprintf("pwmWriteStandard %d val %.1f on pwm %d,%d -> %d of %d so %.1f", index, (double)value, picoPwmMotors[index].slice, picoPwmMotors[index].channel,
 //            dutyLevel, wrap, ((double)dutyLevel)/wrap );
     pwm_set_chan_level(picoPwmMotors[index].slice, picoPwmMotors[index].channel, dutyLevel);
+#endif
 }
 
 static void pwmCompleteMotorUpdate(void)
