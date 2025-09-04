@@ -102,6 +102,7 @@ static void i2cMuxEnableDevice(int device)
 
 static bool readMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t *result)
 {
+    static int badcount;
     // Read in 32-bit words, no CRC
     uint8_t control_word[3] = {0x90, (mctAddress&0x00000F00)>>8, mctAddress&0x000000FF};
 
@@ -110,7 +111,9 @@ static bool readMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t
 //    uint32_t c1 = getCycleCounter();
     int res = i2c_write_blocking(muxi2c, i2cLocation, control_word, 3, true /*no stop*/);
     if (res != 3) {
-        bprintf("i2c_write_blocking for control word returned %d", res);
+        if (badcount++ % 2000 <= 1) {
+            bprintf("%d i2c_write_blocking for control word returned %d", badcount, res);
+        }
         return false;
     }
 
@@ -125,7 +128,9 @@ static bool readMCTRegister32(uint8_t i2cLocation, uint32_t mctAddress, uint32_t
 //    bprintf("control word write: %.1f us, data read: %.1f us, total %.1f us",
 //            ((int32_t)(c2-c1))/150.0, ((int32_t)(c3-c2))/150.0, ((int32_t)(c3-c1))/150.0);
     if (res != 4) {
-        bprintf("i2c_read_blocking returned %d with result %08x", res, *result);
+        if (badcount++ % 2000 <= 1) {
+            bprintf("%d i2c_read_blocking returned %d with result %08x", badcount, res, *result);
+        }
     }
 
     return res == 4;
