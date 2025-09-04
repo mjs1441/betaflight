@@ -517,6 +517,24 @@ FAST_CODE void scheduler(void)
     static const int nsr = sizeof(sregs)/sizeof(sregs[0]);
     static int mcount;
     uint32_t result;
+    static int initfaultgpio;
+    const int mfgpio = MCT8329A_MOTOR_FAULT_GPIO;
+    if (!initfaultgpio) {
+        gpio_init(mfgpio);
+        gpio_pull_up(mfgpio);
+        bprintf("*** set motor fault gpio %d (pull up)", mfgpio);
+        initfaultgpio=1;
+    }
+
+#if 0
+    seems to be always fault??
+        if (mcount % 100 == 0) {
+        if (!gpio_get(mfgpio)) {
+            bprintf("\n*** motor fault indicated on gpio %d", mfgpio);
+        }
+    }
+#endif
+        
     if (mcount++ % 20000 == 0) {
         for (int i=0; i<nsr; ++i) {
             bool ok = mctReadRegByAddress(0, sregs[i], &result);
