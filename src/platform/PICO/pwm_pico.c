@@ -72,7 +72,7 @@ void pwmDisableMotors(void)
     pwmShutdownPulsesForAllMotors();
 }
 
-#define testmctdevicectrl
+//#define testmctdevicectrl
 #ifdef testmctdevicectrl
 #include "pico_mct8329a.h"
 #endif
