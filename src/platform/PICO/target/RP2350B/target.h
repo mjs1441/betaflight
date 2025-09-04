@@ -40,6 +40,9 @@
 #define RP2350B
 #endif
 
+#ifdef EXCLUDE_DSHOT
+#undef USE_DSHOT
+#endif
 //#define USE_MULTICORE
 
 #define USE_UART0

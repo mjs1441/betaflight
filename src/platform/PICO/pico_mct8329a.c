@@ -87,9 +87,13 @@ static void i2cMuxEnableDevice(int device)
 {
     uint8_t buf = 1 << device;
     int wrote = i2c_write_blocking(muxi2c, muxAddr, &buf, 1, false);
-    bprintf("mux wrote %d bytes, value 0x%02x (device %d)", wrote, buf, device);
+    if (device == 99) {
+        bprintf("mux wrote %d bytes, value 0x%02x (device %d)", wrote, buf, device);
+    }
     int readBack = i2c_read_blocking(muxi2c, muxAddr, &buf, 1, false);
-    bprintf("read back %d bytes, value 0x%02x", readBack, buf);
+    if (device == 99) {
+        bprintf("read back %d bytes, value 0x%02x", readBack, buf);
+    }
 #ifndef PICO_TRACE
     UNUSED(wrote);
     UNUSED(readBack);
@@ -342,7 +346,6 @@ bool mctReadRegByName(int device, const char *name, uint32_t *result)
 bool mctReadRegByAddress(int device, uint8_t addr, uint32_t *result)
 {
     bool success = false;
-    bool found = false;
     disableI2Cinterrupts();
     i2cMuxEnableDevice(device);
     for (int i=0; i<numMCTregs; ++i) {

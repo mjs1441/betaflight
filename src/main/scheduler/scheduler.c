@@ -484,6 +484,7 @@ static void readSchedulerLocals(task_t *selectedTask, uint8_t selectedTaskDynami
 #endif
 
 #define TEST_MCTREGS
+#include "pico_mct8329a.h"
 
 FAST_CODE void scheduler(void)
 {
@@ -523,16 +524,17 @@ FAST_CODE void scheduler(void)
         }
     }
 
+    if (mcount % 100 == 0) {
     for (int i=0; i<4; ++i) {
         bool ok = mctReadRegByAddress(0, mregs[i], &result);
         if (ok) {
             if (result != lastvals[i]) {
                 bprintf("*** status/fault reg 0x%02x: %08x", mregs[i], result);
-                lastvaks[i] = result;
+                lastvals[i] = result;
             }
         }
     }
-    
+    }
             
 #endif
     
