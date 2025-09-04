@@ -339,6 +339,21 @@ bool mctReadRegByName(int device, const char *name, uint32_t *result)
     return success;
 }
 
+bool mctReadRegByAddress(int device, uint8_t addr, uint32_t *result)
+{
+    bool success = false;
+    bool found = false;
+    disableI2Cinterrupts();
+    i2cMuxEnableDevice(device);
+    for (int i=0; i<numMCTregs; ++i) {
+        success = readMCTRegister32(MCTi2cLocation, addr, result);
+        break;
+    }
+
+    reenableI2Cinterrupts();
+    return success;
+}
+
 bool mctWriteRegByName(int device, const char *name, uint32_t data)
 {
     bool success = false;

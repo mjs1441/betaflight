@@ -28,3 +28,4 @@ void pico_esc_mct8329a_init(bool isDshotProtocol);
 bool mctReadRegByName(int device, const char *name, uint32_t *result);
 bool mctWriteRegByName(int device, const char *name, uint32_t data);
 bool mctWriteRegByAddress(int device, uint32_t reg, uint32_t data);
+bool mctReadRegByAddress(int device, uint8_t addr, uint32_t *result);
