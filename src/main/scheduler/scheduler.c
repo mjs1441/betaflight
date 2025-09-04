@@ -510,30 +510,34 @@ FAST_CODE void scheduler(void)
     bool firstSchedulingOpportunity = false;
 
 #ifdef TEST_MCTREGS
-    const uint8_t mregs[] = {0xe0, 0xe2, 0xea, 0xec};
-    static uint32_t lastvals[4];
-    const uint8_t sreg = 0xe4;
+    const uint8_t mregs[] = {0xe0, 0xe2, 0xea};
+    static const int nmr = sizeof(mregs)/sizeof(mregs[0]);
+    static uint32_t lastvals[sizeof(mregs)/sizeof(mregs[0])];
+    const uint8_t sregs[] = {0xe4, 0xec};
+    static const int nsr = sizeof(sregs)/sizeof(sregs[0]);
     static int mcount;
     uint32_t result;
-    if (mcount++ % 10000 == 0) {
-        bool ok = mctReadRegByAddress(0, sreg, &result);
-        if (ok) {
-            bprintf("status reg 0xe4: %08x", result);
-        } else {
-            bprintf("status reg 0xe4: n/a");
-        }
-    }
-
-    if (mcount % 100 == 0) {
-    for (int i=0; i<4; ++i) {
-        bool ok = mctReadRegByAddress(0, mregs[i], &result);
-        if (ok) {
-            if (result != lastvals[i]) {
-                bprintf("*** status/fault reg 0x%02x: %08x", mregs[i], result);
-                lastvals[i] = result;
+    if (mcount++ % 20000 == 0) {
+        for (int i=0; i<nsr; ++i) {
+            bool ok = mctReadRegByAddress(0, sregs[i], &result);
+            if (ok) {
+                bprintf("status reg 0x%02x: %08x", sregs[i], result);
+            } else {
+                bprintf("status reg 0x%02x: n/a", sregs[i]);
             }
         }
     }
+
+    if (mcount % 200 == 0) {
+        for (int i=0; i<nmr; ++i) {
+            bool ok = mctReadRegByAddress(0, mregs[i], &result);
+            if (ok) {
+                if (result != lastvals[i]) {
+                    bprintf("*** status/fault reg 0x%02x: %08x", mregs[i], result);
+                    lastvals[i] = result;
+                }
+            }
+        }
     }
             
 #endif
