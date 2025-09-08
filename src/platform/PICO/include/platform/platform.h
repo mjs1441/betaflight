@@ -117,6 +117,7 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
 
 
 #define SERIAL_UART_FIRST_INDEX     0
+#define SERIAL_PIOUART_FIRST_INDEX  0
 
 extern uint32_t systemUniqueId[3];
 

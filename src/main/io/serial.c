@@ -519,6 +519,7 @@ serialPort_t *openSerialPort(
 #if defined(USE_UART)
     case SERIALTYPE_UART:
     case SERIALTYPE_LPUART:
+    case SERIALTYPE_PIOUART:
 #if defined(SIMULATOR_BUILD)
         // emulate serial ports over TCP
         serialPort = serTcpOpen(identifier, rxCallback, rxCallbackData, baudRate, mode, options);
