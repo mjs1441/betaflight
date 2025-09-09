@@ -160,8 +160,6 @@ typedef struct uartDevice_s {
     const uartHardware_t *hardware;
     uartPinDef_t rx;
     uartPinDef_t tx;
-//    volatile uint8_t *rxBuffer;
-//    volatile uint8_t *txBuffer;
 #if UART_TRAIT_PINSWAP
     bool pinSwap;
 #endif
