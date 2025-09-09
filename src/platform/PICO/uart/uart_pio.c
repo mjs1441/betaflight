@@ -64,6 +64,75 @@ static const uint32_t txnfullbit[4] = {
     PIO_INTR_SM3_TXNFULL_BITS,
 };
 
+todo similar to
+    // PIO-based UARTs. For now, hardwired to UARTs 2,3 on PIO number UART_PIO_INDEX.
+#ifdef USE_UART2
+    {
+        .identifier = SERIAL_PORT_UART2,
+        .reg = (USART_TypeDef *)uartPio,
+        .irqn = PIO_IRQ_NUM(uartPio, 0),
+        .txBuffer = uart2TxBuffer,
+        .rxBuffer = uart2RxBuffer,
+        .txBufferSize = sizeof(uart2TxBuffer),
+        .rxBufferSize = sizeof(uart2RxBuffer),
+    },
+#endif
+
+#ifdef USE_UART3
+    {
+        .identifier = SERIAL_PORT_UART3,
+        .reg = (USART_TypeDef *)uartPio,
+        .irqn = PIO_IRQ_NUM(uartPio, 1),
+        .txBuffer = uart3TxBuffer,
+        .rxBuffer = uart3RxBuffer,
+        .txBufferSize = sizeof(uart3TxBuffer),
+        .rxBufferSize = sizeof(uart3RxBuffer),
+    },
+#endif
+
+void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig)
+{
+    // software UART by PIO
+    int pinIndexMin = 48;
+    int pinIndexMax = -1;
+    uartPioBase = 0;
+    for (const piouartHardware_t* hardware = piouartHardware; hardware < ARRAYEND(piouartHardware); hardware++) {
+        const serialPortIdentifier_e identifier = hardware->identifier;
+        uartDevice_t* uartdev = uartDeviceFromIdentifier(identifier);
+        const int resourceIndex = serialResourceIndex(identifier);
+        // On a single PIO block, we are restricted either to pins 0-31 or pins 16-47.
+        pinIndexMin = cfgRx && (DEFIO_TAG_PIN(cfgRx) < pinIndexMin) ? DEFIO_TAG_PIN(cfgRx) : pinIndexMin;
+        pinIndexMax = cfgRx && (DEFIO_TAG_PIN(cfgRx) > pinIndexMax) ? DEFIO_TAG_PIN(cfgRx) : pinIndexMax;
+        pinIndexMin = cfgTx && (DEFIO_TAG_PIN(cfgTx) < pinIndexMin) ? DEFIO_TAG_PIN(cfgTx) : pinIndexMin;
+        pinIndexMax = cfgTx && (DEFIO_TAG_PIN(cfgTx) > pinIndexMax) ? DEFIO_TAG_PIN(cfgTx) : pinIndexMax;
+        if (pinIndexMax >= 32) {
+            if (pinIndexMin < 16) {
+                bprintf("* Not configuring UART%d (PIO can't span pins min %d max %d)",
+                        uartDeviceIdxFromIdentifier(identifier), pinIndexMin, pinIndexMax);
+                continue;
+            } else {
+                uartPioBase = 16;
+            }
+        }
+
+        if (cfgRx) {
+            uartdev->rx = makePinDef(cfgRx);
+        }
+        
+        if (cfgTx) {
+            uartdev->tx = makePinDef(cfgTx);
+        }
+
+        if (uartdev->rx.pin || uartdev->tx.pin ) {
+            uartdev->hardware = hardware;
+        } else {
+            bprintf("\n ** unexpected no rx.pin or tx.pin even though cfgRx or cfgTx");
+        }
+    }
+
+    bprintf("pico uartPinConfigure pio%d pin min, max = %d, %d; setting gpio base to %d", PIO_NUM(uartPio), pinIndexMin, pinIndexMax, uartPioBase);
+}
+
 static bool ensurePioProgram(PIO pio, const pio_program_t *program, bool isTx)
 {
     // The GPIO base must be set before adding the program.
