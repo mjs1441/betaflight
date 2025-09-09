@@ -92,6 +92,7 @@ typedef struct pioUartHardware_s {
 #error USE_PIOUARTn only currently supported for n=0,1
 #endif
 
+/*
 // compressed index of UART/LPUART. Direct index into uartDevice[]
 typedef enum {
     PIOUARTDEV_INVALID = -1,
@@ -103,6 +104,7 @@ typedef enum {
 #endif
     PIOUARTDEV_COUNT
 } uartDeviceIdx_e;
+*/
 
 // PIO-based UARTs. For now, hardwired to PIOUARTs 0,1 on PIO number UART_PIO_INDEX.
 const pioUartHardware_t pioUartHardware[PIOUARTDEV_COUNT] = {
@@ -152,6 +154,7 @@ void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig)
         pinIndexMax = cfgTx && (DEFIO_TAG_PIN(cfgTx) > pinIndexMax) ? DEFIO_TAG_PIN(cfgTx) : pinIndexMax;
         if (pinIndexMax >= 32) {
             if (pinIndexMin < 16) {
+                not deviceidx ...
                 bprintf("* Not configuring UART%d (PIO can't span pins min %d max %d)",
                         uartDeviceIdxFromIdentifier(identifier), pinIndexMin, pinIndexMax);
                 continue;
@@ -250,7 +253,7 @@ static void uartPioIrqHandler(uartPort_t *s, pioDetails_t *pioDetailsPtr)
 static void on_pioUART0(void)
 {
 ///    bprintf("\n\n on_pioUART0");
-    uartPioIrqHandler(& pio uartDevice[UARTDEV_2].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_PIOUART0));
+    uartPioIrqHandler(&uartDevice[UARTDEV_2].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_PIOUART0));
 }
 
 static void on_uart3(void)

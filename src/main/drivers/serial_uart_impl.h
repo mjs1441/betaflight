@@ -91,7 +91,44 @@ typedef enum {
 #ifdef USE_LPUART1
     UARTDEV_LP1,
 #endif
-    UARTDEV_COUNT
+    UARTDEV_COUNT, // let UARTDEV_COUNT be the count of uartHardware
+
+    DUMMY_RESTART_FROM_UARTDEV_COUNT = UARTDEV_COUNT - 1,
+// The following devices have their own hardware descriptions, so don't contribute to uartHardware
+#ifdef USE_PIOUART0
+    PIOUARTDEV_0,
+#endif
+#ifdef USE_PIOUART0
+    PIOUARTDEV_0,
+#endif
+#ifdef USE_PIOUART1
+    PIOUARTDEV_1,
+#endif
+#ifdef USE_PIOUART2
+    PIOUARTDEV_2,
+#endif
+#ifdef USE_PIOUART3
+    PIOUARTDEV_3,
+#endif
+#ifdef USE_PIOUART4
+    PIOUARTDEV_4,
+#endif
+#ifdef USE_PIOUART5
+    PIOUARTDEV_5,
+#endif
+#ifdef USE_PIOUART6
+    PIOUARTDEV_6,
+#endif
+#ifdef USE_PIOUART7
+    PIOUARTDEV_7,
+#endif
+#ifdef USE_PIOUART8
+    PIOUARTDEV_8,
+#endif
+#ifdef USE_PIOUART9
+    PIOUARTDEV_9,
+#endif
+    UARTDEV_DEVICECOUNT
 } uartDeviceIdx_e;
 
 typedef struct uartPinDef_s {
