@@ -21,7 +21,7 @@
 
 #include "platform.h"
 
-#ifdef USE_UART
+#ifdef USE_PIOUART
 
 #include "drivers/io.h"
 #include "drivers/serial.h"
@@ -35,16 +35,31 @@
 #include "uart_tx.pio.h"
 #include "uart_rx.pio.h"
 
+// The PIO block for software UARTs PIOUART0, PIOUART1
+static const PIO uartPio = PIO_INSTANCE(PIO_UART_INDEX);
+
 #define PIO_IRQ_INDEX(irqn) (irqn == PIO_IRQ_NUM(uartPio, 0) ? 0 : 1)
 
-// Store for details, catering for UART2, UART3
-pioDetails_t uartPioDetails[2];
+typedef struct pioDetails_s {
+    irq_num_t irqn;
+    io_rw_32 *enableReg;
+    io_ro_32 *statusReg;
+    int rxPin;
+    int txPin;
+    uint16_t sm_rx; // sm number for rx (0..3)
+    uint16_t sm_tx; // sm number for tx (0..3)
+    uint32_t rx_intr_bit; // bit to check on interrupt enable and status registers for rx not empty
+    uint32_t tx_intr_bit; // bit to check on interrupt enable and status registers for tx not full
+} pioDetails_t;
+
+// Store for details, catering for PIOUART0, PIOUART1
+static pioDetails_t uartPioDetails[2];
+
+#define UART_PIO_DETAILS_IDX(id) (id - SERIAL_PORT_UART2)
+#define UART_PIO_DETAILS_PTR(id) (&uartPioDetails[UART_PIO_DETAILS_IDX(id)])
 
 // Base for PIO pin counts (0 or 16)
-int uartPioBase;
-
-// The PIO block for software UARTs UART2, UART3
-static const PIO uartPio = UART_PIO_INSTANCE;
+static int uartPioBase;
 
 static int txProgram_offset = -1;
 static int rxProgram_offset = -1;
@@ -64,31 +79,61 @@ static const uint32_t txnfullbit[4] = {
     PIO_INTR_SM3_TXNFULL_BITS,
 };
 
-todo similar to
-    // PIO-based UARTs. For now, hardwired to UARTs 2,3 on PIO number UART_PIO_INDEX.
-#ifdef USE_UART2
+typedef struct pioUartHardware_s {
+    serialPortIdentifier_e identifier;
+    uint8_t irqn;
+    volatile uint8_t *txBuffer;
+    volatile uint8_t *rxBuffer;
+    uint16_t txBufferSize;
+    uint16_t rxBufferSize;
+} pioUartHardware_t;
+
+#if SERIAL_PIOUART_MAX > 2
+#error USE_PIOUARTn only currently supported for n=0,1
+#endif
+
+// compressed index of UART/LPUART. Direct index into uartDevice[]
+typedef enum {
+    PIOUARTDEV_INVALID = -1,
+#ifdef USE_PIOUART0
+    PIOUARTDEV_0,
+#endif
+#ifdef USE_PIOUART1
+    PIOUARTDEV_1,
+#endif
+    PIOUARTDEV_COUNT
+} uartDeviceIdx_e;
+
+// PIO-based UARTs. For now, hardwired to PIOUARTs 0,1 on PIO number UART_PIO_INDEX.
+const pioUartHardware_t pioUartHardware[PIOUARTDEV_COUNT] = {
+#ifdef USE_PIOUART0
     {
-        .identifier = SERIAL_PORT_UART2,
-        .reg = (USART_TypeDef *)uartPio,
+        .identifier = SERIAL_PORT_PIOUART0,
         .irqn = PIO_IRQ_NUM(uartPio, 0),
-        .txBuffer = uart2TxBuffer,
-        .rxBuffer = uart2RxBuffer,
-        .txBufferSize = sizeof(uart2TxBuffer),
-        .rxBufferSize = sizeof(uart2RxBuffer),
+        .txBuffer = uartPio0TxBuffer,
+        .rxBuffer = uartPio0RxBuffer,
+        .txBufferSize = sizeof(uartPio0TxBuffer),
+        .rxBufferSize = sizeof(uartPio0RxBuffer),
     },
 #endif
 
-#ifdef USE_UART3
+#ifdef USE_PIOUART1
     {
-        .identifier = SERIAL_PORT_UART3,
-        .reg = (USART_TypeDef *)uartPio,
+        .identifier = SERIAL_PORT_PIOUART1,
         .irqn = PIO_IRQ_NUM(uartPio, 1),
-        .txBuffer = uart3TxBuffer,
-        .rxBuffer = uart3RxBuffer,
-        .txBufferSize = sizeof(uart3TxBuffer),
-        .rxBufferSize = sizeof(uart3RxBuffer),
+        .txBuffer = uartPio1TxBuffer,
+        .rxBuffer = uartPio1RxBuffer,
+        .txBufferSize = sizeof(uartPio1TxBuffer),
+        .rxBufferSize = sizeof(uartPio1RxBuffer),
     },
 #endif
+};
+
+static uartPinDef_t makePinDef(ioTag_t tag)
+{
+    uartPinDef_t ret = { .pin = tag };
+    return ret;
+}
 
 void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig)
 {
@@ -202,16 +247,16 @@ static void uartPioIrqHandler(uartPort_t *s, pioDetails_t *pioDetailsPtr)
     }
 }
 
-static void on_uart2(void)
+static void on_pioUART0(void)
 {
-///    bprintf("\n\n on_uart2");
-    uartPioIrqHandler(&uartDevice[UARTDEV_2].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_UART2));
+///    bprintf("\n\n on_pioUART0");
+    uartPioIrqHandler(& pio uartDevice[UARTDEV_2].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_PIOUART0));
 }
 
 static void on_uart3(void)
 {
 ///    bprintf("\n\n\n\non_uart3");
-    uartPioIrqHandler(&uartDevice[UARTDEV_3].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_UART3));
+    uartPioIrqHandler(&pio uartDevice[UARTDEV_3].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_PIOUART1));
 }
 
 bool serialUART_pio(uint32_t baudRate, portMode_e mode, portOptions_e options,
@@ -283,7 +328,7 @@ bool serialUART_pio(uint32_t baudRate, portMode_e mode, portOptions_e options,
 //    uart_set_format(uartInstance, 8, 1, UART_PARITY_NONE);
 
     bprintf("id %d, going to set exclusive handler for irqn %d", hardware->identifier, hardware->irqn);
-    irq_set_exclusive_handler(hardware->irqn, hardware->identifier == SERIAL_PORT_UART2 ? on_uart2 : on_uart3);
+    irq_set_exclusive_handler(hardware->irqn, hardware->identifier == SERIAL_PORT_PIOUART0 ? on_pioUART0 : on_pioUART1);
     irq_set_enabled(hardware->irqn, true);
 
     // Don't enable pio irq yet, wait until a call to uartReconfigure...

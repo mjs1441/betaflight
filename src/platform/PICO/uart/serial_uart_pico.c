@@ -41,17 +41,9 @@
 
 #include "serial_uart_pico.h"
 
-static const PIO uartPio = UART_PIO_INSTANCE;
-
-bool isHardwareUART(serialPortIdentifier_e identifier)
+static bool isPioUART(serialPortIdentifier_e identifier)
 {
-    return identifier == SERIAL_PORT_UART0 || identifier == SERIAL_PORT_UART1;
-}
-
-uartPinDef_t makePinDef(ioTag_t tag)
-{
-    uartPinDef_t ret = { .pin = tag };
-    return ret;
+    return serialType(identifier) == SERIALTPYE_PIOUART;
 }
 
 void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig)
@@ -82,11 +74,11 @@ uartPort_t *serialUART(uartDevice_t *uartdev, uint32_t baudRate, portMode_e mode
     const serialPortIdentifier_e identifier = s->port.identifier;
 
     bool uartInitialised;
-    if (isHardwareUART(identifier)) {
-        uartInitialised = serialUART_hw(baudRate, mode, options,
+    if (isPioUART(identifier)) {
+        uartInitialised = serialUART_pio(baudRate, mode, options,
                                               hardware, identifier, txIO, rxIO);
     } else {
-        uartInitialised = serialUART_pio(baudRate, mode, options,
+        uartInitialised = serialUART_hw(baudRate, mode, options,
                                               hardware, identifier, txIO, rxIO);
     }
 
@@ -134,20 +126,20 @@ void uartEnableTxInterrupt(uartPort_t *uartPort)
     }
 
     const serialPortIdentifier_e identifier = uartPort->port.identifier;
-    if (isHardwareUART(identifier)) {
-        uartEnableTxInterrupt_hw(uartPort);
-    } else {
+    if (isPioUART(identifier)) {
         uartEnableTxInterrupt_pio(uartPort);
+    } else {
+        uartEnableTxInterrupt_hw(uartPort);
     }
 }
 
 void uartReconfigure(uartPort_t *s)
 {
     const serialPortIdentifier_e identifier = s->port.identifier;
-    if (isHardwareUART(identifier)) {
-        uartReconfigure_hw(s);
-    } else {
+    if (isPioUART(identifier)) {
         uartReconfigure_pio(s);
+    } else {
+        uartReconfigure_hw(s);
     }
 }
 

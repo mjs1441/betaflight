@@ -51,8 +51,8 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
 
 #define ADC_TypeDef          void*
 
-#define USART_TypeDef        void
-#define UART_INST(uart)      ((uart_inst_t *)uart)
+#define USART_TypeDef        uart_inst_t
+#define UART_INST(uart)      (uart)
 
 #define TIM_OCInitTypeDef    void*
 #define TIM_ICInitTypeDef    void*
