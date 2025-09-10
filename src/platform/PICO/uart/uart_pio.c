@@ -126,6 +126,10 @@ void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig)
         const int resourceIndex = serialResourceIndex(identifier);
         const ioTag_t cfgRx = pSerialPinConfig->ioTagRx[resourceIndex];
         const ioTag_t cfgTx = pSerialPinConfig->ioTagTx[resourceIndex];
+        bprintf("pico uartPinConfigure pio at %p dev = %p,  tags rx 0x%x, tx 0x%x", hardware, uartdev, cfgRx, cfgTx);
+        if (!cfgRx && !cfgTx) {
+            continue;
+        }
 
         // On a single PIO block, we are restricted either to pins 0-31 or pins 16-47.
         pinIndexMin = cfgRx && (DEFIO_TAG_PIN(cfgRx) < pinIndexMin) ? DEFIO_TAG_PIN(cfgRx) : pinIndexMin;
@@ -153,7 +157,7 @@ void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig)
         if (uartdev->rx.pin || uartdev->tx.pin ) {
             uartdev->hardware = (uartHardware_t *)hardware; // Sneak in pointer to pioUartHardware_t as a pointer to uartHardware_t
         } else {
-            bprintf("\n ** unexpected no rx.pin or tx.pin even though cfgRx or cfgTx");
+            bprintf("** uartPinConfigure_pio no compatible rx or tx pin for this PIO UART");
         }
     }
 

@@ -136,7 +136,7 @@ void uartPinConfigure_hw(const serialPinConfig_t *pSerialPinConfig)
         }
         const ioTag_t cfgRx = pSerialPinConfig->ioTagRx[resourceIndex];
         const ioTag_t cfgTx = pSerialPinConfig->ioTagTx[resourceIndex];
-        bprintf("pico uartPinConfigure hw = %p dev = %p,  tags rx 0x%x, tx 0x%x", hardware, uartdev, cfgRx, cfgTx);
+        bprintf("pico uartPinConfigure hw = %p (UART%d) dev = %p,  tags rx 0x%x, tx 0x%x", hardware, UART_NUM(hardware->reg), uartdev, cfgRx, cfgTx);
         if (!cfgRx && !cfgTx) {
             continue;
         }
@@ -154,7 +154,7 @@ void uartPinConfigure_hw(const serialPinConfig_t *pSerialPinConfig)
         if (uartdev->rx.pin || uartdev->tx.pin ) {
             uartdev->hardware = hardware;
         } else {
-            bprintf("\n ** unexpected no rx.pin or tx.pin even though cfgRx or cfgTx");
+            bprintf("** uartPinConfigure_hw no compatible rx or tx pin for this hardware UART");
         }
     }
 }
