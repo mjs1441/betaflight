@@ -180,7 +180,7 @@ static bool ensurePioProgram(PIO pio, const pio_program_t *program, bool isTx)
     }
 }
 
-#if PIOUARTDEV_COUNT > 0
+#if SERIAL_PIOUART_COUNT > 0
 static void uartPioIrqHandler(uartPort_t *s, pioDetails_t *pioDetailsPtr)
 {
     io_rw_32 *enableRegPtr = pioDetailsPtr->enableReg;
@@ -243,7 +243,7 @@ static void on_pioUART1(void)
 {
 ///    bprintf("\n\n\n\non_pioUART1");
 #ifdef USE_PIOUART1
-    uartPioIrqHandler(&piouartDevice[PIOUARTDEV_1].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_PIOUART1));
+    uartPioIrqHandler(&pioUartDevice[PIOUARTDEV_1].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_PIOUART1));
 #endif
 }
 
