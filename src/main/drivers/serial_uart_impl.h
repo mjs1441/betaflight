@@ -91,13 +91,11 @@ typedef enum {
 #ifdef USE_LPUART1
     UARTDEV_LP1,
 #endif
-    UARTDEV_COUNT, // let UARTDEV_COUNT be the count of uartHardware
+    UARTDEV_COUNT
+} uartDeviceIdx_e;
 
-    DUMMY_RESTART_FROM_UARTDEV_COUNT = UARTDEV_COUNT - 1,
-// The following devices have their own hardware descriptions, so don't contribute to uartHardware
-#ifdef USE_PIOUART0
-    PIOUARTDEV_0,
-#endif
+// compressed index of PIOUART. Direct index into pioUartDevice[]
+typedef enum {
 #ifdef USE_PIOUART0
     PIOUARTDEV_0,
 #endif
@@ -128,8 +126,8 @@ typedef enum {
 #ifdef USE_PIOUART9
     PIOUARTDEV_9,
 #endif
-    UARTDEV_DEVICECOUNT
-} uartDeviceIdx_e;
+    PIOUARTDEV_COUNT
+} pioUartDeviceIdx_e;
 
 typedef struct uartPinDef_s {
     ioTag_t pin;
@@ -204,6 +202,7 @@ typedef struct uartDevice_s {
 } uartDevice_t;
 
 extern uartDevice_t uartDevice[UARTDEV_COUNT];  // indexed by uartDeviceIdx_e;
+extern uartDevice_t pioUartDevice[PIOUARTDEV_COUNT];  // indexed by pioUartDeviceIdx_e;
 
 uartDeviceIdx_e uartDeviceIdxFromIdentifier(serialPortIdentifier_e identifier);
 uartDevice_t* uartDeviceFromIdentifier(serialPortIdentifier_e identifier);

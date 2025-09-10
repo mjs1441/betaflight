@@ -21,9 +21,18 @@
 
 #include "hardware/pio.h"
 
+typedef struct pioUartHardware_s {
+    serialPortIdentifier_e identifier;
+    uint8_t irqn;
+    volatile uint8_t *txBuffer;
+    volatile uint8_t *rxBuffer;
+    uint16_t txBufferSize;
+    uint16_t rxBufferSize;
+} pioUartHardware_t;
+
 void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig);
 bool serialUART_pio(uint32_t baudRate, portMode_e mode, portOptions_e options,
-                    const uartHardware_t *hardware, serialPortIdentifier_e identifier, IO_t txIO, IO_t rxIO);
+                    const pioUartHardware_t *hardware, serialPortIdentifier_e identifier, IO_t txIO, IO_t rxIO);
 void uartReconfigure_pio(uartPort_t *s);
 void uartEnableTxInterrupt_pio(uartPort_t *uartPort);
 

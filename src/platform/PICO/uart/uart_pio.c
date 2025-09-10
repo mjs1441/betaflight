@@ -21,7 +21,7 @@
 
 #include "platform.h"
 
-#ifdef USE_PIOUART
+#ifdef USE_UART
 
 #include "drivers/io.h"
 #include "drivers/serial.h"
@@ -79,32 +79,9 @@ static const uint32_t txnfullbit[4] = {
     PIO_INTR_SM3_TXNFULL_BITS,
 };
 
-typedef struct pioUartHardware_s {
-    serialPortIdentifier_e identifier;
-    uint8_t irqn;
-    volatile uint8_t *txBuffer;
-    volatile uint8_t *rxBuffer;
-    uint16_t txBufferSize;
-    uint16_t rxBufferSize;
-} pioUartHardware_t;
-
 #if SERIAL_PIOUART_MAX > 2
 #error USE_PIOUARTn only currently supported for n=0,1
 #endif
-
-/*
-// compressed index of UART/LPUART. Direct index into uartDevice[]
-typedef enum {
-    PIOUARTDEV_INVALID = -1,
-#ifdef USE_PIOUART0
-    PIOUARTDEV_0,
-#endif
-#ifdef USE_PIOUART1
-    PIOUARTDEV_1,
-#endif
-    PIOUARTDEV_COUNT
-} uartDeviceIdx_e;
-*/
 
 // PIO-based UARTs. For now, hardwired to PIOUARTs 0,1 on PIO number UART_PIO_INDEX.
 const pioUartHardware_t pioUartHardware[PIOUARTDEV_COUNT] = {
@@ -143,10 +120,13 @@ void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig)
     int pinIndexMin = 48;
     int pinIndexMax = -1;
     uartPioBase = 0;
-    for (const piouartHardware_t* hardware = piouartHardware; hardware < ARRAYEND(piouartHardware); hardware++) {
+    for (const pioUartHardware_t* hardware = pioUartHardware; hardware < ARRAYEND(pioUartHardware); hardware++) {
         const serialPortIdentifier_e identifier = hardware->identifier;
         uartDevice_t* uartdev = uartDeviceFromIdentifier(identifier);
         const int resourceIndex = serialResourceIndex(identifier);
+        const ioTag_t cfgRx = pSerialPinConfig->ioTagRx[resourceIndex];
+        const ioTag_t cfgTx = pSerialPinConfig->ioTagTx[resourceIndex];
+
         // On a single PIO block, we are restricted either to pins 0-31 or pins 16-47.
         pinIndexMin = cfgRx && (DEFIO_TAG_PIN(cfgRx) < pinIndexMin) ? DEFIO_TAG_PIN(cfgRx) : pinIndexMin;
         pinIndexMax = cfgRx && (DEFIO_TAG_PIN(cfgRx) > pinIndexMax) ? DEFIO_TAG_PIN(cfgRx) : pinIndexMax;
@@ -154,9 +134,8 @@ void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig)
         pinIndexMax = cfgTx && (DEFIO_TAG_PIN(cfgTx) > pinIndexMax) ? DEFIO_TAG_PIN(cfgTx) : pinIndexMax;
         if (pinIndexMax >= 32) {
             if (pinIndexMin < 16) {
-                not deviceidx ...
-                bprintf("* Not configuring UART%d (PIO can't span pins min %d max %d)",
-                        uartDeviceIdxFromIdentifier(identifier), pinIndexMin, pinIndexMax);
+                bprintf("* Not configuring PIOUART with identifier %d (PIO can't span pins min %d max %d)",
+                        identifier, pinIndexMin, pinIndexMax);
                 continue;
             } else {
                 uartPioBase = 16;
@@ -172,7 +151,7 @@ void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig)
         }
 
         if (uartdev->rx.pin || uartdev->tx.pin ) {
-            uartdev->hardware = hardware;
+            uartdev->hardware = (uartHardware_t *)hardware; // Sneak in pointer to pioUartHardware_t as a pointer to uartHardware_t
         } else {
             bprintf("\n ** unexpected no rx.pin or tx.pin even though cfgRx or cfgTx");
         }
@@ -201,6 +180,7 @@ static bool ensurePioProgram(PIO pio, const pio_program_t *program, bool isTx)
     }
 }
 
+#if PIOUARTDEV_COUNT > 0
 static void uartPioIrqHandler(uartPort_t *s, pioDetails_t *pioDetailsPtr)
 {
     io_rw_32 *enableRegPtr = pioDetailsPtr->enableReg;
@@ -249,21 +229,26 @@ static void uartPioIrqHandler(uartPort_t *s, pioDetails_t *pioDetailsPtr)
         }
     }
 }
+#endif
 
 static void on_pioUART0(void)
 {
 ///    bprintf("\n\n on_pioUART0");
-    uartPioIrqHandler(&uartDevice[UARTDEV_2].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_PIOUART0));
+#ifdef USE_PIOUART0
+    uartPioIrqHandler(&pioUartDevice[PIOUARTDEV_0].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_PIOUART0));
+#endif
 }
 
-static void on_uart3(void)
+static void on_pioUART1(void)
 {
-///    bprintf("\n\n\n\non_uart3");
-    uartPioIrqHandler(&pio uartDevice[UARTDEV_3].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_PIOUART1));
+///    bprintf("\n\n\n\non_pioUART1");
+#ifdef USE_PIOUART1
+    uartPioIrqHandler(&piouartDevice[PIOUARTDEV_1].port, UART_PIO_DETAILS_PTR(SERIAL_PORT_PIOUART1));
+#endif
 }
 
 bool serialUART_pio(uint32_t baudRate, portMode_e mode, portOptions_e options,
-                    const uartHardware_t *hardware, serialPortIdentifier_e identifier, IO_t txIO, IO_t rxIO)
+                    const pioUartHardware_t *hardware, serialPortIdentifier_e identifier, IO_t txIO, IO_t rxIO)
 {
     // Set up details for state machine, will be finalised in uartReconfigure.
     if (options != 0) {

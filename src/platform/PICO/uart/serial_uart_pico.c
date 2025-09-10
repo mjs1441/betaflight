@@ -43,7 +43,7 @@
 
 static bool isPioUART(serialPortIdentifier_e identifier)
 {
-    return serialType(identifier) == SERIALTPYE_PIOUART;
+    return serialType(identifier) == SERIALTYPE_PIOUART;
 }
 
 void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig)
@@ -76,10 +76,10 @@ uartPort_t *serialUART(uartDevice_t *uartdev, uint32_t baudRate, portMode_e mode
     bool uartInitialised;
     if (isPioUART(identifier)) {
         uartInitialised = serialUART_pio(baudRate, mode, options,
-                                              hardware, identifier, txIO, rxIO);
+                                         (pioUartHardware_t *)hardware, identifier, txIO, rxIO);
     } else {
         uartInitialised = serialUART_hw(baudRate, mode, options,
-                                              hardware, identifier, txIO, rxIO);
+                                        hardware, identifier, txIO, rxIO);
     }
 
     if (!uartInitialised) {

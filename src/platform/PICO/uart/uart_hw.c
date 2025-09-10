@@ -33,7 +33,7 @@
 
 #include "serial_uart_pico.h"
 
-static const uartHardware_t uartHardware[UARTDEV_COUNT] = {
+const uartHardware_t uartHardware[UARTDEV_COUNT] = {
 #ifdef USE_UART0
     {
         .identifier = SERIAL_PORT_UART0,
