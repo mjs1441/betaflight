@@ -145,7 +145,7 @@ void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig)
         if (cfgRx) {
             uartdev->rx = makePinDef(cfgRx);
         }
-        
+
         if (cfgTx) {
             uartdev->tx = makePinDef(cfgTx);
         }
