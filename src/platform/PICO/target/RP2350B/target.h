@@ -97,6 +97,17 @@
 // #undef USE_CRSF
 // #undef USE_SERIALRX_CRSF
 
+// 0, 1 or 2 for pio0, pio1, pio2
+// maybe these more dynamic,
+// or configurable in config.h
+// Four state machines (sm) per pio block
+// pio0 -> dshot for motors 1,2,3,4
+// pio1 -> UART2, UART3
+// pio2 -> LED STRIP
+#define PIO_DSHOT_INDEX    0
+#define PIO_UART_INDEX     1
+#define PIO_LEDSTRIP_INDEX 2
+
 // Various untested or unsupported elements are undefined below
 
 #undef USE_RX_SPI
