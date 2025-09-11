@@ -52,10 +52,14 @@ typedef struct pioDetails_s {
     uint32_t tx_intr_bit; // bit to check on interrupt enable and status registers for tx not full
 } pioDetails_t;
 
+#if SERIAL_PIOUART_MAX > 2
+#error USE_PIOUARTn only currently supported for n=0,1
+#endif
+
 // Store for details, catering for PIOUART0, PIOUART1
 static pioDetails_t uartPioDetails[2];
 
-#define UART_PIO_DETAILS_IDX(id) (id - SERIAL_PORT_UART2)
+#define UART_PIO_DETAILS_IDX(id) (id - SERIAL_PORT_PIOUART_FIRST)
 #define UART_PIO_DETAILS_PTR(id) (&uartPioDetails[UART_PIO_DETAILS_IDX(id)])
 
 // Base for PIO pin counts (0 or 16)
@@ -78,10 +82,6 @@ static const uint32_t txnfullbit[4] = {
     PIO_INTR_SM2_TXNFULL_BITS,
     PIO_INTR_SM3_TXNFULL_BITS,
 };
-
-#if SERIAL_PIOUART_MAX > 2
-#error USE_PIOUARTn only currently supported for n=0,1
-#endif
 
 // PIO-based UARTs. For now, hardwired to PIOUARTs 0,1 on PIO number UART_PIO_INDEX.
 const pioUartHardware_t pioUartHardware[PIOUARTDEV_COUNT] = {
@@ -155,6 +155,7 @@ void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig)
         }
 
         if (uartdev->rx.pin || uartdev->tx.pin ) {
+            bprintf("uartdev %p setting hardware to %p which has txbuffer %p", uartdev, hardware, hardware->txBuffer);
             uartdev->hardware = (uartHardware_t *)hardware; // Sneak in pointer to pioUartHardware_t as a pointer to uartHardware_t
         } else {
             bprintf("** uartPinConfigure_pio no compatible rx or tx pin for this PIO UART");
@@ -251,7 +252,7 @@ static void on_pioUART1(void)
 #endif
 }
 
-bool serialUART_pio(uint32_t baudRate, portMode_e mode, portOptions_e options,
+bool serialUART_pio(uartPort_t *s, uint32_t baudRate, portMode_e mode, portOptions_e options,
                     const pioUartHardware_t *hardware, serialPortIdentifier_e identifier, IO_t txIO, IO_t rxIO)
 {
     // Set up details for state machine, will be finalised in uartReconfigure.
@@ -325,6 +326,13 @@ bool serialUART_pio(uint32_t baudRate, portMode_e mode, portOptions_e options,
 
     // Don't enable pio irq yet, wait until a call to uartReconfigure...
     // (with current code in serial_uart.c, this prevents irq callback before rxCallback has been set)
+
+    s->port.rxBuffer = hardware->rxBuffer;
+    s->port.txBuffer = hardware->txBuffer;
+    bprintf("uartport %p port %p txbuffer %p from hardware %p",
+            s, &s->port, s->port.txBuffer, hardware);
+    s->port.rxBufferSize = hardware->rxBufferSize;
+    s->port.txBufferSize = hardware->txBufferSize;
     return true;
 }
 
@@ -359,6 +367,7 @@ void uartEnableTxInterrupt_pio(uartPort_t *uartPort)
     pioDetails_t *pioDetailsPtr = UART_PIO_DETAILS_PTR(uartPort->port.identifier);
     pio_interrupt_source_t irqSourceTX = pio_get_tx_fifo_not_full_interrupt_source(pioDetailsPtr->sm_tx);
     int irqn_index = PIO_IRQ_INDEX(pioDetailsPtr->irqn);
+    // bprintf("uartEnableTxInterrupt_pio %p irqn_index %d, %p", uartPio, irqn_index, irqSourceTX);
     pio_set_irqn_source_enabled(uartPio, irqn_index, irqSourceTX, true);
 }
  

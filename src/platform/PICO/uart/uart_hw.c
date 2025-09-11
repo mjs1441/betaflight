@@ -199,7 +199,7 @@ static void on_uart1(void)
     uartIrqHandler_hw(&uartDevice[UARTDEV_1].port);
 }
 
-bool serialUART_hw(uint32_t baudRate, portMode_e mode, portOptions_e options,
+bool serialUART_hw(uartPort_t *s, uint32_t baudRate, portMode_e mode, portOptions_e options,
                    const uartHardware_t *hardware, serialPortIdentifier_e identifier, IO_t txIO, IO_t rxIO)
 {
     UNUSED(options); // TODO ?
@@ -241,6 +241,13 @@ bool serialUART_hw(uint32_t baudRate, portMode_e mode, portOptions_e options,
     // Don't enable any uart irq yet, wait until a call to uartReconfigure...
     // (with the code as it currently is in serial_uart.c, this will prevent irq callback before rxCallback has been set)
     // TODO review serial_uart.c uartOpen()
+
+    s->port.rxBuffer = hardware->rxBuffer;
+    s->port.txBuffer = hardware->txBuffer;
+    s->port.rxBufferSize = hardware->rxBufferSize;
+    s->port.txBufferSize = hardware->txBufferSize;
+    s->USARTx = hardware->reg;
+    bprintf("====== setting USARTx to reg == %p", s->USARTx);
     return true;
 }
 

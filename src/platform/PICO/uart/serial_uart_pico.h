@@ -31,14 +31,14 @@ typedef struct pioUartHardware_s {
 } pioUartHardware_t;
 
 void uartPinConfigure_pio(const serialPinConfig_t *pSerialPinConfig);
-bool serialUART_pio(uint32_t baudRate, portMode_e mode, portOptions_e options,
+bool serialUART_pio(uartPort_t *s, uint32_t baudRate, portMode_e mode, portOptions_e options,
                     const pioUartHardware_t *hardware, serialPortIdentifier_e identifier, IO_t txIO, IO_t rxIO);
 void uartReconfigure_pio(uartPort_t *s);
 void uartEnableTxInterrupt_pio(uartPort_t *uartPort);
 
 
 void uartPinConfigure_hw(const serialPinConfig_t *pSerialPinConfig);
-bool serialUART_hw(uint32_t baudRate, portMode_e mode, portOptions_e options,
+bool serialUART_hw(uartPort_t *s, uint32_t baudRate, portMode_e mode, portOptions_e options,
                    const uartHardware_t *hardware, serialPortIdentifier_e identifier, IO_t txIO, IO_t rxIO);
 void uartReconfigure_hw(uartPort_t *s);
 void uartEnableTxInterrupt_hw(uartPort_t *uartPort);

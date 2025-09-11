@@ -60,42 +60,33 @@ uartPort_t *serialUART(uartDevice_t *uartdev, uint32_t baudRate, portMode_e mode
 {
     bprintf("\nserialUART");
     uartPort_t *s = &uartdev->port;
-    const uartHardware_t *hardware = uartdev->hardware;
+    const serialPortIdentifier_e identifier = s->port.identifier;
 
     IO_t txIO = IOGetByTag(uartdev->tx.pin);
     IO_t rxIO = IOGetByTag(uartdev->rx.pin);
 
     if (!txIO && !rxIO) {
-        bprintf("serialUART no pins mapped for device %p", s->USARTx);
+        bprintf("serialUART no pins mapped for device %p, id %d", uartdev, identifier);
         return NULL;
     }
 
     // SERIAL_PORT_UART0, 1, 2, 3, ...
-    const serialPortIdentifier_e identifier = s->port.identifier;
-
-    bool uartInitialised;
+    bool uartInitialised = false;
     if (isPioUART(identifier)) {
-        uartInitialised = serialUART_pio(baudRate, mode, options,
-                                         (pioUartHardware_t *)hardware, identifier, txIO, rxIO);
+        uartInitialised = serialUART_pio(s, baudRate, mode, options, (pioUartHardware_t *)uartdev->hardware,
+                                         identifier, txIO, rxIO);
     } else {
-        uartInitialised = serialUART_hw(baudRate, mode, options,
-                                        hardware, identifier, txIO, rxIO);
+        uartInitialised = serialUART_hw(s, baudRate, mode, options, uartdev->hardware,
+                                        identifier, txIO, rxIO);
     }
 
     if (!uartInitialised) {
-        bprintf("* Failed to initialised uart device %p, id %d", hardware->reg, identifier);
+        bprintf("* Failed to initialised uart device %p, id %d", uartdev, identifier);
         return NULL;
     }
 
     s->port.vTable = uartVTable;
-    s->port.baudRate = baudRate; // TODO set by caller?
-    s->port.rxBuffer = hardware->rxBuffer;
-    s->port.txBuffer = hardware->txBuffer;
-    s->port.rxBufferSize = hardware->rxBufferSize;
-    s->port.txBufferSize = hardware->txBufferSize;
-
-    s->USARTx = hardware->reg;
-    bprintf("====== setting USARTx to reg == %p", s->USARTx);
+    s->port.baudRate = baudRate;
     return s;
 }
 
