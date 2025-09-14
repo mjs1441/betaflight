@@ -83,7 +83,6 @@ PICO_LIB_SRC = \
             rp2_common/pico_divider/divider_compiler.c \
             rp2_common/pico_double/double_math.c \
             rp2_common/pico_flash/flash.c \
-            rp2_common/pico_float/float_math.c \
             rp2_common/hardware_divider/divider.c \
             rp2_common/hardware_vreg/vreg.c \
             rp2_common/hardware_xip_cache/xip_cache.c \
@@ -116,6 +115,55 @@ TINYUSB_SRC += \
             $(TINY_USB_SRC_DIR)/class/usbtmc/usbtmc_device.c \
             $(TINY_USB_SRC_DIR)/class/audio/audio_device.c
 
+# pico_float
+PICO_FLOAT_SRC  = \
+            rp2_common/pico_float/float_common_m33.S \
+            rp2_common/pico_float/float_conv32_vfp.S \
+            rp2_common/pico_float/float_math.c \
+            rp2_common/pico_float/float_sci_m33_vfp.S
+
+PICO_FLOAT_LD_FLAGS = \
+            -Wl,--wrap=__aeabi_f2lz \
+            -Wl,--wrap=__aeabi_f2ulz \
+            -Wl,--wrap=__aeabi_l2f \
+            -Wl,--wrap=__aeabi_ul2f \
+            -Wl,--wrap=acosf \
+            -Wl,--wrap=acoshf \
+            -Wl,--wrap=asinf \
+            -Wl,--wrap=asinhf \
+            -Wl,--wrap=atan2f \
+            -Wl,--wrap=atanf \
+            -Wl,--wrap=atanhf \
+            -Wl,--wrap=cbrtf \
+            -Wl,--wrap=ceilf \
+            -Wl,--wrap=copysignf \
+            -Wl,--wrap=cosf \
+            -Wl,--wrap=coshf \
+            -Wl,--wrap=dremf \
+            -Wl,--wrap=exp10f \
+            -Wl,--wrap=exp2f \
+            -Wl,--wrap=expf \
+            -Wl,--wrap=expm1f \
+            -Wl,--wrap=floorf \
+            -Wl,--wrap=fmaf \
+            -Wl,--wrap=fmodf \
+            -Wl,--wrap=hypotf \
+            -Wl,--wrap=ldexpf \
+            -Wl,--wrap=log10f \
+            -Wl,--wrap=log1pf \
+            -Wl,--wrap=log2f \
+            -Wl,--wrap=logf \
+            -Wl,--wrap=powf \
+            -Wl,--wrap=powintf \
+            -Wl,--wrap=remainderf \
+            -Wl,--wrap=remquof \
+            -Wl,--wrap=roundf \
+            -Wl,--wrap=sincosf \
+            -Wl,--wrap=sinf \
+            -Wl,--wrap=sinhf \
+            -Wl,--wrap=tanf \
+            -Wl,--wrap=tanhf \
+            -Wl,--wrap=truncf
 
 VPATH := $(VPATH):$(STDPERIPH_DIR)
 
@@ -269,7 +317,7 @@ PICO_STDIO_LD_FLAGS  = \
             -Wl,--wrap=putchar \
             -Wl,--wrap=getchar
 
-EXTRA_LD_FLAGS += $(PICO_STDIO_LD_FLAGS) $(PICO_TRACE_LD_FLAGS)
+EXTRA_LD_FLAGS += $(PICO_STDIO_LD_FLAGS) $(PICO_TRACE_LD_FLAGS) $(PICO_FLOAT_LD_FLAGS)
 
 ifdef RP2350_TARGET
 
@@ -425,7 +473,8 @@ DEVICE_STDPERIPH_SRC := \
             $(PICO_LIB_SRC) \
             $(STDPERIPH_SRC) \
             $(TINYUSB_SRC) \
-            $(PICO_TRACE_SRC)
+            $(PICO_TRACE_SRC) \
+            $(PICO_FLOAT_SRC)
 
 # Add a target-specific definition for PICO_LIB_TARGETS in order
 # to remove -flto=auto for pico-sdk file compilation
