@@ -22,8 +22,11 @@
 #include "platform.h"
 
 #include "drivers/io.h"
+#include "drivers/io_impl.h"
 
 #ifdef USE_OSD_SD
+
+#include "osd/osd.h"
 
 #include "hardware/irq.h"
 #include "hardware/pio.h"
@@ -43,11 +46,12 @@
 static const PIO osdPio = PIO_INSTANCE(PIO_OSD_INDEX);
 static int osd_tx_offset;
 static int osd_en_gpio;
+static int osd_tx_sm;
 
 // 360 x 288
 static uint8_t monoBuffer[PICO_OSD_BUF_LENGTH];
 
-void osd_test_init()
+void osd_test_init(void)
 {
     bprintf("osd_test_init");
     for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
@@ -57,8 +61,8 @@ void osd_test_init()
         monoBuffer[i] = dd < 15000 ? 0xff : 0;
     }
 
-    osd_en_gpio = OSD_EN_PIN;
-    osd_tx_offset = pio_add_program(osdPio, osd_tx_program);
+    osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
+    osd_tx_offset = pio_add_program(osdPio, &osd_tx_program);
     osd_tx_sm = pio_claim_unused_sm(osdPio, false);
     if (osd_tx_sm < 0) {
         bprintf("*** pico osd tx failed to claim state machine");
@@ -84,12 +88,10 @@ void osd_test_init()
   // #define OSD_SYNC_PIN
 */
 
-static uint8_t osd_en_gpio;
-
-void osd_test()
+void osd_test(void)
 {
     osd_test_init();
-    pio_sm_set_enabled(pio, sm, true);
+    pio_sm_set_enabled(osdPio, osd_tx_sm, true);
 }
 
 
