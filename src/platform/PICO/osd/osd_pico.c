@@ -88,10 +88,32 @@ void osd_test_init(void)
   // #define OSD_SYNC_PIN
 */
 
+bool timer_callback(repeating_timer_t *rt)
+{
+    uint8_t *buffer = (uint8_t *)rt->user_data;
+    bprintf("buffer = %p, monoBuffer = %p", buffer, monoBuffer);
+        
+//    pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+    //return false;
+    return true;
+}
+
+
+static repeating_timer_t rtdata;
+
 void osd_test(void)
 {
     osd_test_init();
-    pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+//     int32_t delay_ms = 20;
+    int32_t delay_ms = 1520;
+    bprintf("adding timer");
+    if (!add_repeating_timer_ms(delay_ms, timer_callback, &monoBuffer[0], &rtdata)) {
+        bprintf("*** failed to add timer ***");
+    }
+
+    while (true) {
+        sleep_ms(1);
+    }
 }
 
 
