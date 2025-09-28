@@ -29,6 +29,8 @@
 
 void run(void);
 
+void osd_test(void);
+
 int main(int argc, char * argv[])
 {
 #ifdef USE_MAIN_ARGS
@@ -39,6 +41,8 @@ int main(int argc, char * argv[])
 #endif
     init();
 
+    osd_test();
+    
     run();
 
     return 0;
