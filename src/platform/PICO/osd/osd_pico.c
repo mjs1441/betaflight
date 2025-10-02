@@ -23,6 +23,7 @@
 
 #include "drivers/io.h"
 #include "drivers/io_impl.h"
+#include "drivers/time.h"
 
 #ifdef USE_OSD_SD
 
@@ -68,7 +69,7 @@ void osd_test_init(void)
     }
 
     osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
-    osd__gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_W_PIN));
+    osd_w_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_W_PIN));
     if (osd_en_gpio != osd_w_gpio + 1) {
         bprintf("*** OSD_EN_GPIO must be next pin up from OSD_W_GPIO (%d vs %d)", osd_en_gpio, osd_w_gpio);
     }
@@ -80,7 +81,7 @@ void osd_test_init(void)
     }
 
     bprintf("osd_w gpio %d, osd_en gpio %d, osd_sync gpio %d", osd_w_gpio, osd_en_gpio, osd_sync_gpio);
-    // TODO PIO BASE
+    // *** TODO PIO BASE
 
     osd_tx_offset = pio_add_program(osdPio, &osd_tx_program);
     osd_tx_sm = pio_claim_unused_sm(osdPio, false);
@@ -89,15 +90,21 @@ void osd_test_init(void)
         return;
     }
 
-    // osd_tx_program_init(osdPio, osd_tx, osd_tx_offset, osd_en_gpio);
     pio_sm_config config = osd_tx_program_get_default_config(osd_tx_offset); // default config with wrap set
-    pio_sm_set_consecutive_pindirs(osdPio, osd_tx_sm, osd_en_gpio, 1, true /* output */);
-    sm_config_set_out_pins(&config, osd_en_gpio, 1);
-    //static void sm_config_set_out_shift (pio_sm_config * c, bool shift_right, bool autopull, uint pull_threshold) [inline], [static]
-    sm_config_set_out_shift(&config, true, false, 32);
+    pio_sm_set_consecutive_pindirs(osdPio, osd_tx_sm, osd_w_gpio, 2, true /* output */);
+    pio_sm_set_consecutive_pindirs(osdPio, osd_tx_sm, osd_sync_gpio, 1, false /* input */);
+    sm_config_set_in_pin_base(&config, osd_sync_gpio); // in PIN set SYNC (for WAIT)
+    sm_config_set_in_pin_count(&config, 1);
+    sm_config_set_jmp_pin(&config, osd_sync_gpio);     // jmp PIN is SYNC
+    sm_config_set_set_pins(&config, osd_w_gpio, 2);    // set PIN set W, EN
+    sm_config_set_out_pins(&config, osd_w_gpio, 2);    // out PIN set W, EN
+
+    sm_config_set_out_shift(&config, true, true, 32); // autopull
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
-    int pioclock = (int)1e6; // TODO
+
+    int pioclock = (int)75e6; // TODO
     float div = (float)SystemCoreClock / pioclock;
+    bprintf("pio clock div = %f", (double)div);
     sm_config_set_clkdiv(&config, div);
     pio_sm_init(osdPio, osd_tx_sm, osd_tx_offset, &config);
 }
@@ -130,14 +137,19 @@ void osd_test(void)
 {
     osd_test_init();
 //     int32_t delay_ms = 20;
-    int32_t delay_ms = 1520;
+//    int32_t delay_ms = 1520;
+    int32_t delay_ms = 51520;
+    
     bprintf("adding timer");
     if (!add_repeating_timer_ms(delay_ms, timer_callback, &monoBuffer[0], &rtdata)) {
         bprintf("*** failed to add timer ***");
     }
 
     while (true) {
-        sleep_ms(1);
+        delay(5000); // 5s
+        pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+        delay(5000); // 5s
+        pio_sm_set_enabled(osdPio, osd_tx_sm, true);
     }
 }
 
