@@ -145,11 +145,17 @@ void osd_test(void)
         bprintf("*** failed to add timer ***");
     }
 
+    int pc;
     while (true) {
+        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("A pc = %d", pc);
         delay(5000); // 5s
+        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("B pc = %d", pc);
         pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("C pc = %d", pc);
         delay(5000); // 5s
+        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("D pc = %d", pc);
         pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("E pc = %d", pc);
     }
 }
 
