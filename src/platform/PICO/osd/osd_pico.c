@@ -26,6 +26,10 @@
 
 #ifdef USE_OSD_SD
 
+#if !(defined OSD_W_PIN && defined OSD_EN_PIN && defined OSD_SYNC_PIN)
+#error This PICO OSD requires OSD_W_PIN, OSD_EN_PIN and OSD_SYNC_PIN to be defined
+#endif
+
 #include "osd/osd.h"
 
 #include "hardware/irq.h"
@@ -46,6 +50,8 @@
 static const PIO osdPio = PIO_INSTANCE(PIO_OSD_INDEX);
 static int osd_tx_offset;
 static int osd_en_gpio;
+static int osd_w_gpio;
+static int osd_sync_gpio;
 static int osd_tx_sm;
 
 // 360 x 288
@@ -62,6 +68,20 @@ void osd_test_init(void)
     }
 
     osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
+    osd__gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_W_PIN));
+    if (osd_en_gpio != osd_w_gpio + 1) {
+        bprintf("*** OSD_EN_GPIO must be next pin up from OSD_W_GPIO (%d vs %d)", osd_en_gpio, osd_w_gpio);
+    }
+
+    osd_sync_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_SYNC_PIN));
+    if (osd_sync_gpio != osd_en_gpio + 1) {
+        // might relax this... wait GPIO vs wait PINS if single SM, or just separate SMs
+        bprintf("*** OSD_SYNC_GPIO must be next pin up from OSD_EN_GPIO (%d vs %d)", osd_sync_gpio, osd_en_gpio);
+    }
+
+    bprintf("osd_w gpio %d, osd_en gpio %d, osd_sync gpio %d", osd_w_gpio, osd_en_gpio, osd_sync_gpio);
+    // TODO PIO BASE
+
     osd_tx_offset = pio_add_program(osdPio, &osd_tx_program);
     osd_tx_sm = pio_claim_unused_sm(osdPio, false);
     if (osd_tx_sm < 0) {
@@ -86,6 +106,11 @@ void osd_test_init(void)
   #define OSD_W_PIN            PA32
   #define OSD_EN_PIN           PA33
   // #define OSD_SYNC_PIN
+  
+#define OSD_W_PIN            PA16
+#define OSD_EN_PIN           PA17
+#define OSD_SYNC_PIN         PA18
+
 */
 
 bool timer_callback(repeating_timer_t *rt)
