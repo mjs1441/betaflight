@@ -55,7 +55,7 @@ pxl_divert:
     jmp pxl_loop2       [7]  ; 10 clocks per pixel
 
 pxl_done:
-    irq 0                    ; signal for DMA to restart
+    irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
 ; wrap
 
 
