@@ -92,6 +92,11 @@ void osd_test_init(void)
         return;
     }
 
+    // set up for outputs from PIO
+    pio_gpio_init(osdPio, osd_w_gpio);
+    pio_gpio_init(osdPio, osd_en_gpio);
+
+    // [00:37:44.679969 0.002269] osd_w gpio 16, osd_en gpio 17, osd_sync gpio 18
     pio_sm_config config = osd_tx_program_get_default_config(osd_tx_offset); // default config with wrap set
     pio_sm_set_consecutive_pindirs(osdPio, osd_tx_sm, osd_w_gpio, 2, true /* output */);
     pio_sm_set_consecutive_pindirs(osdPio, osd_tx_sm, osd_sync_gpio, 1, false /* input */);
