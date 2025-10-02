@@ -2,4 +2,65 @@
 
 .program osd_tx
 
-    nop
+;
+; h pixels	360
+; h display (us)	48
+; clocks / pixel	10
+; 
+; sysclock MHz	150			
+; pixels / us	7.5		us / pixel	0.133333333
+; clocks / us	75		us / clock	0.013333333
+; clock divider	2			
+; 
+; wait ensure vsync	10	750.00
+; wait ensure >= hsync	3.4	255.00 (could go a bit lower, want > 2.35 us)
+; hsync + back porch	10.4	780.00
+; hsync + back porch + left margin	12.375	928.13
+
+; (1 + hshiftA) * (1 + hshiftB) ~= 928 less change
+.define hshiftA 24
+.define hshiftB 26
+
+    set PINS, 0              ; set OSD_W and OSD_EN pins to 0
+await_vsync:
+    wait 1 PIN, 0            ; wait for high on the sync pin
+    wait 0 PIN, 0            ; transition to low on the sync pin, then delay
+    set  y, 22     [12]
+d1: jmp  y--, d1   [31]
+    jmp PIN, await_vsync     ; too short (high after 750 clocks = 10us), wasn't vsync
+
+    wait 1 PIN, 0            ; wait out until end of that long pulse
+    set x, 31                ; start writing out after the 32nd hsync
+loop_hsync:
+    set y, 15
+    wait 0 PIN, 0  [9]
+d2: jmp y--, d2    [14]      ; wait 16*15 + 10
+    jmp PIN, loop_hsync      ; too short (high after ~251clocks ~3.4us, maybe short sync pulse)
+    set y, hshiftA
+d3: jmp y--, d3    [hshiftB] ; wait low total of 16*15+10+2+25*27 = 927 ~ 12.375us
+    jmp PIN, lh_cont
+    jmp loop_hsync           ; looks like another vsync pulse, don't count it, look again for hsync
+lh_cont:
+    jmp x--, loop_hsync
+
+    set x, 15                ; we have waited for back porch + margin
+pxl_loop1:
+    set y, 15
+pxl_loop2:
+    set PINS, 3 ;;;; TESTING ;;;; out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
+    jmp y--, pxl_divert
+    jmp x--, pxl_loop1  [6]   ; 10 clocks per pixel
+    jmp pxl_done
+pxl_divert:
+    jmp pxl_loop2       [7]  ; 10 clocks per pixel
+
+pxl_done:
+    irq 0                    ; signal for DMA to restart
+; wrap
+
+
+
+; pio_sm_set_in_pins   OSD_SYNC        <--- IN, mov blah PINS, and WAIT PIN
+; pio_sm_set_jmp_pin   OSD_SYNC        <--- jmp PIN
+; pio_sm_set_set_pins  OSD_W, OSD_EN   <--- set PINS 
+; pio_sm_set_out_pins  OSD_W, OSD_EN   <--- OUT, mov PINS blah
