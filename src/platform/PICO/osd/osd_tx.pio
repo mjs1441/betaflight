@@ -28,7 +28,7 @@
 ;; pio_sm_exec_wait_blocking(pio, sm, [mov isr, osr])
 
     irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
-    set PINS, 0              ; set OSD_W and OSD_EN pins to 0
+    set PINS, 0              ; set OSD_W and OSD_EN pins to 0 ;;; **** probably remove from here
 await_vsync:
     wait 1 PIN, 0            ; wait for high on the sync pin
 detected_vsync:
@@ -59,11 +59,12 @@ lh_cont:
 
 wait_next_hsync:
     wait 1 PIN, 0
-    set y, 29   [26]
-d4: jmp y--, d4 [29]     ; until set would be 2 + 26 + 30*30 = 928 (sub 2 more if pull, out)
+    set y, 29   [25]
+d4: jmp y--, d4 [29]     ; until set would be 3 + 26 + 30*30 = 928 (sub 2 more if pull, out)
 
 next_line:
     mov y, isr               ; pre-arranged (number of pixels in line - 1) = 359
+    ; **** that will go away, become 22.5 -1 (23-1) when do extra pull, jmp !osre loop for word based
 line_loop:
     set PINS, 3 ;;;; TESTING ;;;; out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
     jmp y--, line_loop  [8]   ; 10 clocks per pixel
@@ -74,6 +75,7 @@ line_loop:
 ;; jmp y--, [pull]      [dd]
 ;; then osr is otherwise free
 
+   set PINS, 0
    jmp x--, wait_next_hsync
    ; that's a wrap
 

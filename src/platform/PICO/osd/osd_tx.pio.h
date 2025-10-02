@@ -13,7 +13,7 @@
 // ------ //
 
 #define osd_tx_wrap_target 0
-#define osd_tx_wrap 26
+#define osd_tx_wrap 27
 #define osd_tx_pio_version 0
 
 static const uint16_t osd_tx_program_instructions[] = {
@@ -39,19 +39,20 @@ static const uint16_t osd_tx_program_instructions[] = {
     0xa0eb, // 18: mov    osr, ~null
     0x6027, // 19: out    x, 7
     0x20a0, // 20: wait   1 pin, 0
-    0xfa5d, // 21: set    y, 29                  [26]
+    0xf95d, // 21: set    y, 29                  [25]
     0x1d96, // 22: jmp    y--, 22                [29]
     0xa046, // 23: mov    y, isr
     0xe003, // 24: set    pins, 3
     0x0898, // 25: jmp    y--, 24                [8]
-    0x0054, // 26: jmp    x--, 20
+    0xe000, // 26: set    pins, 0
+    0x0054, // 27: jmp    x--, 20
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program osd_tx_program = {
     .instructions = osd_tx_program_instructions,
-    .length = 27,
+    .length = 28,
     .origin = -1,
     .pio_version = osd_tx_pio_version,
 #if PICO_PIO_VERSION > 0
