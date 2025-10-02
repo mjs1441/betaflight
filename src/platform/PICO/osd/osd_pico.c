@@ -25,6 +25,8 @@
 #include "drivers/io_impl.h"
 #include "drivers/time.h"
 
+#include "drivers/system.h"
+
 #ifdef USE_OSD_SD
 
 #if !(defined OSD_W_PIN && defined OSD_EN_PIN && defined OSD_SYNC_PIN)
@@ -99,6 +101,9 @@ void osd_test_init(void)
     sm_config_set_set_pins(&config, osd_w_gpio, 2);    // set PIN set W, EN
     sm_config_set_out_pins(&config, osd_w_gpio, 2);    // out PIN set W, EN
 
+    // * TODO auto pull for OSR, or not
+
+        
     sm_config_set_out_shift(&config, true, true, 32); // autopull
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
 
@@ -107,7 +112,19 @@ void osd_test_init(void)
     bprintf("pio clock div = %f", (double)div);
     sm_config_set_clkdiv(&config, div);
     pio_sm_init(osdPio, osd_tx_sm, osd_tx_offset, &config);
+
+    /*
+      must arrange ISR to contain 359 = h pixels - 1
+ stop (or not started yet), clear fifos
+ send 359 to SM (put in TX fifo)
+ pio_sm_exec_wait_blocking(pio, sm, [pull])
+ pio_sm_exec_wait_blocking(pio, sm, [mov isr, osr])
+    */
+    pio_sm_put(osdPio, osd_tx_sm, 359);
+    pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
+    pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_mov(pio_isr, pio_osr));
 }
+
 
 /*
   #define OSD_W_PIN            PA32
@@ -146,16 +163,56 @@ void osd_test(void)
     }
 
     int pc;
+    int pca[50];
+    int hist[32];
+    for (int i=0; i<32; ++i) hist[i] = 0;
+    bprintf("SM offset is %d", osd_tx_offset);
     while (true) {
-        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("A pc = %d", pc);
+        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("A pc = %d less offset = %d", pc, pc - osd_tx_offset);
         delay(5000); // 5s
-        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("B pc = %d", pc);
+        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("B pc = %d less offset = %d", pc, pc - osd_tx_offset);
+
         pio_sm_set_enabled(osdPio, osd_tx_sm, true);
-        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("C pc = %d", pc);
+
+        while (1) {
+            uint32_t x = getCycleCounter();
+            if ((x%13) == 1 || (x % 17) == 7) {
+                for (int i=0; i<10000000; ++i) {
+                    hist[osdPio->sm[osd_tx_sm].addr]++;
+                }
+                bprintf("-----");
+                for (int i=0; i<32-osd_tx_offset; ++i) {
+                    bprintf("%d: %d", i, hist[i+osd_tx_offset]);
+                }
+                bprintf("-----");
+            }
+        }
+        
+        for (int i=0; i<50; ++i) {
+            pca[i] = pio_sm_get_pc(osdPio, osd_tx_sm);
+        }
+        for (int i=0; i<50; ++i) {
+            bprintf("pc = %d", pca[i] - osd_tx_offset);
+        }
+        bprintf(".");
+        delay(7);
+        while (pio_sm_get_pc(osdPio, osd_tx_sm) < osd_tx_offset + 17) {
+            ;
+        }
+        for (int i=0; i<50; ++i) {
+            pca[i] = pio_sm_get_pc(osdPio, osd_tx_sm);
+        }
+        for (int i=0; i<50; ++i) {
+            bprintf("pc = %d", pca[i] - osd_tx_offset);
+        }
+        
+            
+        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("C pc = %d less offset = %d", pc, pc - osd_tx_offset);
         delay(5000); // 5s
-        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("D pc = %d", pc);
-        pio_sm_set_enabled(osdPio, osd_tx_sm, true);
-        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("E pc = %d", pc);
+        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("D pc = %d less offset = %d", pc, pc - osd_tx_offset);
+
+        pio_sm_set_enabled(osdPio, osd_tx_sm, false);
+        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("E pc = %d less offset = %d", pc, pc - osd_tx_offset);
     }
 }
 
