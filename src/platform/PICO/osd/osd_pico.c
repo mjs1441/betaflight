@@ -125,7 +125,8 @@ void osd_test_init(void)
  pio_sm_exec_wait_blocking(pio, sm, [pull])
  pio_sm_exec_wait_blocking(pio, sm, [mov isr, osr])
     */
-    pio_sm_put(osdPio, osd_tx_sm, 359);
+//    pio_sm_put(osdPio, osd_tx_sm, 359);
+    pio_sm_put(osdPio, osd_tx_sm, 255); // see how square...
 //    pio_sm_put(osdPio, osd_tx_sm, 344);
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_mov(pio_isr, pio_osr));
