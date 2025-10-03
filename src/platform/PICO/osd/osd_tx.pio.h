@@ -37,7 +37,7 @@ static const uint16_t osd_tx_program_instructions[] = {
     0x0009, // 16: jmp    9
     0x0049, // 17: jmp    x--, 9
     0xe02a, // 18: set    x, 10
-    0x20a0, // 19: wait   1 pin, 0
+    0x2020, // 19: wait   0 pin, 0
     0xf95d, // 20: set    y, 29                  [25]
     0x1d95, // 21: jmp    y--, 21                [29]
     0x00d8, // 22: jmp    pin, 24
