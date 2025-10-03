@@ -60,7 +60,7 @@ lh_cont:
       set x, 10 ;;;; *** TESTING
       
 wait_next_hsync:
-    wait 1 PIN, 0
+    wait 0 PIN, 0
     set y, 29   [25]
 d4: jmp y--, d4 [29]     ; until set would be 3 + 26 + 30*30 = 928 (sub 2 more if pull, out)
     jmp PIN, next_line
