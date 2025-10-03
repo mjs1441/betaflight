@@ -126,6 +126,7 @@ void osd_test_init(void)
  pio_sm_exec_wait_blocking(pio, sm, [mov isr, osr])
     */
     pio_sm_put(osdPio, osd_tx_sm, 359);
+//    pio_sm_put(osdPio, osd_tx_sm, 344);
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_mov(pio_isr, pio_osr));
 }
@@ -155,6 +156,21 @@ bool timer_callback(repeating_timer_t *rt)
 
 static repeating_timer_t rtdata;
 
+static void enable(void)
+{
+    pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+    pio_gpio_init(osdPio, osd_w_gpio);
+    pio_gpio_init(osdPio, osd_en_gpio);
+}
+
+static void disable(void)
+{
+    pio_sm_set_enabled(osdPio, osd_tx_sm, false);
+    pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_set(pio_pins, 0));
+    gpio_init(osd_w_gpio);
+    gpio_init(osd_en_gpio);
+}
+
 void osd_test(void)
 {
     osd_test_init();
@@ -174,11 +190,15 @@ void osd_test(void)
     bprintf("SM offset is %d", osd_tx_offset);
     while (true) {
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("A pc = %d less offset = %d", pc, pc - osd_tx_offset);
-        delay(5000); // 5s
+        delay(3893);
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("B pc = %d less offset = %d", pc, pc - osd_tx_offset);
 
-        pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+        enable();
 
+#if 1
+        (void)hist;
+        (void)pca;
+#else
         while (1) {
             uint32_t x = getCycleCounter();
             if ((x%13) == 1 || (x % 17) == 7) {
@@ -211,12 +231,13 @@ void osd_test(void)
             bprintf("pc = %d", pca[i] - osd_tx_offset);
         }
         
+#endif
             
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("C pc = %d less offset = %d", pc, pc - osd_tx_offset);
-        delay(5000); // 5s
+        delay(4997);
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("D pc = %d less offset = %d", pc, pc - osd_tx_offset);
 
-        pio_sm_set_enabled(osdPio, osd_tx_sm, false);
+        disable();
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("E pc = %d less offset = %d", pc, pc - osd_tx_offset);
     }
 }
