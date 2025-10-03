@@ -72,7 +72,8 @@ next_line:
     mov y, isr               ; pre-arranged (number of pixels in line - 1) = 359
     ; **** that will go away, become 22.5 -1 (23-1) when do extra pull, jmp !osre loop for word based
 line_loop:
-    set PINS, 3 ;;;; TESTING ;;;; out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
+; white ;  set PINS, 3 ;;;; TESTING ;;;; out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
+    set PINS, 2 ;;;; TESTING ;;;; out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
     jmp y--, line_loop  [8]   ; 10 clocks per pixel
 ;; will be...
 ;; pull
