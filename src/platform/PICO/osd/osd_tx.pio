@@ -49,25 +49,27 @@ d2: jmp y--, d2    [14]      ; wait 16*15 + 10
 d3: jmp y--, d3    [hshiftB] ; wait from low total of 16*15+10+2+25*27 = 927 ~ 12.375us
     jmp PIN, lh_cont
     jmp loop_hsync           ; looks like another vsync pulse, don't count it, look again for hsync
+        ; TODO *** maybe better loop to wait, set x,31
 lh_cont:
     jmp x--, loop_hsync
 
 
 
 ;;;    set x, 31 ; want 255
-;;    mov osr, ~NULL
-;;    out x, 7             ; shift 7 bits of 1s into x, happens to be 255
-      set x, 10 ;;;; *** TESTING
+    mov osr, ~NULL
+    out x, 8             ; shift 8 bits of 1s into x, happens to be 255
+;;      set x, 10 ;;;; *** TESTING
       
 wait_next_hsync:
     wait 0 PIN, 0
-    set y, 29   [25]
-d4: jmp y--, d4 [29]     ; until set would be 3 + 26 + 30*30 = 928 (sub 2 more if pull, out)
+    set y, 27   [23] ;; TESTING;;;    set y, 29   [23]
+d4: jmp y--, d4 [29]     ; until set would be 4 + 24 + 30*30 = 928 (sub 2 more if pull, out)
     jmp PIN, next_line
     jmp start ; looks like are in a vsync pulse
-    
+
+
 next_line:
-    set y, 31; **** TESTING ; mov y, isr               ; pre-arranged (number of pixels in line - 1) = 359
+    mov y, isr               ; pre-arranged (number of pixels in line - 1) = 359
     ; **** that will go away, become 22.5 -1 (23-1) when do extra pull, jmp !osre loop for word based
 line_loop:
     set PINS, 3 ;;;; TESTING ;;;; out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
