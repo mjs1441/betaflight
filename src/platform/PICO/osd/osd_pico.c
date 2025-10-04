@@ -66,18 +66,18 @@ static int osd_tx_sm;
 
 // 360 x 288 x 2 bits per pixel
 static uint8_t osdBuffer[PICO_OSD_BUF_LENGTH];
+static uint8_t osdBuffer2[PICO_OSD_BUF_LENGTH];
 
  void plot(int x, int y, int c)
 {
+    (void)osdBuffer2;
     // c =  0 -> transparent (no overlay)   W=any EN=0
     // c =  1 -> black                      W=0   EN=1
     // c =  2 -> white                      W=1   EN=1
     uint8_t * pbyte = osdBuffer + PICO_OSD_BUF_WIDTH * y;
-//    pbyte += (int)(x/4.1); // 4 pixels per byte
-
     pbyte += (int)(x/4); // 4 pixels per byte
-    static uint8_t masks[4] = {0b11, 0b1100, 0b110000, 0b11000000};
-    static uint8_t  cols[4] = {0, 0b10101010, 0b11111111, 0};
+    static uint8_t masks[4] = {0b00000011, 0b00001100, 0b00110000, 0b11000000};
+    static uint8_t  cols[4] = {0b00000000, 0b10101010, 0b11111111, 0b00000000};
     uint8_t mask = masks[x%4];
     uint8_t col = cols[c];
     *pbyte = ((*pbyte) &(~mask)) | (mask&col);

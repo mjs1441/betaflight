@@ -26,11 +26,6 @@
 ;;.define hshiftC 23
 .define clocksPerPixel 9
 
-;;; *** must arrange ISR to contain 359 = h pixels - 1
-;; stop (or not started yet), clear fifos
-;; send 359 to SM (put in TX fifo)
-;; pio_sm_exec_wait_blocking(pio, sm, [pull])
-;; pio_sm_exec_wait_blocking(pio, sm, [mov isr, osr])
 
 start:
     irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
@@ -59,13 +54,7 @@ lh_cont:
     jmp x--, loop_hsync
 
 
-
-;;;    set x, 31 ; want 255
-;;;    mov osr, ~NULL
-;;;    out x, 8             ; shift 8 bits of 1s into x, happens to be 255
-    mov x, isr ; prepared 255 (or num lines)
-
-;;      set x, 10 ;;;; *** TESTING
+    mov x, isr ; prepared 255 (num lines)
       
 wait_next_hsync:
     wait 0 PIN, 0
@@ -84,6 +73,10 @@ next_line:
 
 ;;    set PINS, 3
 ;; black   set PINS, 2 ;;;; TESTING ;;;; out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
+;; dithered 75% grey
+;; set PINS, 2 [2]
+;;    set PINS, 3 
+;;    jmp y--, line_loop [4]
 
 line_loop:
     pull noblock
@@ -92,24 +85,8 @@ d6: out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W
     jmp y--, line_loop  [clocksPerPixel - 3]   ; 10 clocks per pixel
 
 
-;; dithered 75% grey
-;; set PINS, 2 [2]
-;;    set PINS, 3 
-;;    jmp y--, line_loop [4]
 
-;; will be...
-;; pull
-;; out pins,2
-;; jmp !osre [out pins] [dd]
-;; jmp y--, [pull]      [dd]
-;; then osr is otherwise free
 
    set PINS, 0
    jmp x--, wait_next_hsync
    ; that's a wrap
-
-
-; pio_sm_set_in_pins   OSD_SYNC        <--- IN, mov blah PINS, and WAIT PIN
-; pio_sm_set_jmp_pin   OSD_SYNC        <--- jmp PIN
-; pio_sm_set_set_pins  OSD_W, OSD_EN   <--- set PINS 
-; pio_sm_set_out_pins  OSD_W, OSD_EN   <--- OUT, mov PINS blah
