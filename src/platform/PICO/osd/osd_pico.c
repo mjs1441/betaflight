@@ -100,14 +100,25 @@ void osd_test_init(void)
 
 
     
+#if 0
+    for (int i=0; i<368; ++i) {
+        for (int j=0; j<256; ++j) {
+            plot(i,j, ((j%100)<10 ? (j%2)+1 : 0)); // (int)((13*j + i/37))%4);
+        }
+    }
+
+    
+#endif
+    
 #if 1
+    // this pattern particularly hard for small old screen
     for (int i=0; i<360; ++i) {
-        plot(i, PICO_OSD_BUF_HEIGHT-1, 1);
-        plot(i, PICO_OSD_BUF_HEIGHT-2, 1);
-        plot(i, PICO_OSD_BUF_HEIGHT-3, 1);
-        plot(i, PICO_OSD_BUF_HEIGHT-3, 1);
-        plot(i, PICO_OSD_BUF_HEIGHT-4, 2);
-        plot(i, PICO_OSD_BUF_HEIGHT-5, 2);
+        plot(i, 256-1, 1);
+        plot(i, 256-2, 1);
+        plot(i, 256-3, 1);
+        plot(i, 256-3, 1);
+        plot(i, 256-4, 2);
+        plot(i, 256-5, 2);
         plot(i, 0, 1);
         plot(i, 1, 1);
         plot(i, 2, 1);
@@ -116,7 +127,7 @@ void osd_test_init(void)
         plot(i, 4, 2);
     }
 
-    for (int i=0; i<PICO_OSD_BUF_HEIGHT; ++i) { 
+    for (int i=0; i<256; ++i) { 
         plot(0, i, 1);
         plot(1, i, 1);
         plot(2, i, 2);
