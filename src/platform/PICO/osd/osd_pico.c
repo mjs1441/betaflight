@@ -24,6 +24,7 @@
 #ifdef USE_OSD_SD
 
 #include <string.h>
+#include <stdlib.h>
 
 #include "drivers/io.h"
 #include "drivers/io_impl.h"
@@ -256,9 +257,9 @@ void osd_test_init(void)
         osd_dma_channel,
         &c,
         &osdPio->txf[osd_tx_sm],  // Write address (PIO TX FIFO)
-        osdBuffer2,                // Read address
-        PICO_OSD_BUF_WORDS,        // Number of transfers
-        false                      // Don't start immediately
+        NULL,                     // Read address (reset each time)
+        PICO_OSD_BUF_WORDS,       // Number of transfers
+        false                     // Don't start immediately
     );
 
 
@@ -288,11 +289,16 @@ static void vsync_callback(void)
     // * stop any dma in progress
     // * clear pio tx fifo
     // * flip buffer (or alternate buffers)
+    // * reset the read address and transfer count on the channel
     // * start dma
 
     dma_channel_abort(osd_dma_channel);
     pio_sm_clear_fifos(osdPio, osd_tx_sm);
     memcpy(osdBuffer2, osdBuffer, PICO_OSD_BUF_LENGTH);
+
+    dma_channel_set_read_addr(osd_dma_channel, osdBuffer2, false);
+    dma_channel_set_trans_count(osd_dma_channel, PICO_OSD_BUF_WORDS, false);
+    
     dma_channel_start(osd_dma_channel);
 
     if (++c % 250 == 0) {
@@ -343,6 +349,7 @@ static void disable(void)
 
 void osd_test(void)
 {
+    int disp = 0;
     osd_test_init();
 //     int32_t delay_ms = 20;
 //    int32_t delay_ms = 1520;
@@ -387,6 +394,34 @@ void osd_test(void)
 #if 1
         (void)hist;
         (void)pca;
+
+        if (disp == 0) {
+            // moving blocks
+            for (int i=0; i<15; ++i) {
+                delay(250);
+                for (int x=0; x<368; ++x) {
+                    int xx = (3*(x+i))>>7;
+                    for (int y=0; y<256; ++y) {
+                        int yy = (3*y)>>7;
+                        plot(x,y,((int)(xx+yy+i))%4);
+                    }
+                }
+            }
+        } else if (disp == 1) {
+            for (int i=0; i<760; ++i) {
+                for (int x=0; x<368; ++x) {
+                    int rx = 32 + ((int)((i*3)/5)) % 304;
+                    for (int y=0; y<256; ++y) {
+                        int ry = 32 + ((int)(((i+123)*5)/7)) % 192;
+                        int d = (x-rx)*(x-rx) + (y-ry)*(y-ry);
+                        plot(x,y, d<1000 ? d<780 ? d<300 ? 0 : 2 : 1 : 0);
+                    }
+                }
+            }
+        }
+
+        disp = (disp + 1)%2;
+        
 #else
         while (1) {
             uint32_t x = getCycleCounter();
@@ -423,7 +458,7 @@ void osd_test(void)
 #endif
             
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("C pc = %d less offset = %d", pc, pc - osd_tx_offset);
-        delay(4997);
+        delay(1997);
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("D pc = %d less offset = %d", pc, pc - osd_tx_offset);
 
         bprintf("      DISABLE");
