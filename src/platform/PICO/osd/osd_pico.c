@@ -162,7 +162,7 @@ static void enable(void)
     pio_sm_set_enabled(osdPio, osd_tx_sm, true);
     pio_gpio_init(osdPio, osd_w_gpio);
     pio_gpio_init(osdPio, osd_en_gpio);
-    gpio_set_pulls(osd_w_gpio, true, false);
+//    gpio_set_pulls(osd_w_gpio, true, false);
 }
 
 static void disable(void)
@@ -171,7 +171,7 @@ static void disable(void)
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_set(pio_pins, 0));
     gpio_init(osd_w_gpio);
     gpio_init(osd_en_gpio);
-    gpio_set_pulls(osd_w_gpio, true, false);
+//    gpio_set_pulls(osd_w_gpio, true, false);
 }
 
 void osd_test(void)

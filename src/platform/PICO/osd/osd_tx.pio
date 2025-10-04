@@ -74,12 +74,10 @@ next_line:
 line_loop:
 
 
-    set PINDIRS, 2
     set PINS, 3
 ;;;;    set PINS, 3 ;;;; TESTING ;;;; out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
 ;; black   set PINS, 2 ;;;; TESTING ;;;; out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
-;;;    jmp y--, line_loop  [8]   ; 10 clocks per pixel
-    jmp y--, line_loop  [7]   ; 10 clocks per pixel
+    jmp y--, line_loop  [8]   ; 10 clocks per pixel
 
 
 ;; dithered 75% grey
@@ -94,7 +92,6 @@ line_loop:
 ;; jmp y--, [pull]      [dd]
 ;; then osr is otherwise free
 
-   set PINDIRS, 3
    set PINS, 0
    jmp x--, wait_next_hsync
    ; that's a wrap
