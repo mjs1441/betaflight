@@ -67,18 +67,20 @@ static int osd_tx_sm;
 // 360 x 288 x 2 bits per pixel
 static uint8_t osdBuffer[PICO_OSD_BUF_LENGTH];
 
-static void plot(int x, int y, int c)
+ void plot(int x, int y, int c)
 {
     // c =  0 -> transparent (no overlay)   W=any EN=0
     // c =  1 -> black                      W=0   EN=1
     // c =  2 -> white                      W=1   EN=1
-    uint8_t * line = osdBuffer + PICO_OSD_BUF_WIDTH * y;
-    line += (int)(x/4); // 4 pixels per byte
-    static uint8_t masks[4] = {0, 0b1100, 0b110000, 0b11000000};
-    static uint8_t  cols[4] = {0, 0b01010101, 0b11111111, 0};
+    uint8_t * pbyte = osdBuffer + PICO_OSD_BUF_WIDTH * y;
+//    pbyte += (int)(x/4.1); // 4 pixels per byte
+
+    pbyte += (int)(x/4); // 4 pixels per byte
+    static uint8_t masks[4] = {0b11, 0b1100, 0b110000, 0b11000000};
+    static uint8_t  cols[4] = {0, 0b10101010, 0b11111111, 0};
     uint8_t mask = masks[x%4];
     uint8_t col = cols[c];
-    *line = ((*line) &(~mask)) | (mask&col);
+    *pbyte = ((*pbyte) &(~mask)) | (mask&col);
 }
 
 void osd_test_init(void)
@@ -91,11 +93,15 @@ void osd_test_init(void)
         int dd = (x-184)*(x-184)+(y-128)*(y-128);
 //        monoBuffer[i] = dd < 15000 ? 0xff : 0;
         osdBuffer[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
-//        osdBuffer[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
+        osdBuffer[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
 //        (void)dd;
     }
 
-    for (int i=0; i<PICO_OSD_BUF_WIDTH; ++i) {
+    ** PIO a bit off, h timings not quite right, overextending
+
+    
+#if 0    
+    for (int i=0; i<360; ++i) {
         plot(i, PICO_OSD_BUF_HEIGHT-1, 1);
         plot(i, PICO_OSD_BUF_HEIGHT-2, 1);
         plot(i, PICO_OSD_BUF_HEIGHT-3, 1);
@@ -115,12 +121,13 @@ void osd_test_init(void)
         plot(1, i, 1);
         plot(2, i, 2);
         plot(3, i, 2);
-        plot(PICO_OSD_BUF_WIDTH-1, i, 1);
-        plot(PICO_OSD_BUF_WIDTH-2, i, 1);
-        plot(PICO_OSD_BUF_WIDTH-3, i, 2);
-        plot(PICO_OSD_BUF_WIDTH-4, i, 2);
+        plot(359, i, 1);
+        plot(358, i, 1);
+        plot(357, i, 2);
+        plot(356, i, 2);
     }
-        
+#endif
+    
     osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
     osd_w_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_W_PIN));
     if (osd_en_gpio != osd_w_gpio + 1) {
