@@ -196,6 +196,7 @@ void osd_test(void)
         delay(3893);
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("B pc = %d less offset = %d", pc, pc - osd_tx_offset);
 
+        bprintf("      ENABLE");
         enable();
 
 #if 1
@@ -240,6 +241,7 @@ void osd_test(void)
         delay(4997);
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("D pc = %d less offset = %d", pc, pc - osd_tx_offset);
 
+        bprintf("      DISABLE");
         disable();
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("E pc = %d less offset = %d", pc, pc - osd_tx_offset);
     }
