@@ -58,6 +58,7 @@
 #define PICO_OSD_BUF_LENGTH  (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT)
 
 static const PIO osdPio = PIO_INSTANCE(PIO_OSD_INDEX);
+static const uint osdPioIrq = PIO_IRQ_NUM(osdPio, 0);
 static int osd_tx_offset;
 static int osd_en_gpio;
 static int osd_w_gpio;
@@ -82,6 +83,8 @@ static uint8_t osdBuffer2[PICO_OSD_BUF_LENGTH];
     uint8_t col = cols[c];
     *pbyte = ((*pbyte) &(~mask)) | (mask&col);
 }
+
+static void vsync_callback(void);
 
 void osd_test_init(void)
 {
@@ -213,8 +216,22 @@ void osd_test_init(void)
 #endif
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_mov(pio_isr, pio_osr));
+
+    pio_set_irq0_source_enabled(osdPio, pis_interrupt0, true); // enable state machine IRQ 0 => system irq PIO_thisone_IRQ_0
+    irq_set_exclusive_handler(osdPioIrq, vsync_callback);
+    irq_set_enabled(osdPioIrq, true);
 }
 
+static void vsync_callback(void)
+{
+    // 50 per second (PAL)
+    static int c=0;
+    // Need to clear the IRQ flag state from the PIO.
+    // This just writes a 1 to a register, doesn't mess with SM execution    
+    pio_interrupt_clear(osdPio, 0);
+
+    
+}
 
 /*
   #define OSD_W_PIN            PA32
