@@ -38,15 +38,15 @@ static const uint16_t osd_tx_program_instructions[] = {
     0x0049, // 17: jmp    x--, 9
     0xa026, // 18: mov    x, isr
     0x2020, // 19: wait   0 pin, 0
-    0xf75b, // 20: set    y, 27                  [23]
+    0xf75d, // 20: set    y, 29                  [23]
     0x1d95, // 21: jmp    y--, 21                [29]
     0x00d8, // 22: jmp    pin, 24
     0x0000, // 23: jmp    0
     0xe056, // 24: set    y, 22
     0x8080, // 25: pull   noblock
     0x6002, // 26: out    pins, 2
-    0x08fa, // 27: jmp    !osre, 26              [8]
-    0x0799, // 28: jmp    y--, 25                [7]
+    0x07fa, // 27: jmp    !osre, 26              [7]
+    0x0699, // 28: jmp    y--, 25                [6]
     0xe000, // 29: set    pins, 0
     0x0053, // 30: jmp    x--, 19
             //     .wrap

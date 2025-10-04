@@ -94,13 +94,13 @@ void osd_test_init(void)
 //        monoBuffer[i] = dd < 15000 ? 0xff : 0;
         osdBuffer[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
         osdBuffer[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
+        osdBuffer[i] = 0;
 //        (void)dd;
     }
 
-    ** PIO a bit off, h timings not quite right, overextending
 
     
-#if 0    
+#if 1
     for (int i=0; i<360; ++i) {
         plot(i, PICO_OSD_BUF_HEIGHT-1, 1);
         plot(i, PICO_OSD_BUF_HEIGHT-2, 1);
@@ -121,10 +121,18 @@ void osd_test_init(void)
         plot(1, i, 1);
         plot(2, i, 2);
         plot(3, i, 2);
-        plot(359, i, 1);
-        plot(358, i, 1);
-        plot(357, i, 2);
-        plot(356, i, 2);
+        plot(359, i, 2);
+        plot(358, i, 2);
+        plot(357, i, 1);
+        plot(356, i, 1);
+        plot(360, i, 2);
+        plot(361, i, 2);
+        plot(362, i, 2);
+        plot(363, i, 2);
+        plot(364, i, 2);
+        plot(365, i, 2);
+        plot(366, i, 2);
+        plot(367, i, 2);
     }
 #endif
     
@@ -257,7 +265,7 @@ void osd_test(void)
     bprintf("SM offset is %d", osd_tx_offset);
     while (true) {
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("A pc = %d less offset = %d", pc, pc - osd_tx_offset);
-        delay(3893);
+        delay(893);
 //        delay(13893);
         delay(13);
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("B pc = %d less offset = %d", pc, pc - osd_tx_offset);
