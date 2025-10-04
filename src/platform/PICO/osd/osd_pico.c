@@ -46,7 +46,12 @@
 
 // chars OSD_SD_ROWS x OSD_SD_COLS (30 x 16)
 // 360 / 8 = 45 x 288
-#define PICO_OSD_BUF_WIDTH   (OSD_SD_COLS * PICO_OSD_CHAR_WIDTH / 8)
+// 2 bits per pixel
+#define PICO_OSD_BPP         2
+//#define PICO_OSD_BUF_WIDTH   (OSD_SD_COLS * PICO_OSD_CHAR_WIDTH / 8)
+#define ROUND_WORD(x)        (4 * (((x) + 3)/4))
+#define PICO_OSD_BUF_WIDTH   ROUND_WORD(OSD_SD_COLS * PICO_OSD_CHAR_WIDTH * PICO_OSD_BPP / 8)
+#define PICO_OSD_BUF_LINEWORDS (PICO_OSD_BUF_WIDTH/4)
 #define PICO_OSD_BUF_HEIGHT  (OSD_SD_ROWS * PICO_OSD_CHAR_HEIGHT)
 #define PICO_OSD_BUF_LENGTH  (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT)
 
@@ -57,17 +62,19 @@ static int osd_w_gpio;
 static int osd_sync_gpio;
 static int osd_tx_sm;
 
-// 360 x 288
-static uint8_t monoBuffer[PICO_OSD_BUF_LENGTH];
+// 360 x 288 x 2 bits per pixel
+static uint8_t osdBuffer[PICO_OSD_BUF_LENGTH];
 
 void osd_test_init(void)
 {
     bprintf("osd_test_init");
+    bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT, PICO_OSD_BUF_LENGTH);
     for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
         int y = i / PICO_OSD_BUF_WIDTH;
         int x = (i % PICO_OSD_BUF_WIDTH) * 8; // approx. pixels
         int dd = (x-180)*(x-180)+(y-144)*(y-144);
-        monoBuffer[i] = dd < 15000 ? 0xff : 0;
+//        monoBuffer[i] = dd < 15000 ? 0xff : 0;
+        osdBuffer[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
     }
 
     osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
@@ -108,8 +115,7 @@ void osd_test_init(void)
 
     // * TODO auto pull for OSR, or not
 
-        
-    sm_config_set_out_shift(&config, true, true, 32); // autopull
+    sm_config_set_out_shift(&config, true, false, 32); // no autopull
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
 
     int pioclock = (int)75e6; // TODO
@@ -125,9 +131,16 @@ void osd_test_init(void)
  pio_sm_exec_wait_blocking(pio, sm, [pull])
  pio_sm_exec_wait_blocking(pio, sm, [mov isr, osr])
     */
+
+#if 0
+    // prepare value for horiz pixel loop
 //    pio_sm_put(osdPio, osd_tx_sm, 359);
     pio_sm_put(osdPio, osd_tx_sm, 255); // see how square...
 //    pio_sm_put(osdPio, osd_tx_sm, 344);
+#else
+    // prepare value for vert pixel loop
+    pio_sm_put(osdPio, osd_tx_sm, 255);
+#endif
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_mov(pio_isr, pio_osr));
 }
@@ -147,7 +160,7 @@ void osd_test_init(void)
 bool timer_callback(repeating_timer_t *rt)
 {
     uint8_t *buffer = (uint8_t *)rt->user_data;
-    bprintf("buffer = %p, monoBuffer = %p", buffer, monoBuffer);
+    bprintf("buffer = %p, osdBuffer = %p", buffer, osdBuffer);
         
 //    pio_sm_set_enabled(osdPio, osd_tx_sm, true);
     //return false;
@@ -182,7 +195,7 @@ void osd_test(void)
     int32_t delay_ms = 51520;
     
     bprintf("adding timer");
-    if (!add_repeating_timer_ms(delay_ms, timer_callback, &monoBuffer[0], &rtdata)) {
+    if (!add_repeating_timer_ms(delay_ms, timer_callback, &osdBuffer[0], &rtdata)) {
         bprintf("*** failed to add timer ***");
     }
 
@@ -194,10 +207,24 @@ void osd_test(void)
     while (true) {
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("A pc = %d less offset = %d", pc, pc - osd_tx_offset);
         delay(3893);
+//        delay(13893);
+        delay(13);
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("B pc = %d less offset = %d", pc, pc - osd_tx_offset);
 
         bprintf("      ENABLE");
         enable();
+        int cc = 0;
+        while (1) {
+            for (int j=0; j<PICO_OSD_BUF_HEIGHT; ++j) {
+                int jj = PICO_OSD_BUF_WIDTH * j;
+                for (int i=0; i<PICO_OSD_BUF_LINEWORDS; ++i) {
+                    uint32_t w = osdBuffer[4*i + jj];
+                    pio_sm_put_blocking(osdPio, osd_tx_sm, w);
+                }
+            }
+            cc += 1;
+            if (cc%200 == 0) { bprintf("cc %d", cc); }
+        }
 
 #if 1
         (void)hist;
