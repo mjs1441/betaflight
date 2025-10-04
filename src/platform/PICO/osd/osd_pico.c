@@ -21,13 +21,16 @@
 
 #include "platform.h"
 
+#ifdef USE_OSD_SD
+
+#include <string.h>
+
 #include "drivers/io.h"
 #include "drivers/io_impl.h"
 #include "drivers/time.h"
 
 #include "drivers/system.h"
 
-#ifdef USE_OSD_SD
 
 #if !(defined OSD_W_PIN && defined OSD_EN_PIN && defined OSD_SYNC_PIN)
 #error This PICO OSD requires OSD_W_PIN, OSD_EN_PIN and OSD_SYNC_PIN to be defined
@@ -37,6 +40,7 @@
 
 #include "hardware/irq.h"
 #include "hardware/pio.h"
+#include "hardware/dma.h"
 
 #include "osd_tx.pio.h"
 
@@ -56,6 +60,7 @@
 ////#define PICO_OSD_BUF_HEIGHT  (OSD_SD_ROWS * PICO_OSD_CHAR_HEIGHT)
 #define PICO_OSD_BUF_HEIGHT  256
 #define PICO_OSD_BUF_LENGTH  (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT)
+#define PICO_OSD_BUF_WORDS   (PICO_OSD_BUF_LENGTH / 4)
 
 static const PIO osdPio = PIO_INSTANCE(PIO_OSD_INDEX);
 static const uint osdPioIrq = PIO_IRQ_NUM(osdPio, 0);
@@ -68,6 +73,8 @@ static int osd_tx_sm;
 // 360 x 288 x 2 bits per pixel
 static uint8_t osdBuffer[PICO_OSD_BUF_LENGTH];
 static uint8_t osdBuffer2[PICO_OSD_BUF_LENGTH];
+
+static int osd_dma_channel;
 
  void plot(int x, int y, int c)
 {
@@ -220,6 +227,54 @@ void osd_test_init(void)
     pio_set_irq0_source_enabled(osdPio, pis_interrupt0, true); // enable state machine IRQ 0 => system irq PIO_thisone_IRQ_0
     irq_set_exclusive_handler(osdPioIrq, vsync_callback);
     irq_set_enabled(osdPioIrq, true);
+
+
+    /*
+    BF DMA thing, with ownership
+
+// --- DMA Configuration ---
+    const dmaIdentifier_e dma_id = dmaGetFreeIdentifier();
+    if (dma_id == DMA_NONE || !dmaAllocate(dma_id, OWNER_LED_STRIP, 0)) {
+        return false;
+    }
+    dma_chan = DMA_IDENTIFIER_TO_CHANNEL(dma_id);
+    */
+
+    osd_dma_channel = dma_claim_unused_channel(false);
+    if (!osd_dma_channel) {
+        bprintf("**** failed to claim dma channel for osd pico");
+        return;
+    }
+    
+    dma_channel_config c = dma_channel_get_default_config(osd_dma_channel);
+    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
+    channel_config_set_read_increment(&c, true);
+    channel_config_set_write_increment(&c, false);
+    channel_config_set_dreq(&c, pio_get_dreq(osdPio, osd_tx_sm, true));
+
+    dma_channel_configure(
+        osd_dma_channel,
+        &c,
+        &osdPio->txf[osd_tx_sm],  // Write address (PIO TX FIFO)
+        osdBuffer2,                // Read address
+        PICO_OSD_BUF_WORDS,        // Number of transfers
+        false                      // Don't start immediately
+    );
+
+
+    /*
+    if dma has handler
+// disable the channel on IRQ0
+dma_channel_set_irq0_enabled(channel, false);
+// abort the channel
+dma_channel_abort(channel);
+// clear the spurious IRQ (if there was one)
+dma_channel_acknowledge_irq0(channel);
+// re-enable the channel on IRQ0
+dma_channel_set_irq0_enabled(channel, true);
+
+otherwise just dma_channel_abort
+    */
 }
 
 static void vsync_callback(void)
@@ -230,7 +285,19 @@ static void vsync_callback(void)
     // This just writes a 1 to a register, doesn't mess with SM execution    
     pio_interrupt_clear(osdPio, 0);
 
-    
+    // * stop any dma in progress
+    // * clear pio tx fifo
+    // * flip buffer (or alternate buffers)
+    // * start dma
+
+    dma_channel_abort(osd_dma_channel);
+    pio_sm_clear_fifos(osdPio, osd_tx_sm);
+    memcpy(osdBuffer2, osdBuffer, PICO_OSD_BUF_LENGTH);
+    dma_channel_start(osd_dma_channel);
+
+    if (++c % 250 == 0) {
+        bprintf("%d vsync_callback",c);
+    }
 }
 
 /*
@@ -300,6 +367,7 @@ void osd_test(void)
 
         bprintf("      ENABLE");
         enable();
+#if 0
         int cc = 0;
         int cj = 0;
         while (1) {
@@ -314,6 +382,7 @@ void osd_test(void)
             cc += 1;
             if (cc%200 == 0) { bprintf("cc %d (%d words)", cc, cj); }
         }
+#endif
 
 #if 1
         (void)hist;
