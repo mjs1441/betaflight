@@ -50,9 +50,11 @@
 #define PICO_OSD_BPP         2
 //#define PICO_OSD_BUF_WIDTH   (OSD_SD_COLS * PICO_OSD_CHAR_WIDTH / 8)
 #define ROUND_WORD(x)        (4 * (((x) + 3)/4))
-#define PICO_OSD_BUF_WIDTH   ROUND_WORD(OSD_SD_COLS * PICO_OSD_CHAR_WIDTH * PICO_OSD_BPP / 8)
+//#define PICO_OSD_BUF_WIDTH   ROUND_WORD(OSD_SD_COLS * PICO_OSD_CHAR_WIDTH * PICO_OSD_BPP / 8)
+#define PICO_OSD_BUF_WIDTH   ROUND_WORD(360 * PICO_OSD_BPP / 8)
 #define PICO_OSD_BUF_LINEWORDS (PICO_OSD_BUF_WIDTH/4)
-#define PICO_OSD_BUF_HEIGHT  (OSD_SD_ROWS * PICO_OSD_CHAR_HEIGHT)
+////#define PICO_OSD_BUF_HEIGHT  (OSD_SD_ROWS * PICO_OSD_CHAR_HEIGHT)
+#define PICO_OSD_BUF_HEIGHT  256
 #define PICO_OSD_BUF_LENGTH  (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT)
 
 static const PIO osdPio = PIO_INSTANCE(PIO_OSD_INDEX);
@@ -75,6 +77,8 @@ void osd_test_init(void)
         int dd = (x-180)*(x-180)+(y-144)*(y-144);
 //        monoBuffer[i] = dd < 15000 ? 0xff : 0;
         osdBuffer[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
+//        osdBuffer[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
+//        (void)dd;
     }
 
     osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
@@ -214,16 +218,18 @@ void osd_test(void)
         bprintf("      ENABLE");
         enable();
         int cc = 0;
+        int cj = 0;
         while (1) {
             for (int j=0; j<PICO_OSD_BUF_HEIGHT; ++j) {
                 int jj = PICO_OSD_BUF_WIDTH * j;
                 for (int i=0; i<PICO_OSD_BUF_LINEWORDS; ++i) {
-                    uint32_t w = osdBuffer[4*i + jj];
+                    uint32_t w = *(uint32_t*)(&osdBuffer[4*i + jj]);
                     pio_sm_put_blocking(osdPio, osd_tx_sm, w);
+                    cj++;
                 }
             }
             cc += 1;
-            if (cc%200 == 0) { bprintf("cc %d", cc); }
+            if (cc%200 == 0) { bprintf("cc %d (%d words)", cc, cj); }
         }
 
 #if 1
