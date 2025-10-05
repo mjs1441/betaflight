@@ -65,6 +65,9 @@
 
 static const PIO osdPio = PIO_INSTANCE(PIO_OSD_INDEX);
 static const uint osdPioIrq = PIO_IRQ_NUM(osdPio, 0);
+static const int nx = PICO_OSD_BUF_WIDTH * 4;
+static const int ny = PICO_OSD_BUF_HEIGHT;
+
 static int osd_tx_offset;
 static int osd_en_gpio;
 static int osd_w_gpio;
@@ -72,12 +75,15 @@ static int osd_sync_gpio;
 static int osd_tx_sm;
 
 // 360 x 288 x 2 bits per pixel
+// **** TODO uint32_t aligned
 static uint8_t osdBuffer[PICO_OSD_BUF_LENGTH];
 static uint8_t osdBuffer2[PICO_OSD_BUF_LENGTH];
 
 static int osd_dma_channel;
 
- void plot(int x, int y, int c)
+void testUpdate(void);
+
+void plot(int x, int y, int c)
 {
     (void)osdBuffer2;
     // c =  0 -> transparent (no overlay)   W=any EN=0
@@ -94,10 +100,23 @@ static int osd_dma_channel;
 
 static void vsync_callback(void);
 
+static void plotBorder(void)
+{    
+    for (int i=0; i<nx; ++i) {
+        plot(i,0,1); plot(i,ny-1,1);
+        plot(i,1,2); plot(i,ny-2,2);
+    }
+    for (int i=0; i<ny; ++i) {
+        plot(0,i,1); plot(nx-1,i,1);
+        plot(1,i,2); plot(nx-2,i,2);
+    }
+}
+
 void osd_test_init(void)
 {
     bprintf("osd_test_init");
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT, PICO_OSD_BUF_LENGTH);
+    bprintf("nx %d, ny %d", nx, ny);
     for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
         int y = i / PICO_OSD_BUF_WIDTH;
         int x = (i % PICO_OSD_BUF_WIDTH) * 4; // approx. pixels
@@ -112,8 +131,8 @@ void osd_test_init(void)
 
     
 #if 0
-    for (int i=0; i<368; ++i) {
-        for (int j=0; j<256; ++j) {
+    for (int i=0; i<nx; ++i) {
+        for (int j=0; j<ny; ++j) {
             plot(i,j, ((j%100)<10 ? (j%2)+1 : 0)); // (int)((13*j + i/37))%4);
         }
     }
@@ -122,6 +141,9 @@ void osd_test_init(void)
 #endif
     
 #if 1
+    plotBorder();
+
+#elif 1
     // this pattern particularly hard for small old screen
     for (int i=0; i<360; ++i) {
         plot(i, 256-1, 1);
@@ -292,16 +314,24 @@ static void vsync_callback(void)
     // * reset the read address and transfer count on the channel
     // * start dma
 
+    ++c;
     dma_channel_abort(osd_dma_channel);
     pio_sm_clear_fifos(osdPio, osd_tx_sm);
-    memcpy(osdBuffer2, osdBuffer, PICO_OSD_BUF_LENGTH);
-
-    dma_channel_set_read_addr(osd_dma_channel, osdBuffer2, false);
-    dma_channel_set_trans_count(osd_dma_channel, PICO_OSD_BUF_WORDS, false);
+    if (c%3 == 0) {
+        testUpdate();
+    }
+//    if (c%10 == 0) {
+    if (1) {
+        memcpy(osdBuffer2, osdBuffer, PICO_OSD_BUF_LENGTH);
+        
+        dma_channel_set_read_addr(osd_dma_channel, osdBuffer2, false);
+//        dma_channel_set_trans_count(osd_dma_channel, PICO_OSD_BUF_WORDS, false);
+        dma_channel_set_trans_count(osd_dma_channel, PICO_OSD_BUF_WORDS, false);
     
-    dma_channel_start(osd_dma_channel);
+        dma_channel_start(osd_dma_channel);
+    }
 
-    if (++c % 250 == 0) {
+    if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
     }
 }
@@ -394,6 +424,11 @@ void osd_test(void)
 #if 1
         (void)hist;
         (void)pca;
+        (void)disp;
+        return;
+#elif 1
+        (void)hist;
+        (void)pca;
 
         if (disp == 0) {
             // moving blocks
@@ -467,6 +502,61 @@ void osd_test(void)
     }
 }
 
+
+#ifdef TEST_PIO_OSD
+void testOSDtask(void)
+{
+#if 1
+    return;
+#else
+    testUpdate();
+#endif
+}
+
+#endif
+
+void testUpdate(void)
+{
+#if 1
+    static const int nxx = nx - 64;
+    static const float xp = ((float)(nxx))/4000000;
+    uint32_t ctime = micros();
+    bzero(osdBuffer, PICO_OSD_BUF_LENGTH);
+    plotBorder();
+    int x = 27 + ((int)(ctime*xp)) % nxx;
+    int y = 32;
+    for (int i=0; i<10; ++i) {
+        for (int j=0; j<10; ++j) {
+            plot(x+i, y+j, (j==0 || i==0) ? 1 : 2);
+        }
+    }
+
+#else
+
+    static const int usPerRun = 50000;
+    static const int nxx = nx - 64;
+    static const float xp = ((float)(nxx))/4000000;
+    static uint32_t ttime;
+    if (!ttime) {
+        ttime = micros();
+    }
+    uint32_t ctime = micros();
+    int32_t dtime = (int32_t)(ctime - ttime);
+    if (dtime > usPerRun) {
+        bzero(osdBuffer, PICO_OSD_BUF_LENGTH);
+        plotBorder();
+        int x = 27 + ((int)(ctime*xp)) % nxx;
+        (void)xp;
+        int y = 32;
+        for (int i=0; i<10; ++i) {
+            for (int j=0; j<10; ++j) {
+                plot(x+i, y+j, (j==0 || i==0) ? 1 : 2);
+            }
+        }
+        ttime = ctime;            
+    }
+#endif
+}
 
 #else // USE_OSD_SD
 // no OSD SD
