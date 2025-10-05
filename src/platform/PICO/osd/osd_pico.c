@@ -558,11 +558,11 @@ osd_ah_invert = OFF
     static bool didPitchCalc;
     static float pitchMult;
     static float rollMult;
-    static const float pitchMaxOffset = ny*0.1f;
+    static const float pitchMaxOffset = ny*0.2f; // ny*0.1f;
     static const float rollMaxOffset = ny*0.2f;
     static const int hcx = nx / 2;
     static const int hcy = ny * 0.68f;
-    static const int hhwid = nx * 0.2f;
+    static const int hhwid = 8 * (int)(nx * 0.2f / 8);
     static const float oohhwid = 1.0f / hhwid;
 
     if (!didPitchCalc) {
@@ -570,6 +570,31 @@ osd_ah_invert = OFF
         rollMult = rollMaxOffset / maxRoll;
     }
 
+    int im = ny*0.75f;
+    int imm = im/10;
+    int yy = ny*0.9f;
+    for (int i=0; i<im; ++i) {
+        int dd = hhwid*1.15f;
+        if (i==0 || i==im-1) {
+            for (int j=-4; j<=4; ++j) {
+                plot(hcx-dd+j, yy, 2);
+                plot(hcx+dd+j, yy, 2);
+            }
+        } else if (i%imm == 0) {
+            for (int j=-2; j<=2; ++j) {
+                plot(hcx-dd+j, yy, 2);
+                plot(hcx+dd+j, yy, 2);
+            }
+        }
+        if (i%8 == 2) {
+            plot(hcx-dd, yy, 2);
+            plot(1 + hcx-dd, yy, 1);
+            plot(hcx+dd, yy, 2);
+            plot(1 + hcx+dd, yy, 1);
+        }
+        yy--;
+    }
+    
     int ypitchoffset, yrollmax; // ypitchoffset -+ yrollmax across hwid
 
     // Convert pitchAngle to y compensation value
@@ -580,13 +605,22 @@ osd_ah_invert = OFF
 
     yrollmax = rollAngle * rollMult;
 
-    float yCurrent = hcy + ypitchoffset - yrollmax;
+    int xi = hcx - hhwid;
+    float yf = hcy + ypitchoffset - yrollmax;
     float yDelta = yrollmax * oohhwid;
-
-    for (int x = hcx - hhwid; x < hcx + hhwid; ++x) {
-        plot(x, yCurrent, 2);
-        plot(x, yCurrent-1, 1);
-        yCurrent += yDelta;
+    // int hmod = hhwid/4;
+    
+    for (int i=0; i< 2*hhwid+1; ++i) {
+        plot(xi, yf, 2);
+        plot(xi, yf+1, 1);
+        if (i == 0 || i == 2*hhwid) { //  || (i%hmod == 0)) {
+            plot(xi, yf-1, 2);
+            plot(xi, yf+1, 2);
+            plot(xi, yf-2, 2);
+            plot(xi, yf+2, 2);
+        }
+        yf += yDelta;
+        xi++;
     }
    
 
