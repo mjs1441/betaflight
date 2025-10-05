@@ -1378,6 +1378,11 @@ FAST_CODE void taskMainPidLoop(timeUs_t currentTimeUs)
     subTaskMotorUpdate(currentTimeUs);
     subTaskPidSubprocesses(currentTimeUs);
 
+#ifdef TEST_PIO_OSD
+    void testOSDtask(void);
+    testOSDtask();
+#endif
+
     DEBUG_SET(DEBUG_CYCLETIME, 0, getTaskDeltaTimeUs(TASK_SELF));
     DEBUG_SET(DEBUG_CYCLETIME, 1, getAverageSystemLoadPercent());
 }
