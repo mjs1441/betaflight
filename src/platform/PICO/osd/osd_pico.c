@@ -26,11 +26,13 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "common/maths.h"
 #include "drivers/io.h"
 #include "drivers/io_impl.h"
-#include "drivers/time.h"
-
 #include "drivers/system.h"
+#include "drivers/time.h"
+#include "flight/imu.h"
+
 
 
 #if !(defined OSD_W_PIN && defined OSD_EN_PIN && defined OSD_SYNC_PIN)
@@ -85,10 +87,13 @@ void testUpdate(void);
 
 void plot(int x, int y, int c)
 {
-    (void)osdBuffer2;
     // c =  0 -> transparent (no overlay)   W=any EN=0
     // c =  1 -> black                      W=0   EN=1
     // c =  2 -> white                      W=1   EN=1
+    if (x<0 || y<0 || x>=nx || y>=ny) {
+        return;
+    }
+
     uint8_t * pbyte = osdBuffer + PICO_OSD_BUF_WIDTH * y;
     pbyte += (int)(x/4); // 4 pixels per byte
     static uint8_t masks[4] = {0b00000011, 0b00001100, 0b00110000, 0b11000000};
@@ -515,6 +520,11 @@ void testOSDtask(void)
 
 #endif
 
+// osd_elements artificalhorizon attitude.values.*
+// also see sensors/gyro/gyro.ADCf, but note gyro ~ rad/sec, accel ~ rad/sec^2
+// flight/imu.c -> "euler angles" (sic) (pitch, roll, yaw)
+// ./telemetry/crsf.c:    sbufWriteU16BigEndian(dst, decidegrees2Radians10000(attitude.values.roll));
+
 void testUpdate(void)
 {
 #if 1
@@ -530,6 +540,55 @@ void testUpdate(void)
             plot(x+i, y+j, (j==0 || i==0) ? 1 : 2);
         }
     }
+
+    /*
+      osd_ah_max_pit = 20
+osd_ah_max_rol = 40
+osd_ah_invert = OFF
+    */
+
+    // cf. osd_elements.c osdElementArtificialHorizon
+    // Get pitch and roll limits [and values] in tenths of degrees
+    const int maxPitch = osdConfig()->ahMaxPitch * 10;
+    const int maxRoll = osdConfig()->ahMaxRoll * 10;
+    const int ahSign = osdConfig()->ahInvert ? -1 : 1;
+    const int rollAngle = constrain(attitude.values.roll * ahSign, -maxRoll, maxRoll);
+    int pitchAngle = constrain(attitude.values.pitch * ahSign, -maxPitch, maxPitch);
+
+    static bool didPitchCalc;
+    static float pitchMult;
+    static float rollMult;
+    static const float pitchMaxOffset = ny*0.1f;
+    static const float rollMaxOffset = ny*0.2f;
+    static const int hcx = nx / 2;
+    static const int hcy = ny * 0.68f;
+    static const int hhwid = nx * 0.2f;
+    static const float oohhwid = 1.0f / hhwid;
+
+    if (!didPitchCalc) {
+        pitchMult = pitchMaxOffset / maxPitch;
+        rollMult = rollMaxOffset / maxRoll;
+    }
+
+    int ypitchoffset, yrollmax; // ypitchoffset -+ yrollmax across hwid
+
+    // Convert pitchAngle to y compensation value
+    // (maxPitch / 25) divisor matches previous settings of fixed divisor of 8 and fixed max AHI pitch angle of 20.0 degrees
+    if (maxPitch > 0) {
+        ypitchoffset = pitchAngle * pitchMult; // small angles, pitchAngle roughly proportional to pitch delta (in pixels)
+    }
+
+    yrollmax = rollAngle * rollMult;
+
+    float yCurrent = hcy + ypitchoffset - yrollmax;
+    float yDelta = yrollmax * oohhwid;
+
+    for (int x = hcx - hhwid; x < hcx + hhwid; ++x) {
+        plot(x, yCurrent, 2);
+        plot(x, yCurrent-1, 1);
+        yCurrent += yDelta;
+    }
+   
 
 #else
 
