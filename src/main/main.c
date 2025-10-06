@@ -41,7 +41,9 @@ int main(int argc, char * argv[])
 #endif
     init();
 
+#ifdef TEST_PIO_OSD
     osd_test();
+#endif
     
     run();
 
