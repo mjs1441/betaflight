@@ -21,7 +21,8 @@
 
 #include "platform.h"
 
-#ifdef USE_OSD_SD
+//#ifdef USE_OSD_SD
+#ifdef TEST_PIO_OSD
 
 #include <string.h>
 #include <stdlib.h>
