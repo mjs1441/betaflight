@@ -78,8 +78,12 @@ static int osd_tx_sm;
 
 // 360 x 288 x 2 bits per pixel
 // **** TODO uint32_t aligned
-static uint8_t osdBuffer[PICO_OSD_BUF_LENGTH];
-static uint8_t osdBuffer2[PICO_OSD_BUF_LENGTH];
+// TODO faster memcpy
+// currently building with no-builtin-memcpy
+// and gcc13.3 with nanolib -> just does byte copy (even when known aligned)
+// (also gcc14.3)
+__attribute__((aligned(4))) static uint8_t osdBuffer[PICO_OSD_BUF_LENGTH];
+__attribute__((aligned(4))) static uint8_t osdBuffer2[PICO_OSD_BUF_LENGTH];
 
 static int osd_dma_channel;
 
