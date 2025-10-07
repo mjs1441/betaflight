@@ -669,6 +669,7 @@ void validateAndFixBlackBox(void) {
         if (!sdcardConfig()->mode)
 #endif
         {
+            bprintf("*** BB but !sdcardConfig mode");
             blackboxConfigMutable()->device = BLACKBOX_DEVICE_NONE;
         }
     }

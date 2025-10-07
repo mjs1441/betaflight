@@ -1182,7 +1182,7 @@ static bool inMotorTestMode(void)
         // Monitor the duration at minimum
         return (millis() < resetTime);
     }
-    return false;
+////////    return false;
 }
 
 #ifdef USE_GPS

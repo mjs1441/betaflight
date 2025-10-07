@@ -483,6 +483,44 @@ static void readSchedulerLocals(task_t *selectedTask, uint8_t selectedTaskDynami
 }
 #endif
 
+
+#include "fc/runtime_config.h"
+void checkCPUload(uint32_t timeus)
+{
+#ifdef PICO_TRACE
+    static bool didone;
+    static bool stacked;
+    static uint32_t lasttime;
+    static uint32_t stacktime;
+    static int cc;
+    static uint32_t cctime;
+    if (!didone) {
+        didone = true;
+        lasttime = timeus;
+        cctime = timeus;
+    }
+
+    ++cc;
+    int dtime = timeus - cctime;
+    if (dtime > 1200000) {
+        bprintf(":: scheduler %d us/cycle, %d x 100 cycles/sec", (int)(dtime/cc), (int)((cc*10000)/dtime));
+        cctime = timeus;
+        cc = 1;
+    }
+
+    if (stacked || (getArmingDisableFlags() & ARMING_DISABLED_LOAD)) {
+        if ((int)(timeus - lasttime) > 1000000) {
+            bprintf("*** CPU OVERLOAD *** %d", stacked ? stacktime : timeus);
+            lasttime = timeus;
+            stacked = false;
+        } else {
+            stacked = true;
+            stacktime = timeus;
+        }
+    }
+#endif
+}
+
 FAST_CODE void scheduler(void)
 {
     static uint32_t checkCycles = 0;
@@ -506,6 +544,7 @@ FAST_CODE void scheduler(void)
     int32_t schedLoopRemainingCycles;
     bool firstSchedulingOpportunity = false;
 
+    checkCPUload(schedulerStartTimeUs);
 #if defined(UNIT_TEST)
     if (nextTargetCycles == 0) {
         lastTargetCycles = getCycleCounter();

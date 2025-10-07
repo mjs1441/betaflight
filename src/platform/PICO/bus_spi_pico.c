@@ -165,7 +165,7 @@ void spiPinConfigure(const struct spiPinConfig_s *pConfig)
 static void spiSetClockFromSpeed(spi_inst_t *spi, uint16_t speed)
 {
     uint32_t freq = spiCalculateClock(speed);
-    bprintf("spiSetClockFromSpeed %p %d -> %d",spi, speed, freq);
+//////////    bprintf("spiSetClockFromSpeed %p %d -> %d",spi, speed, freq);
     spi_set_baudrate(spi, freq);
 }
 
@@ -416,7 +416,7 @@ void spiSequenceStart(const extDevice_t *dev)
     SPI_TypeDef *instance = bus->busType_u.spi.instance;
     spiDevice_t *spi = &spiDevice[spiDeviceByInstance(instance)];
     bool dmaSafe = dev->useDMA;
-#if TESTING_NO_DMA
+#ifdef SPI_NO_DMA
     dmaSafe = false;
 #endif
     uint32_t xferLen = 0;

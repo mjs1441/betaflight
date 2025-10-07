@@ -170,6 +170,7 @@ static bool checkReady(displayPort_t *displayPort, bool rescan)
 {
     UNUSED(displayPort);
     if (!max7456IsDeviceDetected()) {
+        bprintf(". . . *** checkReady -> rescan");
         if (!rescan) {
             return false;
         } else {
@@ -223,6 +224,7 @@ bool max7456DisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **disp
         // not been set.
         *displayPort = NULL;
 
+        bprintf(". . . *** MAX7456 not configured");
         return false;
 
         break;
@@ -233,6 +235,7 @@ bool max7456DisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **disp
         displayInit(&max7456DisplayPort, &max7456VTable, DISPLAYPORT_DEVICE_TYPE_MAX7456);
         *displayPort = &max7456DisplayPort;
 
+        bprintf(". . . *** MAX7456 not yet found");
         return false;
 
         break;
@@ -240,6 +243,7 @@ bool max7456DisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **disp
         // MAX7456 configured and detected
         displayInit(&max7456DisplayPort, &max7456VTable, DISPLAYPORT_DEVICE_TYPE_MAX7456);
         *displayPort = &max7456DisplayPort;
+        bprintf(". . . MAX7456 detected");
 
         break;
     }

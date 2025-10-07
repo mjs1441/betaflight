@@ -645,6 +645,10 @@ FAST_CODE void spiProcessSegmentsPolled(const extDevice_t *dev)
     } else {
         // The end of the segment list has been reached, so mark transactions as complete
         bus->curSegment = (busSegment_t *)BUS_SPI_FREE;
+#ifdef SPI_NO_DMA
+////        IOHi(dev->busType_u.spi.csnPin);
+#endif
+        
     }
 }
 
