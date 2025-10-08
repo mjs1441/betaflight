@@ -52,6 +52,7 @@ typedef struct busDevice_s {
             SPI_TypeDef *instance;
             uint16_t speed;
             bool leadingEdge;
+            IO_t claimedByDevice;
         } spi;
         struct busI2C_s {
             i2cDevice_e device;

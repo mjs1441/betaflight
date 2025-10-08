@@ -566,10 +566,27 @@ bool max7456ReInitIfRequired(bool forceStallCheck)
     if (forceStallCheck || (lastStallCheckMs + MAX7456_STALL_CHECK_INTERVAL_MS < nowMs)) {
         lastStallCheckMs = nowMs;
 
+#if 0
         // Write 0xff to conclude any current SPI transaction the MAX7456 is expecting
         spiWrite(dev, END_STRING);
 
         stalled = (spiReadRegMsk(dev, MAX7456ADD_VM0) != videoSignalReg);
+#else
+        uint8_t data = END_STRING;
+        uint8_t dataReturn;
+        uint8_t reg = MAX7456ADD_VM0 | 0x80;
+
+        busSegment_t segments[] = {
+            {.u.buffers = {&data, NULL}, sizeof(data), true, NULL},
+            {.u.buffers = {&reg, NULL}, sizeof(reg), false, NULL},
+            {.u.buffers = {NULL, &dataReturn}, sizeof(dataReturn), true, NULL},
+            {.u.link = {NULL, NULL}, 0, true, NULL}
+        };
+            
+        spiSequence(dev, &segments[0]);
+        spiWait(dev);
+        stalled = dataReturn != videoSignalReg;
+#endif
     }
 
     if (stalled) {

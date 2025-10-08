@@ -257,12 +257,11 @@ FAST_IRQ_HANDLER static void spiRxIrqHandler(dmaChannelDescriptor_t* descriptor)
         return;
     }
 
-    busDevice_t *bus = dev->bus;
-
-    if (bus->curSegment->negateCS) {
-        // Negate Chip Select
-        IOHi(dev->busType_u.spi.csnPin);
-    }
+////    busDevice_t *bus = dev->bus;    
+////    if (bus->curSegment->negateCS) {
+////        // Negate Chip Select
+////        IOHi(dev->busType_u.spi.csnPin);
+//// }
 
     spiInternalStopDMA(dev);
 

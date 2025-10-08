@@ -101,6 +101,30 @@ SPI_TypeDef *spiInstanceByDevice(spiDevice_e device)
     return spiDevice[device].dev;
 }
 
+static void checkclash(void)
+{
+    bool gpio_get (uint gpio);
+    if (!gpio_get(17) && !gpio_get(25)) {bprintf("!!!! max and sdcard pins 17, 25 both low !!!!");}
+}
+
+static void assertDeviceOnBus(const extDevice_t *dev)
+{
+    IO_t csnPin = dev->busType_u.spi.csnPin;
+    IOLo(csnPin);
+    dev->bus->busType_u.spi.claimedByDevice = csnPin; 
+
+    checkclash();   
+}
+
+static void deassertDeviceOnBus(const extDevice_t *dev)
+{
+    IO_t csnPin = dev->busType_u.spi.csnPin;
+    IOHi(dev->busType_u.spi.csnPin);
+    if (dev->bus->busType_u.spi.claimedByDevice == csnPin) {
+        dev->bus->busType_u.spi.claimedByDevice = (IO_t)0;
+    }
+}
+
 bool spiInit(spiDevice_e device)
 {
     switch (device) {
@@ -140,15 +164,26 @@ bool spiInit(spiDevice_e device)
 bool spiIsBusy(const extDevice_t *dev)
 {
 #if 0
+    (void)dev;
+    return true;
+#elif 1
     if (dev->bus->curSegment != (busSegment_t *)BUS_SPI_FREE) {
-        return true;
+        return true; // busy.
     }
-    
-    bool gpio_get (uint gpio);
-    if (!gpio_get(1)) {bprintf("!!!! FREE but gyro pin 1 is low");}
-    if (!gpio_get(17)) {bprintf("!!!! FREE but max pin 17 is low");}
-    if (!gpio_get(25)) {bprintf("!!!! FREE but sdcard pin 25 is low");}
-    return false;
+
+    // Additional check that CSn is not selected by another device on the bus
+    if (!IORead(dev->busType_u.spi.csnPin)) {
+        return false; // this device has asserted ownership - not busy with a different device.
+    }
+
+    /*
+  bool claimed = dev->bus->busType_u.spi.claimedByDevice;
+    if (claimed) {
+        bprintf("dev %p reports claimed", dev);
+    }
+    */
+
+    return dev->bus->busType_u.spi.claimedByDevice; // true if claimed by a different device
 #else
     return (dev->bus->curSegment != (busSegment_t *)BUS_SPI_FREE);
 #endif
@@ -165,7 +200,7 @@ void spiWait(const extDevice_t *dev)
 void spiRelease(const extDevice_t *dev)
 {
     // Negate Chip Select
-    IOHi(dev->busType_u.spi.csnPin);
+    deassertDeviceOnBus(dev);
 }
 
 // Wait for bus to become free, then read/write block of data
@@ -498,12 +533,6 @@ void spiSequence(const extDevice_t *dev, busSegment_t *segments)
     spiSequenceStart(dev);
 }
 
-void checkclash(void)
-{
-    bool gpio_get (uint gpio);
-    if (!gpio_get(17) && !gpio_get(25)) {bprintf("!!!! max and sdcard pins 17, 25 both low !!!!");}
-}
-
 // Process segments using DMA - expects DMA irq handler to have been set up to feed into spiIrqHandler.
 FAST_CODE void spiProcessSegmentsDMA(const extDevice_t *dev)
 {
@@ -511,8 +540,7 @@ FAST_CODE void spiProcessSegmentsDMA(const extDevice_t *dev)
     spiInternalInitStream(dev, dev->bus->curSegment);
 
     // Assert Chip Select
-    IOLo(dev->busType_u.spi.csnPin);
-    checkclash();    
+    assertDeviceOnBus(dev);
 
     // Start the transfers
     spiInternalStartDMA(dev);
@@ -534,6 +562,12 @@ FAST_IRQ_HANDLER void spiIrqHandler(const extDevice_t *dev)
 {
     busDevice_t *bus = dev->bus;
     busSegment_t *nextSegment;
+    
+    if (bus->curSegment->negateCS) {
+        // Negate Chip Select
+        deassertDeviceOnBus(dev);        
+    }
+    
 
     if (bus->curSegment->callback) {
         switch(bus->curSegment->callback(dev->callbackArg)) {
@@ -592,7 +626,7 @@ FAST_IRQ_HANDLER void spiIrqHandler(const extDevice_t *dev)
 
         if (negateCS) {
             // Assert Chip Select - it's costly so only do so if necessary
-            IOLo(dev->busType_u.spi.csnPin);
+            assertDeviceOnBus(dev);
             checkclash();
         }
 
@@ -614,7 +648,7 @@ FAST_CODE void spiProcessSegmentsPolled(const extDevice_t *dev)
     while (bus->curSegment->len) {
         if (!lastSegment || lastSegment->negateCS) {
             // Assert Chip Select if necessary - it's costly so only do so if necessary
-            IOLo(dev->busType_u.spi.csnPin);
+            assertDeviceOnBus(dev);
         }
 
         spiInternalReadWriteBufPolled(
@@ -625,7 +659,7 @@ FAST_CODE void spiProcessSegmentsPolled(const extDevice_t *dev)
 
         if (bus->curSegment->negateCS) {
             // Negate Chip Select
-            IOHi(dev->busType_u.spi.csnPin);
+            deassertDeviceOnBus(dev);
         }
 
         segmentComplete = true;
