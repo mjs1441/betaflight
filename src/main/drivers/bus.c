@@ -208,6 +208,8 @@ void busDeviceRegister(const extDevice_t *dev)
     switch (dev->bus->busType) {
 #if defined(USE_SPI)
     case BUS_TYPE_SPI:
+        uint16_t IO_Pin(IO_t io);
+       bprintf("SPI register dev %p [CSn %d] on bus %p", dev, IO_Pin(dev->busType_u.spi.csnPin), dev->bus);
         spiBusDeviceRegister(dev);
 
         break;

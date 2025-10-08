@@ -518,6 +518,8 @@ void checkCPUload(uint32_t timeus)
             stacktime = timeus;
         }
     }
+#else
+    (void)timeus;
 #endif
 }
 

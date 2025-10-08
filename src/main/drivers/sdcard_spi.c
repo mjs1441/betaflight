@@ -98,6 +98,7 @@ static void sdcard_reset(void)
     }
 
     if (sdcard.state >= SDCARD_STATE_READY) {
+        bprintf("!! sdcard_reset");
         spiSetClkDivisor(&sdcard.dev, spiCalculateDivider(SDCARD_MAX_SPI_INIT_CLK_HZ));
     }
 
@@ -768,8 +769,11 @@ static bool sdcardSpi_poll(void)
             }
 
             if (sendComplete) {
+                static int badcount;
+                static int goodcount;
                 // Finish up by sending the CRC and checking the SD-card's acceptance/rejectance
                 if (sdcard_sendDataBlockFinish()) {
+                    goodcount++;
                     // The SD card is now busy committing that write to the card
                     sdcard.state = SDCARD_STATE_WAITING_FOR_WRITE;
                     sdcard.operationStartTime = millis();
@@ -782,6 +786,8 @@ static bool sdcardSpi_poll(void)
                     /* Our write was rejected! This could be due to a bad address but we hope not to attempt that, so assume
                      * the card is broken and needs reset.
                      */
+                    badcount++;
+                    bprintf("!! write rejected bad %d vs good %d",badcount,goodcount);
                     sdcard_reset();
 
                     // Announce write failure:
@@ -959,6 +965,7 @@ static sdcardOperationStatus_e sdcardSpi_writeBlock(uint32_t blockIndex, uint8_t
             if (status != 0) {
                 sdcard_deselect();
 
+                bprintf("!! writeblock failure");
                 sdcard_reset();
 
                 return SDCARD_OPERATION_FAILURE;
@@ -1021,6 +1028,7 @@ static sdcardOperationStatus_e sdcardSpi_beginWriteBlocks(uint32_t blockIndex, u
     } else {
         sdcard_deselect();
 
+        bprintf("!! beginwriteblocks fail");
         sdcard_reset();
 
         return SDCARD_OPERATION_FAILURE;

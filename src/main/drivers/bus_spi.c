@@ -139,7 +139,19 @@ bool spiInit(spiDevice_e device)
 // Return true if DMA engine is busy
 bool spiIsBusy(const extDevice_t *dev)
 {
+#if 0
+    if (dev->bus->curSegment != (busSegment_t *)BUS_SPI_FREE) {
+        return true;
+    }
+    
+    bool gpio_get (uint gpio);
+    if (!gpio_get(1)) {bprintf("!!!! FREE but gyro pin 1 is low");}
+    if (!gpio_get(17)) {bprintf("!!!! FREE but max pin 17 is low");}
+    if (!gpio_get(25)) {bprintf("!!!! FREE but sdcard pin 25 is low");}
+    return false;
+#else
     return (dev->bus->curSegment != (busSegment_t *)BUS_SPI_FREE);
+#endif
 }
 
 // Wait for DMA completion
@@ -486,6 +498,12 @@ void spiSequence(const extDevice_t *dev, busSegment_t *segments)
     spiSequenceStart(dev);
 }
 
+void checkclash(void)
+{
+    bool gpio_get (uint gpio);
+    if (!gpio_get(17) && !gpio_get(25)) {bprintf("!!!! max and sdcard pins 17, 25 both low !!!!");}
+}
+
 // Process segments using DMA - expects DMA irq handler to have been set up to feed into spiIrqHandler.
 FAST_CODE void spiProcessSegmentsDMA(const extDevice_t *dev)
 {
@@ -494,6 +512,7 @@ FAST_CODE void spiProcessSegmentsDMA(const extDevice_t *dev)
 
     // Assert Chip Select
     IOLo(dev->busType_u.spi.csnPin);
+    checkclash();    
 
     // Start the transfers
     spiInternalStartDMA(dev);
@@ -574,6 +593,7 @@ FAST_IRQ_HANDLER void spiIrqHandler(const extDevice_t *dev)
         if (negateCS) {
             // Assert Chip Select - it's costly so only do so if necessary
             IOLo(dev->busType_u.spi.csnPin);
+            checkclash();
         }
 
         // Launch the next transfer

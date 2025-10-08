@@ -425,6 +425,7 @@ void spiSequenceStart(const extDevice_t *dev)
 
     // Switch bus speed
     if (dev->busType_u.spi.speed != bus->busType_u.spi.speed) {
+        bprintf("dev at %p bus at %p speeds %04x vs %04x", dev, bus, dev->busType_u.spi.speed, bus->busType_u.spi.speed);
         spiSetClockFromSpeed(SPI_INST(instance), dev->busType_u.spi.speed);
         bus->busType_u.spi.speed = dev->busType_u.spi.speed;
     }
@@ -464,6 +465,7 @@ void spiSequenceStart(const extDevice_t *dev)
     }
 }
 
+#define FS_CACHE_SIZE (2)
 uint16_t spiCalculateDivider(uint32_t freq)
 {
     /*
@@ -473,6 +475,18 @@ uint16_t spiCalculateDivider(uint32_t freq)
 
       prescale and postdiv are in range 1..255 and are packed into the return value.
     */
+    static uint32_t cacheFreq[FS_CACHE_SIZE];
+    static uint16_t cacheSpeed[FS_CACHE_SIZE];
+    static int tryFirst = 0;
+
+    int tryIndex = tryFirst;
+    for (int i=0; i<FS_CACHE_SIZE; ++i) {
+        if (cacheFreq[tryIndex] == freq) {
+            return cacheSpeed[tryIndex];
+        } else {
+            tryIndex = (tryIndex + 1) % FS_CACHE_SIZE;
+        }
+    }
 
     uint32_t spiClock = clock_get_hz(clk_peri);
     uint32_t prescale, postdiv;
@@ -494,7 +508,12 @@ uint16_t spiCalculateDivider(uint32_t freq)
     }
 
     // Store prescale, (postdiv - 1), both in range 0 to 255.
-    return (uint16_t)((prescale << 8) + (postdiv - 1));
+    uint16_t speed = (uint16_t)((prescale << 8) + (postdiv - 1));
+    tryFirst = (tryFirst + 1) % FS_CACHE_SIZE;
+    cacheFreq[tryFirst] = freq;
+    cacheSpeed[tryFirst] = speed;
+    bprintf("calc speed %04x from freq %d", speed, freq);
+    return speed;
 }
 
 uint32_t spiCalculateClock(uint16_t speed)
@@ -503,6 +522,19 @@ uint32_t spiCalculateClock(uint16_t speed)
       speed contains packed values of prescale and postdiv.
       Retrieve a frequency which will recreate the same prescale and postdiv on a call to spi_set_baudrate().
     */
+    static uint16_t cacheSpeed[FS_CACHE_SIZE];
+    static uint32_t cacheFreq[FS_CACHE_SIZE];
+    static int tryFirst = 0;
+
+    int tryIndex = tryFirst;
+    for (int i=0; i<FS_CACHE_SIZE; ++i) {
+        if (cacheSpeed[tryIndex] == speed) {
+            return cacheFreq[tryIndex];
+        } else {
+            tryIndex = (tryIndex + 1) % FS_CACHE_SIZE;
+        }
+    }
+
     uint32_t spiClock = clock_get_hz(clk_peri);
     uint32_t prescale = speed >> 8;
     uint32_t postdivMinusOne = speed & 0xFF;
@@ -510,7 +542,10 @@ uint32_t spiCalculateClock(uint16_t speed)
     // Set freq to reverse the calculation, so that we would end up with the same prescale and postdiv,
     // hence the same frequency as if we had requested directly from spiCalculateDivider().
     uint32_t freq = 1 + (spiClock/prescale)/(postdivMinusOne + 1);
-
+    tryFirst = (tryFirst + 1) % FS_CACHE_SIZE;
+    cacheSpeed[tryFirst] = speed;
+    cacheFreq[tryFirst] = freq;
+    bprintf("calc freq %d from speed %04x", freq, speed);
     return freq;
 }
 
