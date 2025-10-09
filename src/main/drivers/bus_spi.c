@@ -103,14 +103,19 @@ SPI_TypeDef *spiInstanceByDevice(spiDevice_e device)
 
 static void checkclash(void)
 {
-    bool gpio_get (uint gpio);
-    if (!gpio_get(17) && !gpio_get(25)) {bprintf("!!!! max and sdcard pins 17, 25 both low !!!!");}
+//    bool gpio_get (uint gpio);
+    if (!gpio_get(17) && !gpio_get(25)) {
+        bprintf("!!!! max and sdcard (pullup %d dir %d) pins 17, 25 both low !!!!",
+                gpio_is_pulled_up(25), gpio_is_dir_out(25));}
 }
 
 static void assertDeviceOnBus(const extDevice_t *dev)
 {
     IO_t csnPin = dev->busType_u.spi.csnPin;
     IOLo(csnPin);
+    if (dev->bus->busType_u.spi.claimedByDevice && dev->bus->busType_u.spi.claimedByDevice != csnPin) {
+        bprintf("!!! somehow claiming %d but it's already claimed %d", csnPin, dev->bus->busType_u.spi.claimedByDevice);
+    }
     dev->bus->busType_u.spi.claimedByDevice = csnPin; 
 
     checkclash();   
@@ -627,7 +632,6 @@ FAST_IRQ_HANDLER void spiIrqHandler(const extDevice_t *dev)
         if (negateCS) {
             // Assert Chip Select - it's costly so only do so if necessary
             assertDeviceOnBus(dev);
-            checkclash();
         }
 
         // Launch the next transfer

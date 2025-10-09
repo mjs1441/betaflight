@@ -454,7 +454,6 @@ static void sdcard_sendDataBlockBegin(uint8_t *buffer, bool multiBlockWrite)
     segments[2].len = spiUseDMA(&sdcard.dev) ? SDCARD_BLOCK_SIZE : SDCARD_NON_DMA_CHUNK_SIZE;
 
     spiSequence(&sdcard.dev, &segments[0]);
-
     // Don't block pending completion of SPI access
 }
 

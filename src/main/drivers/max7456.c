@@ -359,11 +359,19 @@ max7456InitStatus_e max7456Init(const max7456Config_t *max7456Config, const vcdP
     if (!IOIsFreeOrPreinit(dev->busType_u.spi.csnPin)) {
         return MAX7456_INIT_NOT_CONFIGURED;
     }
-
+    
     IOInit(dev->busType_u.spi.csnPin, OWNER_OSD_CS, 0);
     IOConfigGPIO(dev->busType_u.spi.csnPin, SPI_IO_CS_CFG);
     IOHi(dev->busType_u.spi.csnPin);
 
+    /*
+    delay(50);
+    IOLo(dev->busType_u.spi.csnPin);
+    delay(100);
+    IOHi(dev->busType_u.spi.csnPin);
+    delay(50);
+    */
+    
     // Detect MAX7456 existence and device type. Do this at half the speed for safety.
 
     // Detect MAX7456 and compatible device by reading OSDM (OSD Insertion MUX) register.
@@ -372,10 +380,32 @@ max7456InitStatus_e max7456Init(const max7456Config_t *max7456Config, const vcdP
     spiSetClkDivisor(dev, spiCalculateDivider(MAX7456_INIT_MAX_SPI_CLK_HZ));
 
     // Write 0xff to conclude any current SPI transaction the MAX7456 is expecting
+
+/*
+  gpio_init(25);
+  gpio_setpulls(25, true, false);
+*/
+
     spiWrite(dev, END_STRING);
+
 
     uint8_t osdm = spiReadRegMsk(dev, MAX7456ADD_OSDM);
 
+/*    delay(500);
+    IOLo(dev->busType_u.spi.csnPin);
+    delay(1000);
+    IOHi(dev->busType_u.spi.csnPin);
+    delay(500);
+*/
+
+    /*
+      //again
+      
+    // Write 0xff to conclude any current SPI transaction the MAX7456 is expecting
+    spiWrite(dev, END_STRING);
+    osdm = spiReadRegMsk(dev, MAX7456ADD_OSDM);
+    */
+    
     if (osdm != 0x1B) {
         IOConfigGPIO(dev->busType_u.spi.csnPin, IOCFG_IPU);
         return MAX7456_INIT_NOT_FOUND;

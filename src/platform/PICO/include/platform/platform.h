@@ -116,7 +116,8 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
 #define SPI_IO_AF_SCK_CFG_HIGH  0
 #define SPI_IO_AF_SCK_CFG_LOW   0
 #define SPI_IO_AF_SDI_CFG       0
-#define SPI_IO_CS_CFG           IO_CONFIG(GPIO_OUT, 0, 0)
+////////////#define SPI_IO_CS_CFG           IO_CONFIG(GPIO_OUT, 0, 0)
+#define SPI_IO_CS_CFG           IO_CONFIG(GPIO_OUT, 0, GPIO_PULLUP)
 #define SPI_IO_CS_HIGH_CFG      IO_CONFIG(GPIO_IN, 0, GPIO_PULLUP)
 
 

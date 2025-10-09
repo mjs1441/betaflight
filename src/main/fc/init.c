@@ -782,6 +782,8 @@ void init(void)
     flashfsInit();
 #endif
 
+    
+    if (!gpio_get(25)) { bprintf("!+1 sdcard (pullup %d dir %d) pin 25 low !!!!", gpio_is_pulled_up(25), gpio_is_dir_out(25));}
 #ifdef USE_SDCARD
     if (sdcardConfig()->mode) {
         if (!(initFlags & SD_INIT_ATTEMPTED)) {
@@ -790,10 +792,11 @@ void init(void)
         }
     }
 #endif
+    if (!gpio_get(25)) { bprintf("!+2 sdcard (pullup %d dir %d) pin 25 low !!!!", gpio_is_pulled_up(25), gpio_is_dir_out(25));}
 #ifdef USE_BLACKBOX
     blackboxInit();
 #endif
-
+    if (!gpio_get(25)) { bprintf("!+3 sdcard (pullup %d dir %d) pin 25 low !!!!", gpio_is_pulled_up(25), gpio_is_dir_out(25));}
 #ifdef USE_ACC
     if (mixerConfig()->mixerMode == MIXER_GIMBAL) {
         accStartCalibration();
@@ -856,6 +859,7 @@ void init(void)
     mspInit();
     mspSerialInit();
 
+    if (!gpio_get(25)) { bprintf("!+4 sdcard (pullup %d dir %d) pin 25 low !!!!", gpio_is_pulled_up(25), gpio_is_dir_out(25));}    
 /*
  * CMS, display devices and OSD
  */

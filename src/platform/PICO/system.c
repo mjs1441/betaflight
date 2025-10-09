@@ -54,6 +54,24 @@ void SystemCoreClockUpdate (void)
 void __attribute__((constructor)) SystemInit (void)
 {
     SystemCoreClockUpdate();
+/*
+  bprintf("going to init 38");
+    gpio_init(38);
+    // that kills debugging somehow
+    bprintf("done init 38");
+*/
+    /*
+  bprintf("going to init 25");
+    gpio_init(25);
+    gpio_pull_up(25);
+    bprintf("done init 25");
+    */
+    
+/*
+  for (int i=36; i<38; ++i) {
+        gpio_init(i);
+    }
+*/
 }
 
 ////////////////////////////////////////////////////
