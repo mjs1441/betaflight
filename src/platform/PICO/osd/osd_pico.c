@@ -113,6 +113,8 @@ static void vsync_callback(void);
 static void plotBorder(void)
 {    
     for (int i=0; i<nx; ++i) {
+        if (i < nx/6) {plot(i, i, 2); plot(i, ny-i-1, 2);}
+        if (i > 5*nx/6) {plot(i, (nx-i-1), 2); plot(i, ny-(nx-i-1)-1, 2);}
         plot(i,0,1); plot(i,ny-1,1);
         plot(i,1,2); plot(i,ny-2,2);
     }
@@ -120,6 +122,8 @@ static void plotBorder(void)
         plot(0,i,1); plot(nx-1,i,1);
         plot(1,i,2); plot(nx-2,i,2);
     }
+
+    
 }
 
 void osd_test_init(void)
