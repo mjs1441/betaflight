@@ -600,11 +600,13 @@ osd_ah_invert = OFF
         yy--;
     }
     
-    int ypitchoffset, yrollmax; // ypitchoffset -+ yrollmax across hwid
+    int ypitchoffset = 0;
+    int yrollmax;; // ypitchoffset -+ yrollmax across hwid
 
     // Convert pitchAngle to y compensation value
     // (maxPitch / 25) divisor matches previous settings of fixed divisor of 8 and fixed max AHI pitch angle of 20.0 degrees
-    if (maxPitch > 0) {
+
+    if (maxPitch > 0) { // <-- where did that come from?
         ypitchoffset = pitchAngle * pitchMult; // small angles, pitchAngle roughly proportional to pitch delta (in pixels)
     }
 
