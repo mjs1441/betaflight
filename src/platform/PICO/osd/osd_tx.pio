@@ -1,4 +1,4 @@
-// .pio_version 1 // maybe
+.pio_version 1 // maybe
 
 .program osd_tx
 
