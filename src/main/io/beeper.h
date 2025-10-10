@@ -107,6 +107,12 @@ STATIC_ASSERT(BEEPER_ALL < sizeof(uint32_t) * 8, "BEEPER bits exhausted");
 #define DEFAULT_DSHOT_BEACON_OFF_FLAGS DSHOT_BEACON_ALLOWED_MODES
 #endif // USE_RACE_PRO
 
+#ifdef DEFAULT_BEEPER_NOT_RX_LOST
+#define DEFAULT_BEEPER_OFF_FLAGS BEEPER_GET_FLAG(BEEPER_RX_LOST)
+#else
+#define DEFAULT_BEEPER_OFF_FLAGS (0)
+#endif
+
 void beeper(beeperMode_e mode);
 void beeperSilence(void);
 void beeperUpdate(timeUs_t currentTimeUs);
