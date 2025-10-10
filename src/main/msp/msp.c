@@ -953,6 +953,10 @@ static bool mspCommonProcessOutCommand(int16_t cmdMSP, sbuf_t *dst, mspPostProce
         uint8_t osdFlags = 0;
 
         osdFlags |= OSD_FLAGS_OSD_FEATURE;
+#ifdef TEST_PIO_OSD
+        osdFlags |= OSD_FLAGS_OSD_DEVICE_DETECTED;
+        osdFlags |= OSD_FLAGS_OSD_HARDWARE_MAX_7456;
+#endif
 
         osdDisplayPortDevice_e deviceType;
         displayPort_t *osdDisplayPort = osdGetDisplayPort(&deviceType);

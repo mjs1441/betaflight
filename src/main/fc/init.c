@@ -930,7 +930,11 @@ void init(void)
         osdInit(osdDisplayPort, osdDisplayPortDevice);
 
         if (osdDisplayPortDevice == OSD_DISPLAYPORT_DEVICE_NONE) {
+#ifdef TEST_PIO_OSD
+            bprintf("... would disable feature OSD here");
+#else
             featureDisableImmediate(FEATURE_OSD);
+#endif
         }
     }
 #endif // USE_OSD
