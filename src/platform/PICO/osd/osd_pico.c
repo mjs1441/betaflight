@@ -217,6 +217,8 @@ void osd_test_init(void)
     }
 
     // set up for outputs from PIO
+    gpio_put(osd_w_gpio, false);
+    gpio_put(osd_en_gpio, false);
     pio_gpio_init(osdPio, osd_w_gpio);
     pio_gpio_init(osdPio, osd_en_gpio);
 
@@ -256,7 +258,8 @@ void osd_test_init(void)
 //    pio_sm_put(osdPio, osd_tx_sm, 344);
 #else
     // prepare value for vert pixel loop
-    pio_sm_put(osdPio, osd_tx_sm, 255);
+//    pio_sm_put(osdPio, osd_tx_sm, 255);
+    pio_sm_put(osdPio, osd_tx_sm, 287);
 #endif
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_mov(pio_isr, pio_osr));
