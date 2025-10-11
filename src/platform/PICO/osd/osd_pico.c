@@ -366,7 +366,7 @@ static void vsync_callback(void)
     cca += dd;
     if (++ccc == nav) {
         ccc=0;
-        bprintf("(%d %d) ave us per update: %.1f, max %.1f", cca, maxcc, ((double)cca)/nav/150, ((double)maxcc)/150);
+//////////        bprintf("(%d %d) ave us per update: %.1f, max %.1f", cca, maxcc, ((double)cca)/nav/150, ((double)maxcc)/150);
         cca = 0;
         maxcc = 0;
     }
@@ -579,14 +579,32 @@ void testUpdate(void)
 {
     static int parity;
     parity = 1-parity;
-#if 0
+#if 1
     if (0 == (millis() % 5000) ) { parity = 1 - parity; }
 
-    if (parity) {
-    memset(osdBuffer, 0b10101010, PICO_OSD_BUF_LENGTH/2);
-    memset(osdBuffer + PICO_OSD_BUF_LENGTH/2, 0xff, PICO_OSD_BUF_LENGTH/2);
-//    memset(osdBuffer, 0xff, PICO_OSD_BUF_LENGTH/2);
-//    memset(osdBuffer + PICO_OSD_BUF_LENGTH/2, 0b10101010, PICO_OSD_BUF_LENGTH/2);
+//    if (parity) {
+    if (1) {
+//    memset(osdBuffer, 0b10101010, PICO_OSD_BUF_LENGTH/2);
+//    memset(osdBuffer + PICO_OSD_BUF_LENGTH/2, 0xff, PICO_OSD_BUF_LENGTH/2);
+    memset(osdBuffer, 0xff, PICO_OSD_BUF_LENGTH/2);
+    memset(osdBuffer + PICO_OSD_BUF_LENGTH/2, 0b10101010, PICO_OSD_BUF_LENGTH/2);
+
+    for (int i=0; i<25; ++i) {
+        for (int j=0; j<25; ++j) {
+
+// *** 
+// Individually, these two lines are fine, and we see black square in top left or top right
+// but together, we get wobbly out of sync, black squares appear about 1/4 way across the row (and not stable)
+            plot(i,j,1);
+            plot(fb_nx-1-i,j,1);
+// ***
+
+
+//            plot(i,fb_ny-1,2);
+//            plot(fb_nx-1-i,fb_ny-1,2);
+        }
+    }
+    
     } else {
         memset(osdBuffer, 0, PICO_OSD_BUF_LENGTH);
     }
