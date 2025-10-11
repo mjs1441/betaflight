@@ -34,8 +34,6 @@
 #include "drivers/time.h"
 #include "flight/imu.h"
 
-
-
 #if !(defined OSD_W_PIN && defined OSD_EN_PIN && defined OSD_SYNC_PIN)
 #error This PICO OSD requires OSD_W_PIN, OSD_EN_PIN and OSD_SYNC_PIN to be defined
 #endif
@@ -55,6 +53,7 @@
 // chars OSD_SD_ROWS x OSD_SD_COLS (30 x 16)
 // 360 / 8 = 45 x 288
 // 2 bits per pixel
+/*
 #define PICO_OSD_BPP         2
 //#define PICO_OSD_BUF_WIDTH   (OSD_SD_COLS * PICO_OSD_CHAR_WIDTH / 8)
 #define ROUND_WORD(x)        (4 * (((x) + 3)/4))
@@ -65,11 +64,24 @@
 #define PICO_OSD_BUF_HEIGHT  256
 #define PICO_OSD_BUF_LENGTH  (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT)
 #define PICO_OSD_BUF_WORDS   (PICO_OSD_BUF_LENGTH / 4)
+*/
+
+// 23 -> 23*4*4 = 368 pixels -> 30.67 chars
+// 288 for PAL field
+// _BUF_ in bytes
+#define PICO_OSD_LINE_WORDS 23
+#define PICO_OSD_BUF_WIDTH (PICO_OSD_LINE_WORDS*4)
+//#define PICO_OSD_BUF_HEIGHT 288
+//#define PICO_OSD_BUF_HEIGHT 256
+//#define PICO_OSD_BUF_HEIGHT 272
+#define PICO_OSD_BUF_HEIGHT 270
+#define PICO_OSD_BUF_LENGTH  (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT)
+#define PICO_OSD_BUF_WORDS   (PICO_OSD_BUF_LENGTH / 4)
 
 static const PIO osdPio = PIO_INSTANCE(PIO_OSD_INDEX);
 static const uint osdPioIrq = PIO_IRQ_NUM(osdPio, 0);
-static const int nx = PICO_OSD_BUF_WIDTH * 4;
-static const int ny = PICO_OSD_BUF_HEIGHT;
+static const int fb_nx = PICO_OSD_BUF_WIDTH * 4;
+static const int fb_ny = PICO_OSD_BUF_HEIGHT;
 
 static int osd_tx_offset;
 static int osd_en_gpio;
@@ -95,12 +107,16 @@ void plot(int x, int y, int c)
     // c =  0 -> transparent (no overlay)   W=any EN=0
     // c =  1 -> black                      W=0   EN=1
     // c =  2 -> white                      W=1   EN=1
-    if (x<0 || y<0 || x>=nx || y>=ny) {
+    if (x<0 || y<0 || x>=fb_nx || y>=fb_ny) {
+        bprintf("plot %d, %d, %d",x,y,c);
         return;
     }
 
     uint8_t * pbyte = osdBuffer + PICO_OSD_BUF_WIDTH * y;
     pbyte += (int)(x/4); // 4 pixels per byte
+    if (pbyte<osdBuffer || pbyte>=osdBuffer + PICO_OSD_BUF_LENGTH) {
+        bprintf("huh %p (%p) %d, %d, %d",pbyte,osdBuffer, x,y,c);
+    }
     static uint8_t masks[4] = {0b00000011, 0b00001100, 0b00110000, 0b11000000};
     static uint8_t  cols[4] = {0b00000000, 0b10101010, 0b11111111, 0b00000000};
     uint8_t mask = masks[x%4];
@@ -112,25 +128,27 @@ static void vsync_callback(void);
 
 static void plotBorder(void)
 {    
-    for (int i=0; i<nx; ++i) {
-        if (i < nx/6) {plot(i, i, 2); plot(i, ny-i-1, 2);}
-        if (i > 5*nx/6) {plot(i, (nx-i-1), 2); plot(i, ny-(nx-i-1)-1, 2);}
-        plot(i,0,1); plot(i,ny-1,1);
-        plot(i,1,2); plot(i,ny-2,2);
+    for (int i=0; i<fb_nx; ++i) {
+        if (i < fb_nx/6) {plot(i, i, 2); plot(i, fb_ny-i-1, 2);}
+        if (i > 5*fb_nx/6) {plot(i, (fb_nx-i-1), 2); plot(i, fb_ny-(fb_nx-i-1)-1, 2);}
+        plot(i,0,1); plot(i,fb_ny-1,1);
+        plot(i,1,2); plot(i,fb_ny-2,2);
     }
-    for (int i=0; i<ny; ++i) {
-        plot(0,i,1); plot(nx-1,i,1);
-        plot(1,i,2); plot(nx-2,i,2);
+    for (int i=0; i<fb_ny; ++i) {
+        plot(0,i,1); plot(fb_nx-1,i,1);
+        plot(1,i,2); plot(fb_nx-2,i,2);
     }
-
-    
+    for (int i=200; i<270; ++i) {
+        plot(i,i,2);
+        plot(i-1,i,1);
+    }
 }
 
 void osd_test_init(void)
 {
     bprintf("osd_test_init");
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT, PICO_OSD_BUF_LENGTH);
-    bprintf("nx %d, ny %d", nx, ny);
+    bprintf("nx %d, ny %d", fb_nx, fb_ny);
     for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
         int y = i / PICO_OSD_BUF_WIDTH;
         int x = (i % PICO_OSD_BUF_WIDTH) * 4; // approx. pixels
@@ -145,8 +163,8 @@ void osd_test_init(void)
 
     
 #if 0
-    for (int i=0; i<nx; ++i) {
-        for (int j=0; j<ny; ++j) {
+    for (int i=0; i<fb_nx; ++i) {
+        for (int j=0; j<fb_ny; ++j) {
             plot(i,j, ((j%100)<10 ? (j%2)+1 : 0)); // (int)((13*j + i/37))%4);
         }
     }
@@ -259,7 +277,8 @@ void osd_test_init(void)
 #else
     // prepare value for vert pixel loop
 //    pio_sm_put(osdPio, osd_tx_sm, 255);
-    pio_sm_put(osdPio, osd_tx_sm, 287);
+//    pio_sm_put(osdPio, osd_tx_sm, 287);
+    pio_sm_put(osdPio, osd_tx_sm, PICO_OSD_BUF_HEIGHT - 1);
 #endif
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_mov(pio_isr, pio_osr));
@@ -334,9 +353,24 @@ static void vsync_callback(void)
     ++c;
     dma_channel_abort(osd_dma_channel);
     pio_sm_clear_fifos(osdPio, osd_tx_sm);
-    if (c%3 == 0) {
-        testUpdate();
+//    const int nnn = 1;
+    static int32_t maxcc;
+    static int32_t cca;
+    static int ccc;
+    int nav = 250;
+//    if (c%n == 0) {
+    uint32_t m1 = getCycleCounter();
+    testUpdate();
+    int32_t dd = getCycleCounter() - m1;
+    if (dd>maxcc) maxcc = dd;
+    cca += dd;
+    if (++ccc == nav) {
+        ccc=0;
+        bprintf("(%d %d) ave us per update: %.1f, max %.1f", cca, maxcc, ((double)cca)/nav/150, ((double)maxcc)/150);
+        cca = 0;
+        maxcc = 0;
     }
+//    }
 //    if (c%10 == 0) {
     if (1) {
         memcpy(osdBuffer2, osdBuffer, PICO_OSD_BUF_LENGTH);
@@ -398,15 +432,19 @@ void osd_test(void)
 {
     int disp = 0;
     osd_test_init();
+
+    (void)rtdata;
+/*
 //     int32_t delay_ms = 20;
 //    int32_t delay_ms = 1520;
     int32_t delay_ms = 51520;
     
-    bprintf("adding timer");
+  bprintf("adding timer");
     if (!add_repeating_timer_ms(delay_ms, timer_callback, &osdBuffer[0], &rtdata)) {
         bprintf("*** failed to add timer ***");
     }
-
+*/
+    
     int pc;
     int pca[50];
     int hist[32];
@@ -539,8 +577,32 @@ void testOSDtask(void)
 
 void testUpdate(void)
 {
-#if 1
-    static const int nxx = nx - 64;
+    static int parity;
+    parity = 1-parity;
+#if 0
+    if (0 == (millis() % 5000) ) { parity = 1 - parity; }
+
+    if (parity) {
+    memset(osdBuffer, 0b10101010, PICO_OSD_BUF_LENGTH/2);
+    memset(osdBuffer + PICO_OSD_BUF_LENGTH/2, 0xff, PICO_OSD_BUF_LENGTH/2);
+//    memset(osdBuffer, 0xff, PICO_OSD_BUF_LENGTH/2);
+//    memset(osdBuffer + PICO_OSD_BUF_LENGTH/2, 0b10101010, PICO_OSD_BUF_LENGTH/2);
+    } else {
+        memset(osdBuffer, 0, PICO_OSD_BUF_LENGTH);
+    }
+#if 0
+  int s = millis()/4234;
+    for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
+        osdBuffer[i] = (0b1010101) * ((s >> 10)&3);
+        if (i%577 == 234)
+            s = s*13+29;
+    }
+    memset(osdBuffer, 0b10101010 /*0xff*/, PICO_OSD_BUF_LENGTH/2);
+    memset(osdBuffer + PICO_OSD_BUF_LENGTH/2, 0xff /* 0b10101010*/, PICO_OSD_BUF_LENGTH/2);
+#endif
+    
+#elif 1    
+    static const int nxx = fb_nx - 64;
     static const float xp = ((float)(nxx))/4000000;
     uint32_t ctime = micros();
     bzero(osdBuffer, PICO_OSD_BUF_LENGTH);
@@ -570,11 +632,11 @@ osd_ah_invert = OFF
     static bool didPitchCalc;
     static float pitchMult;
     static float rollMult;
-    static const float pitchMaxOffset = ny*0.2f; // ny*0.1f;
-    static const float rollMaxOffset = ny*0.2f;
-    static const int hcx = nx / 2;
-    static const int hcy = ny * 0.68f;
-    static const int hhwid = 8 * (int)(nx * 0.2f / 8);
+    static const float pitchMaxOffset = fb_ny*0.2f; // fb_ny*0.1f;
+    static const float rollMaxOffset = fb_ny*0.2f;
+    static const int hcx = fb_nx / 2;
+    static const int hcy = fb_ny * 0.68f;
+    static const int hhwid = 8 * (int)(fb_nx * 0.2f / 8);
     static const float oohhwid = 1.0f / hhwid;
 
     if (!didPitchCalc) {
@@ -582,9 +644,9 @@ osd_ah_invert = OFF
         rollMult = rollMaxOffset / maxRoll;
     }
 
-    int im = ny*0.75f;
+    int im = fb_ny*0.75f;
     int imm = im/10;
-    int yy = ny*0.9f;
+    int yy = fb_ny*0.9f;
     for (int i=0; i<im; ++i) {
         int dd = hhwid*1.15f;
         if (i==0 || i==im-1) {
@@ -641,7 +703,7 @@ osd_ah_invert = OFF
 #else
 
     static const int usPerRun = 50000;
-    static const int nxx = nx - 64;
+    static const int nxx = fb_nx - 64;
     static const float xp = ((float)(nxx))/4000000;
     static uint32_t ttime;
     if (!ttime) {

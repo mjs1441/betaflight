@@ -43,7 +43,8 @@ d1: jmp  y--, d1   [31]
 ;; 24 looks about perfect for new screen
 ;; 20 is "safe", off the top a bit but stable
 ;; 23 lose 1 pixel off the top
-set x, 8 ; 31                ; start writing out after the 33nd hsync (wait 32 here, 1 below)
+;;set x, 24 ; 31                ; start writing out after the 33nd hsync (wait 32 here, 1 below)
+set x, 22 ; 31                ; start writing out after the 33nd hsync (wait 32 here, 1 below)
 loop_hsync:
     set y, 15
     wait 0 PIN, 0  [9]
@@ -73,16 +74,17 @@ next_line:
    set y, 22 ; (num words of pixel data in line) - 1
 
 line_loop:
-    pull noblock
-d6: out NULL, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
-    set PINS, 3
-    jmp !osre d6        [clocksPerPixel - 3]
-    jmp y--, line_loop  [clocksPerPixel - 4]
 
 ;    pull noblock
-;d6: out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
-;    jmp !osre d6        [clocksPerPixel - 2]
-;    jmp y--, line_loop  [clocksPerPixel - 3]
+;d6: out NULL, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
+;    set PINS, 3
+;    jmp !osre d6        [clocksPerPixel - 3]
+;    jmp y--, line_loop  [clocksPerPixel - 4]
+
+    pull noblock
+d6: out PINS, 2        ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
+    jmp !osre d6        [clocksPerPixel - 2]
+    jmp y--, line_loop  [clocksPerPixel - 3]
 
     set PINS, 0
     jmp x--, wait_next_hsync
