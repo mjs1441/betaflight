@@ -590,7 +590,7 @@ void testUpdate(void)
     memset(osdBuffer + PICO_OSD_BUF_LENGTH/2, 0b10101010, PICO_OSD_BUF_LENGTH/2);
 
     for (int i=0; i<25; ++i) {
-        for (int j=0; j<25; ++j) {
+        for (int j=4; j<25; ++j) {
 
 // *** 
 // Individually, these two lines are fine, and we see black square in top left or top right
