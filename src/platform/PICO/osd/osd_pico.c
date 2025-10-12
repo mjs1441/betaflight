@@ -342,7 +342,7 @@ static void vsync_callback(void)
     static int c=0;
     // Need to clear the IRQ flag state from the PIO.
     // This just writes a 1 to a register, doesn't mess with SM execution    
-    pio_interrupt_clear(osdPio, 0);
+//    pio_interrupt_clear(osdPio, 0);
 
     // * stop any dma in progress
     // * clear pio tx fifo
@@ -350,9 +350,58 @@ static void vsync_callback(void)
     // * reset the read address and transfer count on the channel
     // * start dma
 
+    static int business;
+
+    if ((c % 334) == 134) {
+        business += 10000;
+        busy_wait_us(8700); // how can this trigger channel busy below? IRQ on IRQ? maybe only clear IRQ at end?
+    }
+
+#if 1
+    // RP2350-E5 disable abort enable
+//    if (dma_channel_is_busy(osd_dma_channel)) {
+    if (c == 834 || dma_channel_is_busy(osd_dma_channel)) {
+        ++business;
+        dma_channel_hw_addr(osd_dma_channel)->ctrl_trig &= !~DMA_CH0_CTRL_TRIG_EN_BITS;
+        dma_channel_abort(osd_dma_channel);
+
+        // after abort, we need to do some / all of this
+    dma_channel_config c = dma_channel_get_default_config(osd_dma_channel);
+    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
+    channel_config_set_read_increment(&c, true);
+    channel_config_set_write_increment(&c, false);
+    channel_config_set_dreq(&c, pio_get_dreq(osdPio, osd_tx_sm, true));
+
+    dma_channel_configure(
+        osd_dma_channel,
+        &c,
+        &osdPio->txf[osd_tx_sm],  // Write address (PIO TX FIFO)
+        NULL,                     // Read address (reset each time)
+        PICO_OSD_BUF_WORDS,       // Number of transfers
+        false                     // Don't start immediately
+    );
+        
+/////        dma_channel_hw_addr(osd_dma_channel)->ctrl_trig |= DMA_CH0_CTRL_TRIG_EN_BITS;
+////        // channel can be busy here...
+    }
+
+    if (1) {
+        memcpy(osdBuffer2, osdBuffer, PICO_OSD_BUF_LENGTH);
+        
+        // prob not required
+        dma_channel_set_write_addr(osd_dma_channel, &osdPio->txf[osd_tx_sm], false);
+
+        dma_channel_set_read_addr(osd_dma_channel, osdBuffer2, false);
+        dma_channel_set_trans_count(osd_dma_channel, PICO_OSD_BUF_WORDS, false);
+
+        pio_sm_clear_fifos(osdPio, osd_tx_sm);
+    
+        dma_channel_start(osd_dma_channel);
+    }
+#endif
+    
     ++c;
-    dma_channel_abort(osd_dma_channel);
-    pio_sm_clear_fifos(osdPio, osd_tx_sm);
+
 //    const int nnn = 1;
     static int32_t maxcc;
     static int32_t cca;
@@ -366,25 +415,50 @@ static void vsync_callback(void)
     cca += dd;
     if (++ccc == nav) {
         ccc=0;
-//////////        bprintf("(%d %d) ave us per update: %.1f, max %.1f", cca, maxcc, ((double)cca)/nav/150, ((double)maxcc)/150);
+        bprintf("(%d %d busy %d) ave us per update: %.1f, max %.1f", cca, maxcc, business, ((double)cca)/nav/150, ((double)maxcc)/150);
         cca = 0;
         maxcc = 0;
     }
 //    }
 //    if (c%10 == 0) {
+
+    
+
+#if 0
+    // RP2350-E5 disable abort enable
+    if (dma_channel_is_busy(osd_dma_channel)) {
+        dma_channel_hw_addr(osd_dma_channel)->ctrl_trig &= !~DMA_CH0_CTRL_TRIG_EN_BITS;
+        dma_channel_abort(osd_dma_channel);
+        dma_channel_hw_addr(osd_dma_channel)->ctrl_trig |= DMA_CH0_CTRL_TRIG_EN_BITS;
+    }
+
+//    if (dma_channel_is_busy(osd_dma_channel)) {
+//        bprintf("*** oops channel busy");
+//    }
+    // dma restart used to be here
     if (1) {
         memcpy(osdBuffer2, osdBuffer, PICO_OSD_BUF_LENGTH);
         
+        // prob not required
+        dma_channel_set_write_addr(osd_dma_channel, &osdPio->txf[osd_tx_sm], false);
+
         dma_channel_set_read_addr(osd_dma_channel, osdBuffer2, false);
-//        dma_channel_set_trans_count(osd_dma_channel, PICO_OSD_BUF_WORDS, false);
         dma_channel_set_trans_count(osd_dma_channel, PICO_OSD_BUF_WORDS, false);
+
+        pio_sm_clear_fifos(osdPio, osd_tx_sm);
     
         dma_channel_start(osd_dma_channel);
     }
-
+#endif
+    
     if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
     }
+
+
+// probably best clear at end, just in case there are re-trigger issues if cleared earlier...
+    pio_interrupt_clear(osdPio, 0);
+    
 }
 
 /*
@@ -589,9 +663,27 @@ void testUpdate(void)
     memset(osdBuffer, 0xff, PICO_OSD_BUF_LENGTH/2);
     memset(osdBuffer + PICO_OSD_BUF_LENGTH/2, 0b10101010, PICO_OSD_BUF_LENGTH/2);
 
-    for (int i=0; i<25; ++i) {
-        for (int j=4; j<25; ++j) {
+    // initially with set x,22 in pio
+    // not with i=1... nor with j=1...
+    // not with i<20,j<20 but with i<25,j<25
+    // i<24, j<24 looks double bad, but maybe correct on one field, bad on the other (squares about 1/4 from the right)
+    // from v offsets, I think the bad first square is late by 3/4 line
+#if 1
+//    int iii=25; int jjj = 25;
+    int iii=45; int jjj = 45;
+//    int iii=20; int jjj = 20;
+//    int iii=5; int jjj = 5;
+    for (int i=0; i<iii; ++i) {
+        for (int j=0; j<jjj; ++j) {
 
+            // how long is 24 pixels horizontally? we are running at 9 cpp so 24*9/150us = 1.44us
+            // maybe monitor thinks it's front porch?
+
+            // wait a minute, we're not allowed to write in first half of first line of even frame nor 2nd half of last line of odd frame
+            // so let's enforce that
+            // either with colour black (level black) or with not enable
+            // try both
+            
 // *** 
 // Individually, these two lines are fine, and we see black square in top left or top right
 // but together, we get wobbly out of sync, black squares appear about 1/4 way across the row (and not stable)
@@ -604,6 +696,17 @@ void testUpdate(void)
 //            plot(fb_nx-1-i,fb_ny-1,2);
         }
     }
+
+    // enforce (overkill full lines, both fields)
+#if 0
+    for (int i=0; i<fb_nx; ++i) {
+        plot(i,0,0);
+        plot(i,1,0);
+        plot(i,2,0);
+        plot(i,fb_ny-1,0);
+    }
+#endif    
+#endif
     
     } else {
         memset(osdBuffer, 0, PICO_OSD_BUF_LENGTH);
