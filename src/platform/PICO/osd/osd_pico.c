@@ -344,23 +344,34 @@ static void vsync_callback(void)
     // This just writes a 1 to a register, doesn't mess with SM execution    
 //    pio_interrupt_clear(osdPio, 0);
 
+    // start new dma as soon as possible, or at any rate before doing significant update work
+
     // * stop any dma in progress
-    // * clear pio tx fifo
     // * flip buffer (or alternate buffers)
     // * reset the read address and transfer count on the channel
     // * start dma
+    // * do any work to update the buffer
+    // * clear pio tx fifo
+
+//#define testdmaabort
 
     static int business;
 
+#ifdef testdmaabort
     if ((c % 334) == 134) {
         business += 10000;
         busy_wait_us(8700); // how can this trigger channel busy below? IRQ on IRQ? maybe only clear IRQ at end?
     }
+#endif
 
 #if 1
     // RP2350-E5 disable abort enable
 //    if (dma_channel_is_busy(osd_dma_channel)) {
+#ifdef testdmaabort
     if (c == 834 || dma_channel_is_busy(osd_dma_channel)) {
+#else
+    if (dma_channel_is_busy(osd_dma_channel)) {
+#endif
         ++business;
 #ifdef disableenable
         // would need this if we're triggering anything on dma completion
