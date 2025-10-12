@@ -362,9 +362,13 @@ static void vsync_callback(void)
 //    if (dma_channel_is_busy(osd_dma_channel)) {
     if (c == 834 || dma_channel_is_busy(osd_dma_channel)) {
         ++business;
+#ifdef disableenable
+        // would need this if we're triggering anything on dma completion
         dma_channel_hw_addr(osd_dma_channel)->ctrl_trig &= !~DMA_CH0_CTRL_TRIG_EN_BITS;
+#endif
         dma_channel_abort(osd_dma_channel);
 
+#ifdef disableenable
         // after abort, we need to do some / all of this
     dma_channel_config c = dma_channel_get_default_config(osd_dma_channel);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
@@ -380,7 +384,7 @@ static void vsync_callback(void)
         PICO_OSD_BUF_WORDS,       // Number of transfers
         false                     // Don't start immediately
     );
-        
+#endif
 /////        dma_channel_hw_addr(osd_dma_channel)->ctrl_trig |= DMA_CH0_CTRL_TRIG_EN_BITS;
 ////        // channel can be busy here...
     }
