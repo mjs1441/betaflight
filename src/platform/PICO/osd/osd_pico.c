@@ -71,10 +71,10 @@
 // _BUF_ in bytes
 #define PICO_OSD_LINE_WORDS 23
 #define PICO_OSD_BUF_WIDTH (PICO_OSD_LINE_WORDS*4)
-//#define PICO_OSD_BUF_HEIGHT 288
+#define PICO_OSD_BUF_HEIGHT 288
 //#define PICO_OSD_BUF_HEIGHT 256
 //#define PICO_OSD_BUF_HEIGHT 272
-#define PICO_OSD_BUF_HEIGHT 270
+//#define PICO_OSD_BUF_HEIGHT 266
 #define PICO_OSD_BUF_LENGTH  (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT)
 #define PICO_OSD_BUF_WORDS   (PICO_OSD_BUF_LENGTH / 4)
 
@@ -713,7 +713,7 @@ void testUpdate(void)
     }
 
     // enforce (overkill full lines, both fields)
-#if 0
+#if 1
     for (int i=0; i<fb_nx; ++i) {
         plot(i,0,0);
         plot(i,1,0);
