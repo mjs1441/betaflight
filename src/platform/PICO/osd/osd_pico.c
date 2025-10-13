@@ -702,6 +702,7 @@ void testUpdate(void)
 // *** 
 // Individually, these two lines are fine, and we see black square in top left or top right
 // but together, we get wobbly out of sync, black squares appear about 1/4 way across the row (and not stable)
+            // [ was probably just total time... ]
             plot(i,j,1);
             plot(fb_nx-1-i,j,1);
 // ***
@@ -715,10 +716,17 @@ void testUpdate(void)
     // enforce (overkill full lines, both fields)
 #if 1
     for (int i=0; i<fb_nx; ++i) {
-        plot(i,0,0);
-        plot(i,1,0);
-        plot(i,2,0);
-        plot(i,fb_ny-1,0);
+        for (int j=0; j<4; ++j) {
+//        plot(i,0,0);
+//        plot(i,1,0);
+//        plot(i,2,0);
+//        plot(i,fb_ny-1,0);
+//            plot(i,j,(i/32)%3);
+//            plot(i,fb_ny-1-j,(i/32)%3);
+            plot(i,j,(i/32)%3);
+//            plot(i,j+4,(i/32)%3);
+            plot(i,fb_ny-1-j,0);
+        }
     }
 #endif    
 #endif

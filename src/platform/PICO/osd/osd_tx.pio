@@ -43,7 +43,8 @@ d1: jmp  y--, d1   [31]
 ;; 24 looks about perfect for new screen
 ;; 20 is "safe", off the top a bit but stable
 ;; 23 lose 1 pixel off the top
-set x, 16; 31                ; start writing out after the 33nd hsync (wait 32 here, 1 below)
+;set x, 16; 31                ; start writing out after the 33nd hsync (wait 32 here, 1 below)
+set x, 20; 31                ; start writing out after the 33nd hsync (wait 32 here, 1 below)
 ;;set x, 22 ; 31                ; start writing out after the 33nd hsync (wait 32 here, 1 below)
 loop_hsync:
     set y, 15
