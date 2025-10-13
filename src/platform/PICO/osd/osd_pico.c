@@ -256,9 +256,9 @@ void osd_test_init(void)
     sm_config_set_out_shift(&config, true, false, 32); // no autopull
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
 
-    int pioclock = (int)75e6; // TODO
+//    int pioclock = (int)75e6; // TODO
 //    int pioclock = (int)75e6 * 1.01; // TODO
-//    int pioclock = (int)75e6 * 1.031; // TODO
+    int pioclock = (int)75e6 * 1.01; // TODO acceptable "slack"? clock should be accurate to ~ 1.00003 ?
     float div = (float)SystemCoreClock / pioclock;
     bprintf("pio clock div = %f", (double)div);
     sm_config_set_clkdiv(&config, div);
@@ -683,7 +683,30 @@ void testUpdate(void)
         plot(fb_nx/2-1, i, 2);
         plot(fb_nx-1, i, 2);
     }
-
+    int xx = fb_nx/2;
+    int yy = fb_ny/2;
+    for (int k=2; k<10; ++k) {
+        int q = fb_nx/2/k;
+        int r = fb_ny/2/k;
+        for (int j=0; j<16; ++j) {
+            plot(xx-q,j,2);
+            plot(xx+q,j,2);
+            plot(xx-q,fb_ny-1-j,2);
+            plot(xx+q,fb_ny-1-j,2);
+            plot(j,yy-r,2);
+            plot(j,yy+r,2);
+            plot(fb_nx-1-j,yy-r,2);
+            plot(fb_nx-1-j,yy+r,2);
+        }
+        for (int i=xx-q; i<xx+q; ++i) {
+            plot(i,k-1,2);
+            plot(i,fb_ny - k,2);
+        }
+        for (int i=yy-r; i<yy+r; ++i) {
+            plot(k-1,i,2);
+            plot(fb_nx-k,i,2);
+        }
+    }
     // white diagonals to corners and centres of sides
     for (int i=0; i<64; ++i) {
         plot(i, i, 2);
@@ -701,7 +724,7 @@ void testUpdate(void)
         
     }
 
-#elif 1
+#elif 0
     if (0 == (millis() % 5000) ) { parity = 1 - parity; }
 
 //    if (parity) {
