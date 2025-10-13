@@ -101,6 +101,15 @@ __attribute__((aligned(4))) static uint8_t osdBuffer2[PICO_OSD_BUF_LENGTH];
 
 static int osd_dma_channel;
 
+static const int charsPerLine = 30;
+static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
+static const int numChars = charsPerLine * charLines;
+
+//static uint8_t charBuffer[numChars];
+static uint8_t charBuffer[480];
+
+void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
+
 void testUpdate(void);
 
 void plot(int x, int y, int c)
@@ -151,17 +160,19 @@ void osd_test_init(void)
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT, PICO_OSD_BUF_LENGTH);
     bprintf("nx %d, ny %d", fb_nx, fb_ny);
     for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
-        int y = i / PICO_OSD_BUF_WIDTH;
-        int x = (i % PICO_OSD_BUF_WIDTH) * 4; // approx. pixels
-        int dd = (x-184)*(x-184)+(y-128)*(y-128);
+//        int y = i / PICO_OSD_BUF_WIDTH;
+//        int x = (i % PICO_OSD_BUF_WIDTH) * 4; // approx. pixels
+//        int dd = (x-184)*(x-184)+(y-128)*(y-128);
 //        monoBuffer[i] = dd < 15000 ? 0xff : 0;
-        osdBuffer[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
-        osdBuffer[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
+//        osdBuffer[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
+//        osdBuffer[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
         osdBuffer[i] = 0;
 //        (void)dd;
     }
 
-
+    for (int i=0; i<numChars; ++i) {
+        charBuffer[i] = 0;
+    }
     
 #if 0
     for (int i=0; i<fb_nx; ++i) {
@@ -683,26 +694,26 @@ void testUpdate(void)
         plot(fb_nx/2-1, i, 2);
         plot(fb_nx-1, i, 2);
     }
-    int xx = fb_nx/2;
-    int yy = fb_ny/2;
+    int xx2 = fb_nx/2;
+    int yy2 = fb_ny/2;
     for (int k=2; k<10; ++k) {
         int q = fb_nx/2/k;
         int r = fb_ny/2/k;
         for (int j=0; j<16; ++j) {
-            plot(xx-q,j,2);
-            plot(xx+q,j,2);
-            plot(xx-q,fb_ny-1-j,2);
-            plot(xx+q,fb_ny-1-j,2);
-            plot(j,yy-r,2);
-            plot(j,yy+r,2);
-            plot(fb_nx-1-j,yy-r,2);
-            plot(fb_nx-1-j,yy+r,2);
+            plot(xx2-q,j,2);
+            plot(xx2+q,j,2);
+            plot(xx2-q,fb_ny-1-j,2);
+            plot(xx2+q,fb_ny-1-j,2);
+            plot(j,yy2-r,2);
+            plot(j,yy2+r,2);
+            plot(fb_nx-1-j,yy2-r,2);
+            plot(fb_nx-1-j,yy2+r,2);
         }
-        for (int i=xx-q; i<xx+q; ++i) {
+        for (int i=xx2-q; i<xx2+q; ++i) {
             plot(i,k-1,2);
             plot(i,fb_ny - k,2);
         }
-        for (int i=yy-r; i<yy+r; ++i) {
+        for (int i=yy2-r; i<yy2+r; ++i) {
             plot(k-1,i,2);
             plot(fb_nx-k,i,2);
         }
@@ -800,8 +811,17 @@ void testUpdate(void)
     memset(osdBuffer, 0b10101010 /*0xff*/, PICO_OSD_BUF_LENGTH/2);
     memset(osdBuffer + PICO_OSD_BUF_LENGTH/2, 0xff /* 0b10101010*/, PICO_OSD_BUF_LENGTH/2);
 #endif
-    
-#elif 1    
+
+
+#endif
+#if 1
+
+
+
+
+#endif
+
+#if 1
     static const int nxx = fb_nx - 64;
     static const float xp = ((float)(nxx))/4000000;
     uint32_t ctime = micros();
@@ -927,7 +947,34 @@ osd_ah_invert = OFF
 #endif
 }
 
+void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c)
+{
+    if (x < charsPerLine && y < charLines) {
+        charBuffer[y*charsPerLine + x] = c;
+    }
+}
+
+void osdPioWrite(uint8_t x, uint8_t y, const char *text)
+{
+    if (y < charLines) {
+        uint8_t *p = charBuffer + y * charsPerLine;
+        int i=0;
+        while (text[i] && x < charsPerLine) {
+            p[x++] = text[i++];
+        }
+    }
+}
+
 #else // USE_OSD_SD
+
 // no OSD SD
+
+// if required
+void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c)
+{
+    UNUSED(x);
+    UNUSED(y);
+    UNUSED(c);
+}
 
 #endif // USE_OSD_SD

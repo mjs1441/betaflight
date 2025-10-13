@@ -16,8 +16,10 @@ mods = dict(
 
 row = 0
 header = f.readline().strip()
+print("#include <stdint.h>")
+print()
 print("// %s font"%header)
-print("fontData[18*3*256] = {", end="")
+print("const uint8_t fontData[18*3*256] = {", end="")
 for x in f:
     z = row % 64
     if (z >= 54):
@@ -35,7 +37,7 @@ for x in f:
     if (rc != 2):
         print(" ", end="")
     row += 1
-print("\n}")
+print("\n};")
 
         
     

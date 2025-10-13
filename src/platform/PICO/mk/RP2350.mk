@@ -539,6 +539,7 @@ MCU_COMMON_SRC = \
             PICO/dshot_pico.c \
             PICO/exti_pico.c \
             PICO/io_pico.c \
+            PICO/osd/betaflight.font.c \
             PICO/osd/osd_pico.c \
             PICO/persistent.c \
             PICO/pwm_pico.c \
