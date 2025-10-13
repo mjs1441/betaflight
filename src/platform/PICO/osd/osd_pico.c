@@ -683,7 +683,8 @@ void testUpdate(void)
     static int parity;
     parity = 1-parity;
 #if 1
-    memset(osdBuffer, 0b10101010, PICO_OSD_BUF_LENGTH); // black background
+//    memset(osdBuffer, 0b10101010, PICO_OSD_BUF_LENGTH); // black background
+    memset(osdBuffer, 0, PICO_OSD_BUF_LENGTH); // transparent background
     for (int i=0; i<fb_nx; ++i) {
         plot(i, 0, 2);
         plot(i, fb_ny/2-1, 2);
