@@ -25,7 +25,7 @@ static const uint16_t osd_tx_program_instructions[] = {
     0x1f84, //  4: jmp    y--, 4                 [31]
     0x00c1, //  5: jmp    pin, 1
     0x20a0, //  6: wait   1 pin, 0
-    0xe034, //  7: set    x, 20
+    0xe030, //  7: set    x, 16
     0xe04f, //  8: set    y, 15
     0x2920, //  9: wait   0 pin, 0               [9]
     0x0e8a, // 10: jmp    y--, 10                [14]
@@ -37,14 +37,14 @@ static const uint16_t osd_tx_program_instructions[] = {
     0x0048, // 16: jmp    x--, 8
     0xa026, // 17: mov    x, isr
     0x2020, // 18: wait   0 pin, 0
-    0xf75d, // 19: set    y, 29                  [23]
+    0xf858, // 19: set    y, 24                  [24]
     0x1d94, // 20: jmp    y--, 20                [29]
     0x00d7, // 21: jmp    pin, 23
     0x0000, // 22: jmp    0
     0xe056, // 23: set    y, 22
     0x8080, // 24: pull   noblock
     0x6002, // 25: out    pins, 2
-    0x07f9, // 26: jmp    !osre, 25              [7]
+    0x08f9, // 26: jmp    !osre, 25              [8]
     0x0698, // 27: jmp    y--, 24                [6]
     0xe000, // 28: set    pins, 0
     0x0052, // 29: jmp    x--, 18
@@ -65,68 +65,6 @@ static const struct pio_program osd_tx_program = {
 static inline pio_sm_config osd_tx_program_get_default_config(uint offset) {
     pio_sm_config c = pio_get_default_sm_config();
     sm_config_set_wrap(&c, offset + osd_tx_wrap_target, offset + osd_tx_wrap);
-    return c;
-}
-#endif
-
-// ---------------- //
-// osd_tx_368_div_2 //
-// ---------------- //
-
-#define osd_tx_368_div_2_wrap_target 0
-#define osd_tx_368_div_2_wrap 30
-#define osd_tx_368_div_2_pio_version 1
-
-static const uint16_t osd_tx_368_div_2_program_instructions[] = {
-            //     .wrap_target
-    0xc000, //  0: irq    nowait 0
-    0xe000, //  1: set    pins, 0
-    0x20a0, //  2: wait   1 pin, 0
-    0x2020, //  3: wait   0 pin, 0
-    0xec56, //  4: set    y, 22                  [12]
-    0x1f85, //  5: jmp    y--, 5                 [31]
-    0x00c2, //  6: jmp    pin, 2
-    0x20a0, //  7: wait   1 pin, 0
-    0xe03f, //  8: set    x, 31
-    0xe04f, //  9: set    y, 15
-    0x2920, // 10: wait   0 pin, 0               [9]
-    0x0e8b, // 11: jmp    y--, 11                [14]
-    0x00c9, // 12: jmp    pin, 9
-    0xe058, // 13: set    y, 24
-    0x1a8e, // 14: jmp    y--, 14                [26]
-    0x00d1, // 15: jmp    pin, 17
-    0x0009, // 16: jmp    9
-    0x0049, // 17: jmp    x--, 9
-    0xa026, // 18: mov    x, isr
-    0x2020, // 19: wait   0 pin, 0
-    0xf75d, // 20: set    y, 29                  [23]
-    0x1d95, // 21: jmp    y--, 21                [29]
-    0x00d8, // 22: jmp    pin, 24
-    0x0000, // 23: jmp    0
-    0xe056, // 24: set    y, 22
-    0x8080, // 25: pull   noblock
-    0x6002, // 26: out    pins, 2
-    0x07fa, // 27: jmp    !osre, 26              [7]
-    0x0699, // 28: jmp    y--, 25                [6]
-    0xe000, // 29: set    pins, 0
-    0x0053, // 30: jmp    x--, 19
-            //     .wrap
-};
-
-#if !PICO_NO_HARDWARE
-static const struct pio_program osd_tx_368_div_2_program = {
-    .instructions = osd_tx_368_div_2_program_instructions,
-    .length = 31,
-    .origin = -1,
-    .pio_version = osd_tx_368_div_2_pio_version,
-#if PICO_PIO_VERSION > 0
-    .used_gpio_ranges = 0x0
-#endif
-};
-
-static inline pio_sm_config osd_tx_368_div_2_program_get_default_config(uint offset) {
-    pio_sm_config c = pio_get_default_sm_config();
-    sm_config_set_wrap(&c, offset + osd_tx_368_div_2_wrap_target, offset + osd_tx_368_div_2_wrap);
     return c;
 }
 #endif

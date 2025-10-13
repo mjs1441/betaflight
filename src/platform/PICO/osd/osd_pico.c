@@ -72,6 +72,7 @@
 #define PICO_OSD_LINE_WORDS 23
 #define PICO_OSD_BUF_WIDTH (PICO_OSD_LINE_WORDS*4)
 #define PICO_OSD_BUF_HEIGHT 288
+//#define PICO_OSD_BUF_HEIGHT 270
 //#define PICO_OSD_BUF_HEIGHT 256
 //#define PICO_OSD_BUF_HEIGHT 272
 //#define PICO_OSD_BUF_HEIGHT 266
@@ -256,6 +257,8 @@ void osd_test_init(void)
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
 
     int pioclock = (int)75e6; // TODO
+//    int pioclock = (int)75e6 * 1.01; // TODO
+//    int pioclock = (int)75e6 * 1.031; // TODO
     float div = (float)SystemCoreClock / pioclock;
     bprintf("pio clock div = %f", (double)div);
     sm_config_set_clkdiv(&config, div);
@@ -669,6 +672,36 @@ void testUpdate(void)
     static int parity;
     parity = 1-parity;
 #if 1
+    memset(osdBuffer, 0b10101010, PICO_OSD_BUF_LENGTH); // black background
+    for (int i=0; i<fb_nx; ++i) {
+        plot(i, 0, 2);
+        plot(i, fb_ny/2-1, 2);
+        plot(i, fb_ny-1, 2);
+    }
+    for (int i=0; i<fb_ny; ++i) {
+        plot(0, i, 2);
+        plot(fb_nx/2-1, i, 2);
+        plot(fb_nx-1, i, 2);
+    }
+
+    // white diagonals to corners and centres of sides
+    for (int i=0; i<64; ++i) {
+        plot(i, i, 2);
+        plot(i, fb_ny/2 - 1 -i, 2);
+        plot(i, fb_ny/2 + i, 2);
+        plot(i, fb_ny - 1 - i, 2);
+        plot(fb_nx -1 -i, i, 2);
+        plot(fb_nx -1 -i, fb_ny/2 - 1 -i, 2);
+        plot(fb_nx -1 -i, fb_ny/2 + i, 2);
+        plot(fb_nx -1 -i, fb_ny - 1 - i, 2);
+        plot(fb_nx/2 -1 -i, i, 2);
+        plot(fb_nx/2  +i, i, 2);
+        plot(fb_nx/2 -1 -i, fb_ny -1 -i, 2);
+        plot(fb_nx/2  +i, fb_ny -1 -i, 2);
+        
+    }
+
+#elif 1
     if (0 == (millis() % 5000) ) { parity = 1 - parity; }
 
 //    if (parity) {
