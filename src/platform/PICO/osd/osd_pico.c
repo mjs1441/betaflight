@@ -816,7 +816,10 @@ void testUpdate(void)
 #endif
 #if 1
 
+    for (int i=0; i<numChars; ++i) {
+        
 
+    }
 
 
 #endif
@@ -825,8 +828,8 @@ void testUpdate(void)
     static const int nxx = fb_nx - 64;
     static const float xp = ((float)(nxx))/4000000;
     uint32_t ctime = micros();
-    bzero(osdBuffer, PICO_OSD_BUF_LENGTH);
-    plotBorder();
+    //bzero(osdBuffer, PICO_OSD_BUF_LENGTH);
+    //plotBorder();
     int x = 27 + ((int)(ctime*xp)) % nxx;
     int y = 32;
     for (int i=0; i<10; ++i) {
