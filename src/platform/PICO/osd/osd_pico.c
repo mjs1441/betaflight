@@ -502,6 +502,9 @@ static void vsync_callback(void)
             osdPioWriteChar(0,i,65+i);
             osdPioWriteChar(29,i,65+i);
         }
+        for (int i=0; i<30*16; ++i) {
+            osdPioWriteChar(i%30, i/30, i%256);
+        }
     }
 
 
@@ -702,9 +705,9 @@ void testUpdate(void)
 {
 #define clearscreen
 //#define testcard
-//#define textpaint
-//#define blockpaint
-//#define ahpaint
+#define textpaint
+#define blockpaint
+#define ahpaint
     // none:       0.0
     // blockpaint 39.4
     // ahpaint   216.7
@@ -736,7 +739,9 @@ void testUpdate(void)
     
 #ifdef testcard
 //    memset(osdBuffer, 0b10101010, PICO_OSD_BUF_LENGTH); // black background
+#ifndef clearscreen
     memset(osdBuffer, 0, PICO_OSD_BUF_LENGTH); // transparent background
+#endif
     for (int i=0; i<fb_nx; ++i) {
         plot(i, 0, 2);
         plot(i, fb_ny/2-1, 2);
