@@ -320,11 +320,14 @@ static bool deviceDetect(const extDevice_t *dev)
     for (int retry = 0; retry < DETECTION_MAX_RETRY_COUNT; retry++) {
         delay(100);
 
+        bprintf("BARO DPS310 try detect %d",retry);
         bool ack = busReadBuf(dev, DPS310_REG_ID, chipId, 1);
 
         if (ack && (chipId[0] == DPS310_ID_REV_AND_PROD_ID || chipId[0] == SPL07_003_CHIP_ID)) {
+            bprintf("BARO success");
             return true;
         }
+        bprintf("BARO no ack");
     };
 
     return false;

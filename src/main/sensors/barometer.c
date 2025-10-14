@@ -201,6 +201,7 @@ static bool baroDetect(baroDev_t *baroDev, baroSensor_e baroHardwareToUse)
     switch (barometerConfig()->baro_busType) {
 #ifdef USE_I2C
     case BUS_TYPE_I2C:
+        bprintf("BARO going to i2cBusSetInstance to %d", barometerConfig()->baro_i2c_device);
         i2cBusSetInstance(dev, barometerConfig()->baro_i2c_device);
         dev->busType_u.i2c.address = barometerConfig()->baro_i2c_address;
         break;
