@@ -202,11 +202,15 @@ bool i2cWriteBuffer(i2cDevice_e device, uint8_t addr, uint8_t reg, uint8_t len, 
 
 bool i2cRead(i2cDevice_e device, uint8_t addr, uint8_t reg, uint8_t len, uint8_t* buf)
 {
+    bprintf("PICO I2C i2cRead %d addr=0x%02x, reg = 0x%02x, len = %d",
+            device, addr, reg, len);
     // Start non-blocking read
     if (!i2cReadBuffer(device, addr, reg, len, buf)) {
+        bprintf("PICO I2C failed i2cReadBuffer");
         return false;
     }
 
+    bprintf("PICO I2C device %d i2cReadBuffer read data starting %d", device, buf[0]);
     // Wait for completion
     while (i2cBusy(device, NULL)) {
         // Wait until transfer is complete
@@ -231,17 +235,20 @@ static void i2c_load_read_commands(i2c_hw_t *hw, uint8_t len, bool final_batch)
 bool i2cReadBuffer(i2cDevice_e device, uint8_t addr, uint8_t reg, uint8_t len, uint8_t* buf)
 {
     if (device == I2CINVALID || device >= I2CDEV_COUNT || len == 0) {
+        bprintf("no 1");
         return false;
     }
 
     i2c_inst_t *port = I2C_INST(i2cHardware[device].reg);
 
     if (!port) {
+        bprintf("no 2");
         return false;
     }
 
     // Check if I2C is busy
     if (i2cBusy(device, NULL)) {
+        bprintf("no 3");
         return false;
     }
 

@@ -153,6 +153,7 @@ static int32_t getTwosComplement(uint32_t raw, uint8_t length)
 
 static bool deviceConfigure(const extDevice_t *dev)
 {
+    bprintf("BARO deviceConfigure");
     // Trigger a chip reset
     registerSetBits(dev, DPS310_REG_RESET, DPS310_RESET_BIT_SOFT_RST);
 
@@ -320,8 +321,8 @@ static bool deviceDetect(const extDevice_t *dev)
     for (int retry = 0; retry < DETECTION_MAX_RETRY_COUNT; retry++) {
         delay(100);
 
-        bprintf("BARO DPS310 try detect %d",retry);
         bool ack = busReadBuf(dev, DPS310_REG_ID, chipId, 1);
+        bprintf("BARO DPS310 try %d detect, reg %d, chipId %d",retry, DPS310_REG_ID, chipId[0]);
 
         if (ack && (chipId[0] == DPS310_ID_REV_AND_PROD_ID || chipId[0] == SPL07_003_CHIP_ID)) {
             bprintf("BARO success");
