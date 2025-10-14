@@ -27,7 +27,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "common/maths.h"
+#include "common/printf.h"
 #include "drivers/io.h"
 #include "drivers/io_impl.h"
 #include "drivers/system.h"
@@ -483,12 +483,22 @@ static void vsync_callback(void)
     
     if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
-        osdPioWrite(4,13,"VSYNC CALLBACK");
-        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
-        osdPioWriteChar(4,10,0x90);
-        osdPioWriteChar(5,10,0xc0);
-        osdPioWriteChar(6,10,0x90);
-        
+//        osdPioWrite(4,13,"VSYNC CALLBACK");
+//        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
+//        osdPioWriteChar(4,10,0x90);
+//        osdPioWriteChar(5,10,0xc0);
+//        osdPioWriteChar(6,10,0x90);
+        static char text[30];
+        tfp_sprintf(text, "%d VSYNC CALLBACKS", c);
+        osdPioWrite(2,4,text);
+        for (int i=0; i<30; ++i) {
+            osdPioWriteChar(i,0,48+(i%10));
+            osdPioWriteChar(i,15,48+(i%10));
+        }
+        for (int i=1; i<15; ++i) {
+            osdPioWriteChar(0,i,65+i);
+            osdPioWriteChar(29,i,65+i);
+        }
     }
 
 
@@ -825,7 +835,7 @@ void testUpdate(void)
 #if 1
     extern const uint8_t fontData[18*3*256];
 
-    const int hoffs = 4; // 0..7
+    const int hoffs = 0; //4; // 0..7
     const int pxpc = 12;
     const int bxpc = pxpc / 4; // 4 pixels per byte
     const int pypc = 18;
