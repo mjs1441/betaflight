@@ -96,8 +96,11 @@ static int osd_tx_sm;
 // currently building with no-builtin-memcpy
 // and gcc13.3 with nanolib -> just does byte copy (even when known aligned)
 // (also gcc14.3)
-__attribute__((aligned(4))) static uint8_t osdBuffer[PICO_OSD_BUF_LENGTH];
-__attribute__((aligned(4))) static uint8_t osdBuffer2[PICO_OSD_BUF_LENGTH];
+__attribute__((aligned(4))) static uint32_t osdBufferW[PICO_OSD_BUF_LENGTH/4];
+__attribute__((aligned(4))) static uint32_t osdBuffer2W[PICO_OSD_BUF_LENGTH/4];
+static uint8_t* osdBuffer = (uint8_t *)osdBufferW;
+static uint8_t* osdBuffer2 = (uint8_t *)osdBuffer2W;
+
 
 static int osd_dma_channel;
 
@@ -697,9 +700,41 @@ void testOSDtask(void)
 
 void testUpdate(void)
 {
+#define clearscreen
+//#define testcard
+//#define textpaint
+//#define blockpaint
+//#define ahpaint
+    // none:       0.0
+    // blockpaint 39.4
+    // ahpaint   216.7
+    // clearscreen (bzero) 1104 (loop bytes) 1104 (loop words) 1104 (memset) 1104
+    // clearscreen (__aeabi_memset) 99.6
+    // testcard 3302.2 [includes memset clear]
+    // textpaint blank: 25.7 ~4lines: 160
     static int parity;
     parity = 1-parity;
-#if 1
+
+#ifdef clearscreen
+//    for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
+//        osdBuffer[i] = 0;
+//    }
+    {
+        void *__aeabi_memset(void *s, size_t n, int c); // maybe , size_t n);    
+//        __aeabi_memset(osdBuffer, PICO_OSD_BUF_LENGTH, 0xff);
+        __aeabi_memset(osdBuffer, PICO_OSD_BUF_LENGTH, 0);
+
+//        uint32_t *p = (uint32_t *)osdBuffer;
+//        uint32_t *p = osdBufferW;
+//        for (int i=0; i<PICO_OSD_BUF_LENGTH/4; ++i) {
+//            *p++ = 0;
+//        }
+//        memset(osdBuffer, 0, PICO_OSD_BUF_LENGTH/4);
+    }
+//    bzero(osdBuffer, PICO_OSD_BUF_LENGTH);
+#endif
+    
+#ifdef testcard
 //    memset(osdBuffer, 0b10101010, PICO_OSD_BUF_LENGTH); // black background
     memset(osdBuffer, 0, PICO_OSD_BUF_LENGTH); // transparent background
     for (int i=0; i<fb_nx; ++i) {
@@ -831,8 +866,9 @@ void testUpdate(void)
 #endif
 
 
-#endif
-#if 1
+#endif // testcard
+    
+#ifdef textpaint
     extern const uint8_t fontData[18*3*256];
 
     const int hoffs = 0; //4; // 0..7
@@ -871,19 +907,26 @@ void testUpdate(void)
 
 #endif
 
-#if 1
-    static const int nxx = fb_nx - 64;
-    static const float xp = ((float)(nxx))/4000000;
-    uint32_t ctime = micros();
     //bzero(osdBuffer, PICO_OSD_BUF_LENGTH);
     //plotBorder();
-    int x = 27 + ((int)(ctime*xp)) % nxx;
-    int y = 32;
-    for (int i=0; i<10; ++i) {
-        for (int j=0; j<10; ++j) {
-            plot(x+i, y+j, (j==0 || i==0) ? 1 : 2);
+#ifdef blockpaint
+    {
+        static const int nxx = fb_nx - 64;
+        static const float xp = ((float)(nxx))/4000000;
+        uint32_t ctime = micros();
+        int x = 27 + ((int)(ctime*xp)) % nxx;
+        int y = 32;
+        for (int i=0; i<10; ++i) {
+            for (int j=0; j<10; ++j) {
+                plot(x+i, y+j, (j==0 || i==0) ? 1 : 2);
+            }
         }
     }
+#endif
+
+#ifdef ahpaint
+    //bzero(osdBuffer, PICO_OSD_BUF_LENGTH);
+    //plotBorder();
 
     /*
       osd_ah_max_pit = 20
@@ -970,8 +1013,9 @@ osd_ah_invert = OFF
     }
    
 
-#else
+#endif // ahpaint
 
+#if 0
     static const int usPerRun = 50000;
     static const int nxx = fb_nx - 64;
     static const float xp = ((float)(nxx))/4000000;
