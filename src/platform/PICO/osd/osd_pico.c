@@ -109,6 +109,7 @@ static const int numChars = charsPerLine * charLines;
 static uint8_t charBuffer[480];
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
+void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 
 void testUpdate(void);
 
@@ -482,6 +483,12 @@ static void vsync_callback(void)
     
     if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
+        osdPioWrite(4,13,"VSYNC CALLBACK");
+        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
+        osdPioWriteChar(4,10,0x90);
+        osdPioWriteChar(5,10,0xc0);
+        osdPioWriteChar(6,10,0x90);
+        
     }
 
 
@@ -816,10 +823,39 @@ void testUpdate(void)
 
 #endif
 #if 1
+    extern const uint8_t fontData[18*3*256];
+
+    const int hoffs = 4; // 0..7
+    const int pxpc = 12;
+    const int bxpc = pxpc / 4; // 4 pixels per byte
+    const int pypc = 18;
+    const int bpc  = bxpc * pypc;
+    const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte3
 
     for (int i=0; i<numChars; ++i) {
-        
+        uint8_t c = charBuffer[i];
+        if (!c) {
+            continue;
+        }
 
+        // paint chars to buffer here
+        // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
+        int x = i % charsPerLine;
+        int y = i / charsPerLine; // or loop x,y
+        uint8_t * bufp = osdBuffer + hoffs + fbbpl * y * pypc + x * bxpc; // pointer to topleft of char dest on osdBuffer
+        // TODO bufp without multiply, loop x,y etc.
+
+        const uint8_t * fontp = &fontData[c*bpc]; // 3 bytes per 12 pixel char line, 18 lines
+        // rp2350 don't have to worry about cache, all 1-clock sram
+
+//        bprintf("painting char '%c' (0x%02x) at %d, %d from %p (cf %p) to %p (cf %p)",
+//                c, c, x, y, fontp, fontData, bufp, osdBuffer);
+        for (int j=0; j<18; ++j) {
+            for (int b=0; b<3; ++b) {
+                *bufp++ = *fontp++;
+            }
+            bufp += fbbpl - 3; // new line, back 3 bytes
+        }
     }
 
 
