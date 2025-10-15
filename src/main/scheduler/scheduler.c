@@ -485,6 +485,10 @@ static void readSchedulerLocals(task_t *selectedTask, uint8_t selectedTaskDynami
 
 FAST_CODE void scheduler(void)
 {
+    static int scount = 0;
+    static int howMany = 0;
+    static int gclose;
+
     static uint32_t checkCycles = 0;
     static uint32_t scheduleCount = 0;
 #if defined(USE_LATE_TASK_STATISTICS)
@@ -505,6 +509,15 @@ FAST_CODE void scheduler(void)
     uint32_t nextTargetCycles = 0;
     int32_t schedLoopRemainingCycles;
     bool firstSchedulingOpportunity = false;
+
+    scount++;
+
+    static uint32_t terminalGyroRateCount = 0;
+    if (scount % 300000 == 0) {
+//        bprintf("scount %d gclose %d howMany %d, dpc %d, g->detectedEXTI %d, tGRC %d", scount, gclose, howMany, desiredPeriodCycles,
+//                gyroActiveDev()->detectedEXTI, terminalGyroRateCount);
+
+    }
 
 #if defined(UNIT_TEST)
     if (nextTargetCycles == 0) {
@@ -541,6 +554,7 @@ FAST_CODE void scheduler(void)
 
         // Once close to the timing boundary, poll for it's arrival
         if (schedLoopRemainingCycles < schedLoopStartCycles) {
+            gclose++;
             if (schedLoopStartCycles > schedLoopStartMinCycles) {
                 schedLoopStartCycles -= schedLoopStartDeltaDownCycles;
             }
@@ -623,7 +637,7 @@ FAST_CODE void scheduler(void)
             // Bring the scheduler into lock with the gyro
             if (gyro->gyroModeSPI != GYRO_EXTI_NO_INT) {
                 // Track the actual gyro rate over given number of cycle times and set the expected timebase
-                static uint32_t terminalGyroRateCount = 0;
+//////////////                static uint32_t terminalGyroRateCount = 0;
                 static int32_t sampleRateStartCycles;
 
                 if (terminalGyroRateCount == 0) {
@@ -635,6 +649,7 @@ FAST_CODE void scheduler(void)
                     // Calculate the number of clock cycles on average between gyro interrupts
                     uint32_t sampleCycles = nowCycles - sampleRateStartCycles;
                     desiredPeriodCycles = sampleCycles / GYRO_RATE_COUNT;
+                    howMany++;
                     sampleRateStartCycles = nowCycles;
                     terminalGyroRateCount += GYRO_RATE_COUNT;
                 }
@@ -706,6 +721,7 @@ FAST_CODE void scheduler(void)
         // Update task dynamic priorities
         for (task_t *task = queueFirst(); task != NULL; task = queueNext()) {
             if (task->attribute->staticPriority != TASK_PRIORITY_REALTIME) {
+                // bprintf("task %s", task->attribute->taskName);
                 // Task has checkFunc - event driven
                 if (task->attribute->checkFunc) {
                     // Increase priority for event driven tasks

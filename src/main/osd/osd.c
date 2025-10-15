@@ -1394,6 +1394,11 @@ void osdUpdate(timeUs_t currentTimeUs)
     static uint32_t osdElementDurationFractionUs[OSD_ITEM_COUNT] = { 0 };
     static bool moreElementsToDraw;
 
+#ifdef TEST_PIO_OSD
+    void osdUpdateCallback(uint32_t currentTimeUs);
+    osdUpdateCallback((uint32_t)currentTimeUs);
+    return;
+#endif
     timeUs_t executeTimeUs;
     osdState_e osdCurrentState = osdState;
 

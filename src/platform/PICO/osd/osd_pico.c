@@ -354,6 +354,8 @@ otherwise just dma_channel_abort
     */
 }
 
+static int ouccount;
+
 static void vsync_callback(void)
 {
     // 50 per second (PAL)
@@ -486,14 +488,18 @@ static void vsync_callback(void)
     
     if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
+        bprintf("ouccount %d", ouccount);
 //        osdPioWrite(4,13,"VSYNC CALLBACK");
 //        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
 //        osdPioWriteChar(4,10,0x90);
 //        osdPioWriteChar(5,10,0xc0);
 //        osdPioWriteChar(6,10,0x90);
         static char text[30];
-        tfp_sprintf(text, "%d VSYNC CALLBACKS", c);
+//        int sprintf(char *str, const char *format, ...);
+//        sprintf(text, "%.1f VSYNC SNPRINTF", (double)c);
         osdPioWrite(2,4,text);
+        tfp_sprintf(text, "%d VSYNC CALLBACKS", c);
+#if 0
         for (int i=0; i<30; ++i) {
             osdPioWriteChar(i,0,48+(i%10));
             osdPioWriteChar(i,15,48+(i%10));
@@ -505,6 +511,7 @@ static void vsync_callback(void)
         for (int i=0; i<30*16; ++i) {
             osdPioWriteChar(i%30, i/30, i%256);
         }
+#endif
     }
 
 
@@ -526,8 +533,12 @@ static void vsync_callback(void)
 
 bool timer_callback(repeating_timer_t *rt)
 {
+#ifdef PICO_TRACE
     uint8_t *buffer = (uint8_t *)rt->user_data;
     bprintf("buffer = %p, osdBuffer = %p", buffer, osdBuffer);
+#else
+    UNUSED(rt);
+#endif
         
 //    pio_sm_set_enabled(osdPio, osd_tx_sm, true);
     //return false;
@@ -545,6 +556,7 @@ static void enable(void)
 //    gpio_set_pulls(osd_w_gpio, true, false);
 }
 
+#ifdef oldtests
 static void disable(void)
 {
     pio_sm_set_enabled(osdPio, osd_tx_sm, false);
@@ -553,10 +565,10 @@ static void disable(void)
     gpio_init(osd_en_gpio);
 //    gpio_set_pulls(osd_w_gpio, true, false);
 }
+#endif
 
 void osd_test(void)
 {
-    int disp = 0;
     osd_test_init();
 
     (void)rtdata;
@@ -571,6 +583,13 @@ void osd_test(void)
     }
 */
     
+#if 1
+    bprintf("OSD PIO Enable");
+    enable();
+#else
+    // debug PIO, histogram etc.
+    
+    int disp = 0;
     int pc;
     int pca[50];
     int hist[32];
@@ -681,6 +700,7 @@ void osd_test(void)
         disable();
         pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("E pc = %d less offset = %d", pc, pc - osd_tx_offset);
     }
+#endif
 }
 
 
@@ -701,13 +721,24 @@ void testOSDtask(void)
 // flight/imu.c -> "euler angles" (sic) (pitch, roll, yaw)
 // ./telemetry/crsf.c:    sbufWriteU16BigEndian(dst, decidegrees2Radians10000(attitude.values.roll));
 
+void osdUpdateCallback(uint32_t t_us)
+{
+    static char oucbuf[30];
+    // int osdPrintFloat(char *buffer, char leadingSymbol, float value, char *formatString, unsigned decimalPlaces, bool round, char trailingSymbol);
+    // tfp_sprintf(oucbuf, "abc %d", t_us);
+    ouccount++;
+    osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
+    osdPioWrite(2,8,oucbuf);
+}
+
 void testUpdate(void)
 {
-#define clearscreen
+//#define clearscreen
 //#define testcard
 #define textpaint
-#define blockpaint
-#define ahpaint
+//#define blockpaint
+//#define ahpaint
+//#define testsprintf
     // none:       0.0
     // blockpaint 39.4
     // ahpaint   216.7
@@ -718,6 +749,29 @@ void testUpdate(void)
     static int parity;
     parity = 1-parity;
 
+#ifdef testsprintf
+    static char tsbuf[32];
+#if 0
+    int snprintf(char *str, size_t size, const char *format, ...);
+    int sprintf(char *str, const char *format, ...);
+//    for (int i=0; i<100; ++i) {
+    for (float i=0.123f; i<100.0f; ++i) {
+//        snprintf(tsbuf, 30, "look %d here %d so",i, i); // 622.5
+//        sprintf(tsbuf, "look %d here %d so",i, i); // 621.8
+        sprintf(tsbuf, "A%.1fB",(double)i); // ...
+        sprintf(tsbuf, "A%.2fB",(double)i); // 929.6
+    }
+#else
+//    for (int i=0; i<100; ++i) {
+    for (float i=0.123f; i<100.0f; ++i) {
+//        tfp_sprintf(tsbuf, "look %d here %d so",i, i); // 429.8
+        int osdPrintFloat(char *buffer, char leadingSymbol, float value, char *formatString, unsigned decimalPlaces, bool round, char trailingSymbol);
+        osdPrintFloat(tsbuf, 'A', i, "", 1, false, 'B'); // ...
+        osdPrintFloat(tsbuf, 'A', i, "", 2, false, 'B'); // 1166.8
+    }
+#endif
+    
+#endif
 #ifdef clearscreen
 //    for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
 //        osdBuffer[i] = 0;
