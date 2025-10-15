@@ -102,7 +102,8 @@ static uint8_t* osdBuffer = (uint8_t *)osdBufferW;
 static uint8_t* osdBuffer2 = (uint8_t *)osdBuffer2W;
 
 
-static int osd_dma_channel;
+static int osd_dma_chan_buf2_to_fifo;
+static int osd_dma_chan_buf_to_buf2;
 
 static const int charsPerLine = 30;
 static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
@@ -317,20 +318,20 @@ void osd_test_init(void)
     dma_chan = DMA_IDENTIFIER_TO_CHANNEL(dma_id);
     */
 
-    osd_dma_channel = dma_claim_unused_channel(false);
-    if (!osd_dma_channel) {
-        bprintf("**** failed to claim dma channel for osd pico");
+    osd_dma_chan_buf2_to_fifo = dma_claim_unused_channel(false);
+    if (!osd_dma_chan_buf2_to_fifo) {
+        bprintf("**** failed to claim dma channel (buf2 to screen) for osd pico");
         return;
     }
-    
-    dma_channel_config c = dma_channel_get_default_config(osd_dma_channel);
+
+    dma_channel_config c = dma_channel_get_default_config(osd_dma_chan_buf2_to_fifo);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
     channel_config_set_read_increment(&c, true);
     channel_config_set_write_increment(&c, false);
     channel_config_set_dreq(&c, pio_get_dreq(osdPio, osd_tx_sm, true));
 
     dma_channel_configure(
-        osd_dma_channel,
+        osd_dma_chan_buf2_to_fifo,
         &c,
         &osdPio->txf[osd_tx_sm],  // Write address (PIO TX FIFO)
         NULL,                     // Read address (reset each time)
@@ -338,6 +339,26 @@ void osd_test_init(void)
         false                     // Don't start immediately
     );
 
+    osd_dma_chan_buf_to_buf2 = dma_claim_unused_channel(false);
+    if (!osd_dma_chan_buf_to_buf2) {
+        bprintf("**** failed to claim dma channel (buf to buf2) for osd pico");
+        return;
+    }
+
+    c = dma_channel_get_default_config(osd_dma_chan_buf_to_buf2);
+    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
+    channel_config_set_read_increment(&c, true);
+    channel_config_set_write_increment(&c, true);
+    channel_config_set_chain_to(&c, osd_dma_chan_buf2_to_fifo); // DMA to PIO fifo starts immediately on completion of buffer flip
+
+    dma_channel_configure(
+        osd_dma_chan_buf_to_buf2,
+        &c,
+        NULL,                     // Write address (reset each time)
+        NULL,                     // Read address (reset each time)
+        PICO_OSD_BUF_WORDS,       // Number of transfers
+        false                     // Don't start immediately
+    );
 
     /*
     if dma has handler
@@ -375,74 +396,39 @@ static void vsync_callback(void)
 
 //#define testdmaabort
 
+    // Ensure that DMA (buf2 to PIO FIFO) is not in progress, and that the PIO FIFO is empty.
     static int business;
-
-#ifdef testdmaabort
-    if ((c % 334) == 134) {
-        business += 10000;
-        busy_wait_us(8700); // how can this trigger channel busy below? IRQ on IRQ? maybe only clear IRQ at end?
-    }
-#endif
-
-#if 1
-    // RP2350-E5 disable abort enable
-//    if (dma_channel_is_busy(osd_dma_channel)) {
-#ifdef testdmaabort
-    if (c == 834 || dma_channel_is_busy(osd_dma_channel)) {
-#else
-    if (dma_channel_is_busy(osd_dma_channel)) {
-#endif
+    static int busybuf;
+    if (dma_channel_is_busy(osd_dma_chan_buf2_to_fifo)) {
         ++business;
-#ifdef disableenable
-        // would need this if we're triggering anything on dma completion
-        dma_channel_hw_addr(osd_dma_channel)->ctrl_trig &= !~DMA_CH0_CTRL_TRIG_EN_BITS;
-#endif
-        dma_channel_abort(osd_dma_channel);
-
-#ifdef disableenable
-        // after abort, we need to do some / all of this
-    dma_channel_config c = dma_channel_get_default_config(osd_dma_channel);
-    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
-    channel_config_set_read_increment(&c, true);
-    channel_config_set_write_increment(&c, false);
-    channel_config_set_dreq(&c, pio_get_dreq(osdPio, osd_tx_sm, true));
-
-    dma_channel_configure(
-        osd_dma_channel,
-        &c,
-        &osdPio->txf[osd_tx_sm],  // Write address (PIO TX FIFO)
-        NULL,                     // Read address (reset each time)
-        PICO_OSD_BUF_WORDS,       // Number of transfers
-        false                     // Don't start immediately
-    );
-#endif
-/////        dma_channel_hw_addr(osd_dma_channel)->ctrl_trig |= DMA_CH0_CTRL_TRIG_EN_BITS;
-////        // channel can be busy here...
+        dma_channel_abort(osd_dma_chan_buf2_to_fifo);
     }
 
-    if (1) {
-        memcpy(osdBuffer2, osdBuffer, PICO_OSD_BUF_LENGTH);
+    pio_sm_clear_fifos(osdPio, osd_tx_sm);
+
+    if (dma_channel_is_busy(osd_dma_chan_buf_to_buf2)) {
+        busybuf++;
+    }
         
-        // prob not required
-        dma_channel_set_write_addr(osd_dma_channel, &osdPio->txf[osd_tx_sm], false);
+    // Reset the incrementing addresses
+    dma_channel_set_read_addr(osd_dma_chan_buf2_to_fifo, osdBuffer2, false);
+    dma_channel_set_read_addr(osd_dma_chan_buf_to_buf2, osdBuffer, false);
+    dma_channel_set_write_addr(osd_dma_chan_buf_to_buf2, osdBuffer2, false);
 
-        dma_channel_set_read_addr(osd_dma_channel, osdBuffer2, false);
-        dma_channel_set_trans_count(osd_dma_channel, PICO_OSD_BUF_WORDS, false);
+    // Start DMA flipping osdBuffer to osdBuffer2. DMA for buf2 -> screen is chained from this.
+    dma_channel_start(osd_dma_chan_buf_to_buf2);
 
-        pio_sm_clear_fifos(osdPio, osd_tx_sm);
-    
-        dma_channel_start(osd_dma_channel);
-    }
-#endif
-    
+    // probably best clear at end, just in case there are re-trigger issues if cleared earlier...
+    pio_interrupt_clear(osdPio, 0);
+
+    // the rest is just debug and testing.
+
     ++c;
 
-//    const int nnn = 1;
     static int32_t maxcc;
     static int32_t cca;
     static int ccc;
     int nav = 250;
-//    if (c%n == 0) {
     uint32_t m1 = getCycleCounter();
     testUpdate();
     int32_t dd = getCycleCounter() - m1;
@@ -450,45 +436,17 @@ static void vsync_callback(void)
     cca += dd;
     if (++ccc == nav) {
         ccc=0;
-        bprintf("(%d %d busy %d) ave us per update: %.1f, max %.1f", cca, maxcc, business, ((double)cca)/nav/150, ((double)maxcc)/150);
+        bprintf("(%d %d busy %d busybuf %d) ave us per update: %.1f, max %.1f",
+                cca, maxcc, business, busybuf,
+                ((double)cca)/nav/150, ((double)maxcc)/150);
         cca = 0;
         maxcc = 0;
     }
-//    }
-//    if (c%10 == 0) {
-
-    
-
-#if 0
-    // RP2350-E5 disable abort enable
-    if (dma_channel_is_busy(osd_dma_channel)) {
-        dma_channel_hw_addr(osd_dma_channel)->ctrl_trig &= !~DMA_CH0_CTRL_TRIG_EN_BITS;
-        dma_channel_abort(osd_dma_channel);
-        dma_channel_hw_addr(osd_dma_channel)->ctrl_trig |= DMA_CH0_CTRL_TRIG_EN_BITS;
-    }
-
-//    if (dma_channel_is_busy(osd_dma_channel)) {
-//        bprintf("*** oops channel busy");
-//    }
-    // dma restart used to be here
-    if (1) {
-        memcpy(osdBuffer2, osdBuffer, PICO_OSD_BUF_LENGTH);
-        
-        // prob not required
-        dma_channel_set_write_addr(osd_dma_channel, &osdPio->txf[osd_tx_sm], false);
-
-        dma_channel_set_read_addr(osd_dma_channel, osdBuffer2, false);
-        dma_channel_set_trans_count(osd_dma_channel, PICO_OSD_BUF_WORDS, false);
-
-        pio_sm_clear_fifos(osdPio, osd_tx_sm);
-    
-        dma_channel_start(osd_dma_channel);
-    }
-#endif
     
     if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
         bprintf("ouccount %d", ouccount);
+#if 0
 //        osdPioWrite(4,13,"VSYNC CALLBACK");
 //        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
 //        osdPioWriteChar(4,10,0x90);
@@ -499,6 +457,7 @@ static void vsync_callback(void)
 //        sprintf(text, "%.1f VSYNC SNPRINTF", (double)c);
         osdPioWrite(2,4,text);
         tfp_sprintf(text, "%d VSYNC CALLBACKS", c);
+#endif
 #if 0
         for (int i=0; i<30; ++i) {
             osdPioWriteChar(i,0,48+(i%10));
@@ -515,8 +474,6 @@ static void vsync_callback(void)
     }
 
 
-// probably best clear at end, just in case there are re-trigger issues if cleared earlier...
-    pio_interrupt_clear(osdPio, 0);
     
 }
 
@@ -705,7 +662,7 @@ void osd_test(void)
 
 
 #ifdef TEST_PIO_OSD
-void testOSDtask(void)
+void testOSDtaskOffPidLoop(void)
 {
 #if 1
     return;

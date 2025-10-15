@@ -1379,8 +1379,8 @@ FAST_CODE void taskMainPidLoop(timeUs_t currentTimeUs)
     subTaskPidSubprocesses(currentTimeUs);
 
 #ifdef TEST_PIO_OSD
-    void testOSDtask(void);
-    testOSDtask();
+    void testOSDtaskOffPidLoop(void);
+    testOSDtaskOffPidLoop();
 #endif
 
     DEBUG_SET(DEBUG_CYCLETIME, 0, getTaskDeltaTimeUs(TASK_SELF));
