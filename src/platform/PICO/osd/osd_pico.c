@@ -101,9 +101,10 @@ __attribute__((aligned(4))) static uint32_t osdBuffer2W[PICO_OSD_BUF_LENGTH/4];
 static uint8_t* osdBuffer1 = (uint8_t *)osdBuffer1W;
 static uint8_t* osdBuffer2 = (uint8_t *)osdBuffer2W;
 
-
-static int osd_dma_chan_buf2_to_fifo;
-static int osd_dma_chan_buf1_to_buf2;
+static uint32_t zero;
+static int dma_chan_buf1_to_buf2;
+static int dma_chan_zero_to_buf1;
+static int dma_chan_buf2_to_fifo;
 
 static const int charsPerLine = 30;
 static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
@@ -117,18 +118,21 @@ void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 
 bool osdBuffer1Safe(void)
 {
-    return !dma_channel_is_busy(osd_dma_chan_buf1_to_buf2);
+    return !dma_channel_is_busy(dma_chan_buf1_to_buf2);
 }
 
 void testUpdate(void);
 
 void plot(int x, int y, int c)
 {
+    static int badcount = 10;
     // c =  0 -> transparent (no overlay)   W=any EN=0
     // c =  1 -> black                      W=0   EN=1
     // c =  2 -> white                      W=1   EN=1
     if (x<0 || y<0 || x>=fb_nx || y>=fb_ny) {
-        bprintf("plot %d, %d, %d",x,y,c);
+        if (badcount-- > 0) {
+            bprintf("*** out of range plot %d, %d, %d",x,y,c);
+        }
         return;
     }
 
@@ -312,52 +316,67 @@ void osd_test_init(void)
     irq_set_enabled(osdPioIrq, true);
 
 
-    /*
-    BF DMA thing, with ownership
+    // TODO *** consistent dma_claim vs dmaAllocate in PICO, probably follow SPI example
 
-// --- DMA Configuration ---
-    const dmaIdentifier_e dma_id = dmaGetFreeIdentifier();
-    if (dma_id == DMA_NONE || !dmaAllocate(dma_id, OWNER_LED_STRIP, 0)) {
-        return false;
-    }
-    dma_chan = DMA_IDENTIFIER_TO_CHANNEL(dma_id);
-    */
-
-    osd_dma_chan_buf2_to_fifo = dma_claim_unused_channel(false);
-    if (!osd_dma_chan_buf2_to_fifo) {
-        bprintf("**** failed to claim dma channel (buf2 to screen) for osd pico");
+    dma_chan_buf1_to_buf2 = dma_claim_unused_channel(false);
+    if (-1 == dma_chan_buf1_to_buf2) {
+        bprintf("**** failed to claim dma channel (buf1 to buf2) for osd pico");
         return;
     }
 
-    dma_channel_config c = dma_channel_get_default_config(osd_dma_chan_buf2_to_fifo);
+    dma_chan_zero_to_buf1 = dma_claim_unused_channel(false);
+    if (-1 == dma_chan_zero_to_buf1) {
+        bprintf("**** failed to claim dma channel (zero to buf1) for osd pico");
+        dma_channel_unclaim(dma_chan_buf1_to_buf2);
+        return;
+    }
+
+    dma_chan_buf2_to_fifo = dma_claim_unused_channel(false);
+    if (-1 == dma_chan_buf2_to_fifo) {
+        bprintf("**** failed to claim dma channel (buf2 to fifo) for osd pico");
+        dma_channel_unclaim(dma_chan_zero_to_buf1);
+        dma_channel_unclaim(dma_chan_buf1_to_buf2);
+        return;
+    }
+
+    dma_channel_config c = dma_channel_get_default_config(dma_chan_buf2_to_fifo);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
     channel_config_set_read_increment(&c, true);
     channel_config_set_write_increment(&c, false);
     channel_config_set_dreq(&c, pio_get_dreq(osdPio, osd_tx_sm, true));
 
     dma_channel_configure(
-        osd_dma_chan_buf2_to_fifo,
+        dma_chan_buf2_to_fifo,
         &c,
-        &osdPio->txf[osd_tx_sm],  // Write address (PIO TX FIFO)
+        &osdPio->txf[osd_tx_sm],  // Write address (fixed PIO TX FIFO)
         NULL,                     // Read address (reset each time)
         PICO_OSD_BUF_WORDS,       // Number of transfers
         false                     // Don't start immediately
     );
 
-    osd_dma_chan_buf1_to_buf2 = dma_claim_unused_channel(false);
-    if (!osd_dma_chan_buf1_to_buf2) {
-        bprintf("**** failed to claim dma channel (buf to buf2) for osd pico");
-        return;
-    }
+    c = dma_channel_get_default_config(dma_chan_zero_to_buf1);
+    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
+    channel_config_set_read_increment(&c, false);
+    channel_config_set_write_increment(&c, true);
+    channel_config_set_chain_to(&c, dma_chan_buf2_to_fifo); // DMA to PIO fifo starts immediately on completion of clearing buf1
 
-    c = dma_channel_get_default_config(osd_dma_chan_buf1_to_buf2);
+    dma_channel_configure(
+        dma_chan_zero_to_buf1,
+        &c,
+        NULL,                     // Write address (reset each time)
+        &zero,                    // Read address (fixed)
+        PICO_OSD_BUF_WORDS,       // Number of transfers
+        false                     // Don't start immediately
+    );
+
+    c = dma_channel_get_default_config(dma_chan_buf1_to_buf2);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
     channel_config_set_read_increment(&c, true);
     channel_config_set_write_increment(&c, true);
-    channel_config_set_chain_to(&c, osd_dma_chan_buf2_to_fifo); // DMA to PIO fifo starts immediately on completion of buffer flip
+    channel_config_set_chain_to(&c, dma_chan_zero_to_buf1); // DMA to clear buf1 starts immediately on completion of buffer flip
 
     dma_channel_configure(
-        osd_dma_chan_buf1_to_buf2,
+        dma_chan_buf1_to_buf2,
         &c,
         NULL,                     // Write address (reset each time)
         NULL,                     // Read address (reset each time)
@@ -402,38 +421,47 @@ static void vsync_callback(void)
 
 //#define testdmaabort
 
-    // Ensure that DMA (buf2 to PIO FIFO) is not in progress, and that the PIO FIFO is empty.
     static int business;
     static int busybuf;
-    if (dma_channel_is_busy(osd_dma_chan_buf2_to_fifo)) {
+
+    if (dma_channel_is_busy(dma_chan_buf1_to_buf2) || dma_channel_is_busy(dma_chan_zero_to_buf1)) {
+        // Unexpected, PIO shouldn't get back to vsync IRQ unless dma buf2->fifo has started
+        // unless sync signals are rather mixed up (detected vsync pulse but no hsync pulses on any line)
+        busybuf++;
+        dma_channel_abort(dma_chan_zero_to_buf1);
+        dma_channel_abort(dma_chan_buf1_to_buf2);
+    }
+
+    // Ensure that DMA (buf2 to PIO FIFO) is not in progress, and that the PIO FIFO is empty.
+    // (Can happen if some lines were skipped due to not detecting hsync pulse)
+    if (dma_channel_is_busy(dma_chan_buf2_to_fifo)) {
         ++business;
-        dma_channel_abort(osd_dma_chan_buf2_to_fifo);
+        dma_channel_abort(dma_chan_buf2_to_fifo);
     }
 
     pio_sm_clear_fifos(osdPio, osd_tx_sm);
 
-    if (dma_channel_is_busy(osd_dma_chan_buf1_to_buf2)) {
-        busybuf++;
-    }
-        
     // Reset the incrementing addresses
-    dma_channel_set_read_addr(osd_dma_chan_buf2_to_fifo, osdBuffer2, false);
-    dma_channel_set_read_addr(osd_dma_chan_buf1_to_buf2, osdBuffer1, false);
-    dma_channel_set_write_addr(osd_dma_chan_buf1_to_buf2, osdBuffer2, false);
+    dma_channel_set_read_addr(dma_chan_buf2_to_fifo, osdBuffer2, false);
+    dma_channel_set_read_addr(dma_chan_buf1_to_buf2, osdBuffer1, false);
+    dma_channel_set_write_addr(dma_chan_buf1_to_buf2, osdBuffer2, false);
+    dma_channel_set_write_addr(dma_chan_zero_to_buf1, osdBuffer1, false);
     
-    // Start DMA flipping osdBuffer1 to osdBuffer2. DMA for buf2 -> screen is chained from this.
+    // Start DMA flipping osdBuffer1 to osdBuffer2
+    // chains to DMA for zero->osdBuffer1 (clears screen buffer)
+    // chains to DMA for buf2 -> screen
 
 // testing dma speed
 //    if (c==123) {
 //         uint32_t dc1 = getCycleCounter();
-//         dma_channel_start(osd_dma_chan_buf1_to_buf2);
+//         dma_channel_start(dma_chan_buf1_to_buf2);
 //         uint32_t dc2 = getCycleCounter();
-//         while (dma_channel_is_busy(osd_dma_chan_buf1_to_buf2)) ;
+//         while (dma_channel_is_busy(dma_chan_buf1_to_buf2)) ;
 //         uint32_t dc3 = getCycleCounter();
 //         bprintf("* dc3-dc1 %d dc3-dc2 %d buf1 %p werc %p buf2 %p", dc3-dc1, dc3-dc2, osdBuffer1, &werc[0], osdBuffer2);
 //     }
 
-    dma_channel_start(osd_dma_chan_buf1_to_buf2);
+    dma_channel_start(dma_chan_buf1_to_buf2);
 
     // probably best clear at end, just in case there are re-trigger issues if cleared earlier...
     pio_interrupt_clear(osdPio, 0);
