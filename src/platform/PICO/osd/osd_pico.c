@@ -101,7 +101,7 @@ __attribute__((aligned(4))) static uint32_t osdBuffer2W[PICO_OSD_BUF_LENGTH/4];
 static uint8_t* osdBuffer1 = (uint8_t *)osdBuffer1W;
 static uint8_t* osdBuffer2 = (uint8_t *)osdBuffer2W;
 
-static volatile uint32_t zero;
+static const uint32_t zero;
 static int dma_chan_buf1_to_buf2;
 static int dma_chan_zero_to_buf1;
 static int dma_chan_buf2_to_fifo;
@@ -118,8 +118,7 @@ void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 
 bool osdBuffer1Safe(void)
 {
-//    return !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
-    return dma_channel_is_busy(dma_chan_buf2_to_fifo) ;
+    return !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
 }
 
 void testUpdate(void);
