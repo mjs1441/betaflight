@@ -101,7 +101,7 @@ __attribute__((aligned(4))) static uint32_t osdBuffer2W[PICO_OSD_BUF_LENGTH/4];
 static uint8_t* osdBuffer1 = (uint8_t *)osdBuffer1W;
 static uint8_t* osdBuffer2 = (uint8_t *)osdBuffer2W;
 
-static uint32_t zero;
+static volatile uint32_t zero;
 static int dma_chan_buf1_to_buf2;
 static int dma_chan_zero_to_buf1;
 static int dma_chan_buf2_to_fifo;
@@ -118,7 +118,8 @@ void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 
 bool osdBuffer1Safe(void)
 {
-    return !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
+//    return !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
+    return dma_channel_is_busy(dma_chan_buf2_to_fifo) ;
 }
 
 void testUpdate(void);
@@ -401,6 +402,8 @@ otherwise just dma_channel_abort
 
 volatile int ouccount;
 volatile int oucunsafe;
+volatile int oucunsafe2;
+volatile int oucunsafe3;
 static volatile int vdelay;
 static volatile int vsyncflag;
 
@@ -478,7 +481,7 @@ static void vsync_callback(void)
     static int ccc;
     int nav = 250;
     uint32_t m1 = getCycleCounter();
-    testUpdate();
+    // testUpdate();
     int32_t dd = getCycleCounter() - m1;
     if (dd>maxcc) maxcc = dd;
     cca += dd;
@@ -493,7 +496,8 @@ static void vsync_callback(void)
     
     if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
-        bprintf("ouccount %d of which unsafe %d, delay = %d", ouccount, oucunsafe, vdelay);
+//        bprintf("ouccount %d of which unsafe %d, delay = %d", ouccount, oucunsafe, vdelay);
+        bprintf("ouccount %d of which unsafe %d %d %d", ouccount, oucunsafe, oucunsafe2, oucunsafe3);
 #if 0
 //        osdPioWrite(4,13,"VSYNC CALLBACK");
 //        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
@@ -728,20 +732,33 @@ void testOSDtaskOffPidLoop(void)
 
 void osdUpdateCallback(uint32_t t_us)
 {
+#if 1
+    UNUSED(t_us);
+    while (true) {
+        ouccount++;
+        oucunsafe  += dma_channel_is_busy(dma_chan_buf1_to_buf2);
+        oucunsafe2 += dma_channel_is_busy(dma_chan_zero_to_buf1);
+        oucunsafe3 += dma_channel_is_busy(dma_chan_buf2_to_fifo);
+        zero++;
+    }
+#else
     static char oucbuf[30];
     ouccount++;
     if (vsyncflag) {
         vsyncflag=0;
         delayMicroseconds(vdelay);
-        vdelay = (vdelay+13) % 20000;
+        vdelay = 18000 + (vdelay+1) % 2000;
     }
     if (osdBuffer1Safe()) {
-        osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
-        osdPioWrite(2,8,oucbuf);
+//        osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
+//        osdPioWrite(2,8,oucbuf);
+        osdBuffer1W[ouccount % PICO_OSD_BUF_WORDS] = 0xfffaafff;
+        UNUSED(t_us);
+        UNUSED(oucbuf);
     } else {
-        bprintf("really not?");
         oucunsafe++;
     }
+#endif
 }
 
 void testUpdate(void)
