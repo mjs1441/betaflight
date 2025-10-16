@@ -182,6 +182,7 @@ static void plotBorder(void)
 void osd_test_init(void)
 {
     safe_period_us = 10000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+    hmm getting unsafe for 3370639/4597688
     
     bprintf("osd_test_init");
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT, PICO_OSD_BUF_LENGTH);
