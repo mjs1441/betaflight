@@ -1367,7 +1367,7 @@ bool osdUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
     UNUSED(currentDeltaTimeUs);
     static timeUs_t osdUpdateDueUs = 0;
 
-#ifdef TEST_PIO_OSD
+#if 0 // def TEST_PIO_OSD
     void osdUpdateCallback(uint32_t currentTimeUs);
     osdUpdateCallback((uint32_t)currentTimeUs);
     return false; // hopefully never schedule osdUpdate
