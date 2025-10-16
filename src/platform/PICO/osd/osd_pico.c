@@ -402,9 +402,9 @@ otherwise just dma_channel_abort
 
 volatile int ouccount;
 volatile int oucunsafe;
-volatile int oucunsafe2;
-volatile int oucunsafe3;
-static volatile int vdelay;
+//volatile int oucunsafe2;
+//volatile int oucunsafe3;
+//static volatile int vdelay;
 static volatile int vsyncflag;
 
 static void vsync_callback(void)
@@ -496,8 +496,8 @@ static void vsync_callback(void)
     
     if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
-//        bprintf("ouccount %d of which unsafe %d, delay = %d", ouccount, oucunsafe, vdelay);
-        bprintf("ouccount %d of which unsafe %d %d %d", ouccount, oucunsafe, oucunsafe2, oucunsafe3);
+        bprintf("ouccount %d of which unsafe %d", ouccount, oucunsafe);
+//        bprintf("ouccount %d of which unsafe %d %d %d", ouccount, oucunsafe, oucunsafe2, oucunsafe3);
 #if 0
 //        osdPioWrite(4,13,"VSYNC CALLBACK");
 //        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
@@ -732,7 +732,7 @@ void testOSDtaskOffPidLoop(void)
 
 void osdUpdateCallback(uint32_t t_us)
 {
-#if 1
+#if 0
     UNUSED(t_us);
     while (true) {
         ouccount++;
@@ -744,17 +744,17 @@ void osdUpdateCallback(uint32_t t_us)
 #else
     static char oucbuf[30];
     ouccount++;
-    if (vsyncflag) {
-        vsyncflag=0;
-        delayMicroseconds(vdelay);
-        vdelay = 18000 + (vdelay+1) % 2000;
-    }
+//    if (vsyncflag) {
+//        vsyncflag=0;
+//        delayMicroseconds(vdelay);
+//        vdelay = 18000 + (vdelay+1) % 2000;
+//    }
     if (osdBuffer1Safe()) {
-//        osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
-//        osdPioWrite(2,8,oucbuf);
-        osdBuffer1W[ouccount % PICO_OSD_BUF_WORDS] = 0xfffaafff;
-        UNUSED(t_us);
-        UNUSED(oucbuf);
+        osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
+        osdPioWrite(2,8,oucbuf);
+//        osdBuffer1W[ouccount % PICO_OSD_BUF_WORDS] = 0xfffaafff;
+//        UNUSED(t_us);
+//        UNUSED(oucbuf);
     } else {
         oucunsafe++;
     }
