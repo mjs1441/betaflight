@@ -106,6 +106,9 @@ static int dma_chan_buf1_to_buf2;
 static int dma_chan_zero_to_buf1;
 static int dma_chan_buf2_to_fifo;
 
+static volatile bool in_safe_zone;
+static volatile uint32_t safe_period_us;
+
 static const int charsPerLine = 30;
 static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
 static const int numChars = charsPerLine * charLines;
@@ -116,9 +119,17 @@ static uint8_t charBuffer[480];
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 
+int64_t safe_zone_callback(alarm_id_t id, void * user_data)
+{
+    UNUSED(id);
+    UNUSED(user_data);
+    in_safe_zone = false;
+    return 0; // don't automatically reschedule
+}
+
 bool osdBuffer1Safe(void)
 {
-    return !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
+    return in_safe_zone && !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
 }
 
 void testUpdate(void);
@@ -170,6 +181,8 @@ static void plotBorder(void)
 
 void osd_test_init(void)
 {
+    safe_period_us = 10000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+    
     bprintf("osd_test_init");
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT, PICO_OSD_BUF_LENGTH);
     bprintf("nx %d, ny %d", fb_nx, fb_ny);
@@ -471,6 +484,11 @@ static void vsync_callback(void)
     // probably best clear at end, just in case there are re-trigger issues if cleared earlier...
     pio_interrupt_clear(osdPio, 0);
 
+    // static alarm_id_t add_alarm_in_us (uint64_t us, alarm_callback_t callback, void * user_data, bool fire_if_past)
+    // typedef int64_t(* alarm_callback_t)(alarm_id_t id, void *user_data)
+    add_alarm_in_us(safe_period_us, safe_zone_callback, 0, true);
+    in_safe_zone = true;
+    
     // the rest is just debug and testing.
 
     ++c;
