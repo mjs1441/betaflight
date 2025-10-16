@@ -399,8 +399,8 @@ otherwise just dma_channel_abort
     */
 }
 
- int ouccount;
- int oucunsafe;
+volatile int ouccount;
+volatile int oucunsafe;
 static volatile int vdelay;
 static volatile int vsyncflag;
 
@@ -733,12 +733,13 @@ void osdUpdateCallback(uint32_t t_us)
     if (vsyncflag) {
         vsyncflag=0;
         delayMicroseconds(vdelay);
-        vdelay = (vdelay+1) % 20000;
+        vdelay = (vdelay+13) % 20000;
     }
     if (osdBuffer1Safe()) {
         osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
         osdPioWrite(2,8,oucbuf);
     } else {
+        bprintf("really not?");
         oucunsafe++;
     }
 }

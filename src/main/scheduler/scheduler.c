@@ -527,7 +527,10 @@ FAST_CODE void scheduler(void)
 #endif
 
     void osdUpdateCallback(uint32_t t_us);
-    osdUpdateCallback(1234);
+    while (true) {
+        osdUpdateCallback(getCycleCounter());
+    }
+    
     if (false) {
 //    if (gyroEnabled) {
         // Realtime gyro/filtering/PID tasks get complete priority
