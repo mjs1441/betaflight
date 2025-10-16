@@ -399,11 +399,14 @@ otherwise just dma_channel_abort
     */
 }
 
-// int ouccount;
-// int oucunsafe;
+ int ouccount;
+ int oucunsafe;
+static volatile int vdelay;
+static volatile int vsyncflag;
 
 static void vsync_callback(void)
 {
+    vsyncflag = 1;
     // 50 per second (PAL)
     static int c=0;
     // Need to clear the IRQ flag state from the PIO.
@@ -490,7 +493,7 @@ static void vsync_callback(void)
     
     if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
-//        bprintf("ouccount %d of which unsafe %d", ouccount, oucunsafe);
+        bprintf("ouccount %d of which unsafe %d, delay = %d", ouccount, oucunsafe, vdelay);
 #if 0
 //        osdPioWrite(4,13,"VSYNC CALLBACK");
 //        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
@@ -726,12 +729,17 @@ void testOSDtaskOffPidLoop(void)
 void osdUpdateCallback(uint32_t t_us)
 {
     static char oucbuf[30];
-//    ouccount++;
+    ouccount++;
+    if (vsyncflag) {
+        vsyncflag=0;
+        delayMicroseconds(vdelay);
+        vdelay = (vdelay+1) % 20000;
+    }
     if (osdBuffer1Safe()) {
         osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
         osdPioWrite(2,8,oucbuf);
     } else {
-//        oucunsafe++;
+        oucunsafe++;
     }
 }
 

@@ -1367,6 +1367,12 @@ bool osdUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
     UNUSED(currentDeltaTimeUs);
     static timeUs_t osdUpdateDueUs = 0;
 
+#ifdef TEST_PIO_OSD
+    void osdUpdateCallback(uint32_t currentTimeUs);
+    osdUpdateCallback((uint32_t)currentTimeUs);
+    return false; // hopefully never schedule osdUpdate
+#endif
+
     if (osdState == OSD_STATE_IDLE) {
         // If the OSD is due a refresh, mark that as being the case
         if (cmpTimeUs(currentTimeUs, osdUpdateDueUs) > 0) {
@@ -1394,7 +1400,9 @@ void osdUpdate(timeUs_t currentTimeUs)
     static uint32_t osdElementDurationFractionUs[OSD_ITEM_COUNT] = { 0 };
     static bool moreElementsToDraw;
 
-#ifdef TEST_PIO_OSD
+#if 0 // def TEST_PIO_OSD
+    // xx in testing, never busy at this point, because we passed updatecheck and were scheduled v. soon after
+    // no, wasn't proper test (hadn't saved)
     void osdUpdateCallback(uint32_t currentTimeUs);
     osdUpdateCallback((uint32_t)currentTimeUs);
     return;
