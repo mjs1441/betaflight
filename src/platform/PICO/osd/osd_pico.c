@@ -115,6 +115,11 @@ static uint8_t charBuffer[480];
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 
+bool osdBufferSafe(void)
+{
+    return !dma_channel_is_busy(osd_dma_chan_buf_to_buf2);
+}
+
 void testUpdate(void);
 
 void plot(int x, int y, int c)
@@ -375,7 +380,8 @@ otherwise just dma_channel_abort
     */
 }
 
-static int ouccount;
+// int ouccount;
+// int oucunsafe;
 
 static void vsync_callback(void)
 {
@@ -414,8 +420,19 @@ static void vsync_callback(void)
     dma_channel_set_read_addr(osd_dma_chan_buf2_to_fifo, osdBuffer2, false);
     dma_channel_set_read_addr(osd_dma_chan_buf_to_buf2, osdBuffer, false);
     dma_channel_set_write_addr(osd_dma_chan_buf_to_buf2, osdBuffer2, false);
-
+    
     // Start DMA flipping osdBuffer to osdBuffer2. DMA for buf2 -> screen is chained from this.
+
+// testing dma speed
+//    if (c==123) {
+//         uint32_t dc1 = getCycleCounter();
+//         dma_channel_start(osd_dma_chan_buf_to_buf2);
+//         uint32_t dc2 = getCycleCounter();
+//         while (dma_channel_is_busy(osd_dma_chan_buf_to_buf2)) ;
+//         uint32_t dc3 = getCycleCounter();
+//         bprintf("* dc3-dc1 %d dc3-dc2 %d buf1 %p werc %p buf2 %p", dc3-dc1, dc3-dc2, osdBuffer, &werc[0], osdBuffer2);
+//     }
+
     dma_channel_start(osd_dma_chan_buf_to_buf2);
 
     // probably best clear at end, just in case there are re-trigger issues if cleared earlier...
@@ -445,7 +462,7 @@ static void vsync_callback(void)
     
     if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
-        bprintf("ouccount %d", ouccount);
+        bprintf("ouccount %d of which unsafe %d", ouccount, oucunsafe);
 #if 0
 //        osdPioWrite(4,13,"VSYNC CALLBACK");
 //        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
@@ -681,11 +698,13 @@ void testOSDtaskOffPidLoop(void)
 void osdUpdateCallback(uint32_t t_us)
 {
     static char oucbuf[30];
-    // int osdPrintFloat(char *buffer, char leadingSymbol, float value, char *formatString, unsigned decimalPlaces, bool round, char trailingSymbol);
-    // tfp_sprintf(oucbuf, "abc %d", t_us);
-    ouccount++;
-    osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
-    osdPioWrite(2,8,oucbuf);
+//    ouccount++;
+    if (osdBufferSafe()) {
+        osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
+        osdPioWrite(2,8,oucbuf);
+    } else {
+//        oucunsafe++;
+    }
 }
 
 void testUpdate(void)
@@ -694,7 +713,7 @@ void testUpdate(void)
 //#define testcard
 #define textpaint
 //#define blockpaint
-//#define ahpaint
+#define ahpaint
 //#define testsprintf
     // none:       0.0
     // blockpaint 39.4
