@@ -118,7 +118,7 @@ void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 
 bool osdBuffer1Safe(void)
 {
-    return !dma_channel_is_busy(dma_chan_buf1_to_buf2);
+    return !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
 }
 
 void testUpdate(void);
