@@ -799,7 +799,7 @@ void osdUpdateCallback(uint32_t t_us)
 //        vdelay = 18000 + (vdelay+1) % 2000;
 //    }
     osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
-    osdPioWrite(2,8,oucbuf);
+    osdPioWrite(2,1,oucbuf);
     if (osdBuffer1Safe()) {
         testUpdate();
     } else {
