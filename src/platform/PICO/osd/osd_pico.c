@@ -130,8 +130,8 @@ int64_t safe_zone_callback(alarm_id_t id, void * user_data)
     UNUSED(id);
     UNUSED(user_data);
     in_safe_zone = false;
-    szd = micros();
-    if (++cc == 1) {
+    szd = getCycleCounter();
+    if (++cc == 99999991) {
         bprintf("\nsz %d %d %d %d  %d\n",sza,szb,szc,szd,sze);
     }
     return 0; // don't automatically reschedule
@@ -197,7 +197,9 @@ void osd_test_init(void)
 {
 //    safe_zone_period = 10000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
 //    safe_zone_period = 16723; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
-    safe_zone_period = 19000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+//    safe_zone_period = 16000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+//    safe_zone_period = 1234; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+    safe_zone_period = 220100;
     in_safe_zone = true;
 
     bprintf("osd_test_init");
@@ -396,7 +398,7 @@ void osd_test_init(void)
         &c,
         NULL,                     // Write address (reset each time)
         &zero,                    // Read address (fixed)
-        PICO_OSD_BUF_WORDS,       // Number of transfers
+        PICO_OSD_BUF_WORDS/10,       // Number of transfers
         false                     // Don't start immediately
     );
 
@@ -464,7 +466,7 @@ static void vsync_callback(void)
     static int business;
     static int busybuf;
 
-    sza=micros();
+    sza=getCycleCounter();
 
     if (dma_channel_is_busy(dma_chan_buf1_to_buf2) || dma_channel_is_busy(dma_chan_zero_to_buf1)) {
         // Unexpected, PIO shouldn't get back to vsync IRQ unless dma buf2->fifo has started
@@ -510,7 +512,7 @@ static void vsync_callback(void)
 
     // static alarm_id_t add_alarm_in_us (uint64_t us, alarm_callback_t callback, void * user_data, bool fire_if_past)
     // typedef int64_t(* alarm_callback_t)(alarm_id_t id, void *user_data)
-    szb = micros();
+    szb = getCycleCounter();
 
     static alarm_id_t aid = -1 ;
     if (aid != -1) {
@@ -548,8 +550,8 @@ static void vsync_callback(void)
     static uint32_t szo;
     uint32_t q;
     static uint32_t qtot;
-    uint32_t szn = micros();
-    if (szo) {
+    uint32_t szn = getCycleCounter();
+    if (c>20) {
         q = szn-szo;
         vmax = q > vmax ? q : vmax;
         qtot += q;
@@ -557,8 +559,8 @@ static void vsync_callback(void)
     szo = szn;
     
     if (c % 250 == 0) {
-        bprintf("%d vsync_callback",c);
-        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax, q, (double)(((float)qtot)/c));
+        bprintf("%d vsync_callback busy %d %d",c, business, busybuf);
+        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
         vmax = 0;
 #ifdef unsafetestloop
         bprintf("ouccount %d of which unsafe %d %d %d (%.3f %.3f %.3f of 20000)", ouccount,
@@ -568,37 +570,11 @@ static void vsync_callback(void)
                 (double)(((float)oucunsafe3)*20000.0f/ouccount)
                );
 #else
-        bprintf("ouccount %d of which unsafe %d ~ %d of 20000 ~ %.3f cf %d", ouccount, oucunsafe, (int)((float)oucunsafe * 20000.0f / (float)ouccount), ((double)oucunsafe)/ouccount, 20000 - safe_zone_period);
-#endif
-#if 0
-//        osdPioWrite(4,13,"VSYNC CALLBACK");
-//        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
-//        osdPioWriteChar(4,10,0x90);
-//        osdPioWriteChar(5,10,0xc0);
-//        osdPioWriteChar(6,10,0x90);
-        static char text[30];
-//        int sprintf(char *str, const char *format, ...);
-//        sprintf(text, "%.1f VSYNC SNPRINTF", (double)c);
-        osdPioWrite(2,4,text);
-        tfp_sprintf(text, "%d VSYNC CALLBACKS", c);
-#endif
-#if 0
-        for (int i=0; i<30; ++i) {
-            osdPioWriteChar(i,0,48+(i%10));
-            osdPioWriteChar(i,15,48+(i%10));
-        }
-        for (int i=1; i<15; ++i) {
-            osdPioWriteChar(0,i,65+i);
-            osdPioWriteChar(29,i,65+i);
-        }
-        for (int i=0; i<30*16; ++i) {
-            osdPioWriteChar(i%30, i/30, i%256);
-        }
+        bprintf("ouccount %d of which unsafe %d ~ %d of 20000 ~ %.3f cf %d (%d)", ouccount, oucunsafe, (int)((float)oucunsafe * 20000.0f / (float)ouccount), ((double)oucunsafe)/ouccount, 20000 - safe_zone_period, (int)((float)oucunsafe * 20000.0f / (float)ouccount) - (20000 - safe_zone_period));
 #endif
     }
 
-    szc=micros();
-    
+    szc=getCycleCounter();
 }
 
 /*
@@ -816,7 +792,7 @@ void osdUpdateCallback(uint32_t t_us)
 #else
     static char oucbuf[30];
     ouccount++;
-    sze = micros();
+    sze = getCycleCounter();
 //    if (vsyncflag) {
 //        vsyncflag=0;
 //        delayMicroseconds(vdelay);
@@ -830,6 +806,8 @@ void osdUpdateCallback(uint32_t t_us)
 //        UNUSED(oucbuf);
     } else {
         oucunsafe++;
+        osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
+        osdPioWrite(2,8,oucbuf);
     }
 #endif
 }
