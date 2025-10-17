@@ -107,7 +107,12 @@ static int dma_chan_zero_to_buf1;
 static int dma_chan_buf2_to_fifo;
 
 static volatile bool in_safe_zone;
-static volatile uint32_t safe_period_us;
+static volatile uint32_t safe_zone_period;
+static volatile uint32_t sza;
+static volatile uint32_t szb;
+static volatile uint32_t szc;
+static volatile uint32_t szd;
+static volatile uint32_t sze;
 
 static const int charsPerLine = 30;
 static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
@@ -121,15 +126,24 @@ void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 
 int64_t safe_zone_callback(alarm_id_t id, void * user_data)
 {
+    static int cc;
     UNUSED(id);
     UNUSED(user_data);
     in_safe_zone = false;
+    szd = micros();
+    if (++cc == 1) {
+        bprintf("\nsz %d %d %d %d  %d\n",sza,szb,szc,szd,sze);
+    }
     return 0; // don't automatically reschedule
 }
 
 bool osdBuffer1Safe(void)
 {
-    return in_safe_zone && !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
+    return in_safe_zone;
+//    return in_safe_zone && !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
+//    return // !dma_channel_is_busy(dma_chan_buf1_to_buf2) &&
+//        !dma_channel_is_busy(dma_chan_zero_to_buf1);
+//    return  !dma_channel_is_busy(dma_chan_buf1_to_buf2);
 }
 
 void testUpdate(void);
@@ -181,11 +195,14 @@ static void plotBorder(void)
 
 void osd_test_init(void)
 {
-    safe_period_us = 10000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
-    hmm getting unsafe for 3370639/4597688
-    
+//    safe_zone_period = 10000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+//    safe_zone_period = 16723; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+    safe_zone_period = 19000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+    in_safe_zone = true;
+
     bprintf("osd_test_init");
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT, PICO_OSD_BUF_LENGTH);
+    bprintf("osdBuffer1: %p osdBuffer2: %p", osdBuffer1, osdBuffer2);
     bprintf("nx %d, ny %d", fb_nx, fb_ny);
     for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
 //        int y = i / PICO_OSD_BUF_WIDTH;
@@ -415,8 +432,12 @@ otherwise just dma_channel_abort
 
 volatile int ouccount;
 volatile int oucunsafe;
-//volatile int oucunsafe2;
-//volatile int oucunsafe3;
+
+//#define unsafetestloop
+#ifdef unsafetestloop
+volatile int oucunsafe2;
+volatile int oucunsafe3;
+#endif
 //static volatile int vdelay;
 static volatile int vsyncflag;
 
@@ -442,6 +463,8 @@ static void vsync_callback(void)
 
     static int business;
     static int busybuf;
+
+    sza=micros();
 
     if (dma_channel_is_busy(dma_chan_buf1_to_buf2) || dma_channel_is_busy(dma_chan_zero_to_buf1)) {
         // Unexpected, PIO shouldn't get back to vsync IRQ unless dma buf2->fifo has started
@@ -487,17 +510,25 @@ static void vsync_callback(void)
 
     // static alarm_id_t add_alarm_in_us (uint64_t us, alarm_callback_t callback, void * user_data, bool fire_if_past)
     // typedef int64_t(* alarm_callback_t)(alarm_id_t id, void *user_data)
-    add_alarm_in_us(safe_period_us, safe_zone_callback, 0, true);
+    szb = micros();
+
+    static alarm_id_t aid = -1 ;
+    if (aid != -1) {
+        cancel_alarm(aid);
+    }
+    aid = add_alarm_in_us(safe_zone_period, safe_zone_callback, 0, true);
     in_safe_zone = true;
     
     // the rest is just debug and testing.
 
     ++c;
 
+#if 0
     static int32_t maxcc;
     static int32_t cca;
     static int ccc;
-    int nav = 250;
+//    int nav = 250;
+    int nav = 99999250;
     uint32_t m1 = getCycleCounter();
     // testUpdate();
     int32_t dd = getCycleCounter() - m1;
@@ -511,11 +542,34 @@ static void vsync_callback(void)
         cca = 0;
         maxcc = 0;
     }
+#endif
+    
+    static uint32_t vmax = 0;
+    static uint32_t szo;
+    uint32_t q;
+    static uint32_t qtot;
+    uint32_t szn = micros();
+    if (szo) {
+        q = szn-szo;
+        vmax = q > vmax ? q : vmax;
+        qtot += q;
+    }
+    szo = szn;
     
     if (c % 250 == 0) {
         bprintf("%d vsync_callback",c);
-        bprintf("ouccount %d of which unsafe %d", ouccount, oucunsafe);
-//        bprintf("ouccount %d of which unsafe %d %d %d", ouccount, oucunsafe, oucunsafe2, oucunsafe3);
+        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax, q, (double)(((float)qtot)/c));
+        vmax = 0;
+#ifdef unsafetestloop
+        bprintf("ouccount %d of which unsafe %d %d %d (%.3f %.3f %.3f of 20000)", ouccount,
+                oucunsafe, oucunsafe2, oucunsafe3,
+                (double)(((float)oucunsafe)*20000.0f/ouccount),
+                (double)(((float)oucunsafe2)*20000.0f/ouccount),
+                (double)(((float)oucunsafe3)*20000.0f/ouccount)
+               );
+#else
+        bprintf("ouccount %d of which unsafe %d ~ %d of 20000 ~ %.3f cf %d", ouccount, oucunsafe, (int)((float)oucunsafe * 20000.0f / (float)ouccount), ((double)oucunsafe)/ouccount, 20000 - safe_zone_period);
+#endif
 #if 0
 //        osdPioWrite(4,13,"VSYNC CALLBACK");
 //        osdPioWrite(4,11,"0000 000 00 0 0 00 ");
@@ -543,7 +597,7 @@ static void vsync_callback(void)
 #endif
     }
 
-
+    szc=micros();
     
 }
 
@@ -750,18 +804,19 @@ void testOSDtaskOffPidLoop(void)
 
 void osdUpdateCallback(uint32_t t_us)
 {
-#if 0
+#ifdef unsafetestloop
     UNUSED(t_us);
     while (true) {
         ouccount++;
         oucunsafe  += dma_channel_is_busy(dma_chan_buf1_to_buf2);
         oucunsafe2 += dma_channel_is_busy(dma_chan_zero_to_buf1);
         oucunsafe3 += dma_channel_is_busy(dma_chan_buf2_to_fifo);
-        zero++;
+//        zero++;
     }
 #else
     static char oucbuf[30];
     ouccount++;
+    sze = micros();
 //    if (vsyncflag) {
 //        vsyncflag=0;
 //        delayMicroseconds(vdelay);

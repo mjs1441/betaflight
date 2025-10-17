@@ -372,7 +372,7 @@ void icm426xxGyroInit(gyroDev_t *gyro)
     // See section 12.9 in ICM-42688-P datasheet v1.7
     setUserBank(dev, ICM426XX_BANK_SELECT0);
     turnGyroAccOff(dev);
-
+    
     // Configure gyro Anti-Alias Filter (see section 5.3 "ANTI-ALIAS FILTER")
     const mpuSensor_e gyroModel = gyro->mpuDetectionResult.sensor;
     aafConfig_t aafConfig = getGyroAafConfig(gyroModel, gyroConfig()->gyro_hardware_lpf);
