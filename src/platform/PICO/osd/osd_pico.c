@@ -398,7 +398,7 @@ void osd_test_init(void)
         &c,
         NULL,                     // Write address (reset each time)
         &zero,                    // Read address (fixed)
-        PICO_OSD_BUF_WORDS/10,       // Number of transfers
+        PICO_OSD_BUF_WORDS,       // Number of transfers
         false                     // Don't start immediately
     );
 
@@ -798,16 +798,12 @@ void osdUpdateCallback(uint32_t t_us)
 //        delayMicroseconds(vdelay);
 //        vdelay = 18000 + (vdelay+1) % 2000;
 //    }
+    osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
+    osdPioWrite(2,8,oucbuf);
     if (osdBuffer1Safe()) {
-        osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
-        osdPioWrite(2,8,oucbuf);
-//        osdBuffer1W[ouccount % PICO_OSD_BUF_WORDS] = 0xfffaafff;
-//        UNUSED(t_us);
-//        UNUSED(oucbuf);
+        testUpdate();
     } else {
         oucunsafe++;
-        osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
-        osdPioWrite(2,8,oucbuf);
     }
 #endif
 }
