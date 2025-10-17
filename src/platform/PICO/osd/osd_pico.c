@@ -139,6 +139,7 @@ int64_t safe_zone_callback(alarm_id_t id, void * user_data)
 
 bool osdBuffer1Safe(void)
 {
+    // TODO *** add back in dma check
     return in_safe_zone;
 //    return in_safe_zone && !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
 //    return // !dma_channel_is_busy(dma_chan_buf1_to_buf2) &&
@@ -195,11 +196,12 @@ static void plotBorder(void)
 
 void osd_test_init(void)
 {
-//    safe_zone_period = 10000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+    safe_zone_period = 18000;
+    safe_zone_period = 10000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
 //    safe_zone_period = 16723; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
 //    safe_zone_period = 16000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
 //    safe_zone_period = 1234; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
-    safe_zone_period = 220100;
+//    safe_zone_period = 220100;
     in_safe_zone = true;
 
     bprintf("osd_test_init");
@@ -780,7 +782,22 @@ void testOSDtaskOffPidLoop(void)
 
 void osdUpdateCallback(uint32_t t_us)
 {
-#ifdef unsafetestloop
+#if 1
+    ouccount++;
+    if (!osdBuffer1Safe()) {
+        oucunsafe++;
+        testUpdate();
+    } else {
+        testUpdate();//        oucunsafe++;
+    }
+    UNUSED(t_us);
+    
+#elif 1
+    UNUSED(t_us);
+    ouccount++;
+    oucunsafe += !osdBuffer1Safe();
+    testUpdate(); // delayMicroseconds(755);
+#elif defined unsafetestloop
     UNUSED(t_us);
     while (true) {
         ouccount++;
@@ -798,13 +815,16 @@ void osdUpdateCallback(uint32_t t_us)
 //        delayMicroseconds(vdelay);
 //        vdelay = 18000 + (vdelay+1) % 2000;
 //    }
-    osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
-    osdPioWrite(2,1,oucbuf);
+//    osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
+//    osdPioWrite(2,0,"fish"); UNUSED(oucbuf); UNUSED(t_us);
+//    osdPioWrite(2,0,oucbuf);
     if (osdBuffer1Safe()) {
         testUpdate();
     } else {
         oucunsafe++;
     }
+    //  osdPioWrite(2,0,"fish");
+    UNUSED(oucbuf); UNUSED(t_us);
 #endif
 }
 

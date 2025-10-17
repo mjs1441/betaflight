@@ -1368,9 +1368,12 @@ bool osdUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
     static timeUs_t osdUpdateDueUs = 0;
 
 #ifdef TEST_PIO_OSD
+    return true;
+#if 0
     void osdUpdateCallback(uint32_t currentTimeUs);
     osdUpdateCallback((uint32_t)currentTimeUs);
     return false; // hopefully never schedule osdUpdate
+#endif
 #endif
 
     if (osdState == OSD_STATE_IDLE) {
@@ -1400,7 +1403,7 @@ void osdUpdate(timeUs_t currentTimeUs)
     static uint32_t osdElementDurationFractionUs[OSD_ITEM_COUNT] = { 0 };
     static bool moreElementsToDraw;
 
-#if 0 // def TEST_PIO_OSD
+#ifdef TEST_PIO_OSD
     // xx in testing, never busy at this point, because we passed updatecheck and were scheduled v. soon after
     // no, wasn't proper test (hadn't saved)
     void osdUpdateCallback(uint32_t currentTimeUs);
