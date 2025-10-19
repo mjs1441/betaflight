@@ -29,7 +29,7 @@
 #include "common/utils.h"
 
 #include "drivers/display.h"
-#include "drivers/fb_osd.h"
+#include "drivers/fb_osd_impl.h"
 #include "drivers/osd.h"
 
 #include "config/config.h"
@@ -198,7 +198,6 @@ static const displayPortVTable_t fbOsdVTable = {
     .setBackgroundType = setBackgroundType,
 };
 
-////** TODO call from fc/init.c
 bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displayPort)
 {
     fbOsdVcdProfile = vcdProfile;

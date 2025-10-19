@@ -43,13 +43,15 @@ typedef enum {
 // extern uint16_t maxScreenSize;
  struct fbOsdConfig_s;
 
+// Per platform implementation of framebuffer OSD.
+
 // void    fbOsdHardwareReset(void);
 // void    fbOsdPreinit(const struct fbOsdConfig_s *fbOsdConfig);
 fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struct vcdProfile_s *vcdProfile);
 // void    fbOsdInvert(bool invert);
 // void    fbOsdBrightness(uint8_t black, uint8_t white);
 bool    fbOsdReInitIfRequired(bool forceStallCheck);
-bool     fbOsdDrawScreen(void);
+bool    fbOsdDrawScreen(void);
 bool    fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data);
 uint8_t fbOsdGetRowsCount(void);
 void    fbOsdWrite(uint8_t x, uint8_t y, uint8_t attr, const char *text);

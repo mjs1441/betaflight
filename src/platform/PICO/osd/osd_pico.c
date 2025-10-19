@@ -118,8 +118,8 @@ static const int charsPerLine = 30;
 static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
 static const int numChars = charsPerLine * charLines;
 
-//static uint8_t charBuffer[numChars];
-static uint8_t charBuffer[480];
+//static uint8_t osdCharBuffer[numChars];
+uint8_t osdCharBuffer[480];
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
@@ -211,7 +211,7 @@ void osd_test_init(void)
     }
 
     for (int i=0; i<numChars; ++i) {
-        charBuffer[i] = 0;
+        osdCharBuffer[i] = 0;
     }
     
 #if 0
@@ -1013,7 +1013,7 @@ void testUpdate(void)
     const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte3
 
     for (int i=0; i<numChars; ++i) {
-        uint8_t c = charBuffer[i];
+        uint8_t c = osdCharBuffer[i];
         if (!c) {
             continue;
         }
@@ -1178,14 +1178,14 @@ osd_ah_invert = OFF
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c)
 {
     if (x < charsPerLine && y < charLines) {
-        charBuffer[y*charsPerLine + x] = c;
+        osdCharBuffer[y*charsPerLine + x] = c;
     }
 }
 
 void osdPioWrite(uint8_t x, uint8_t y, const char *text)
 {
     if (y < charLines) {
-        uint8_t *p = charBuffer + y * charsPerLine;
+        uint8_t *p = osdCharBuffer + y * charsPerLine;
         int i=0;
         while (text[i] && x < charsPerLine) {
             p[x++] = text[i++];
