@@ -43,7 +43,8 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
 {
     UNUSED(fbOsdConfig);
     UNUSED(vcdProfile);
-    return FB_OSD_INIT_NOT_FOUND;
+    // *** TODO
+    return FB_OSD_INIT_OK;
 }
 
 bool fbOsdReInitIfRequired(bool forceStallCheck)
@@ -56,7 +57,10 @@ bool fbOsdReInitIfRequired(bool forceStallCheck)
 bool fbOsdDrawScreen(void)
 {
     // static time, spend no more than... 10?us per iteration
-    return true;
+// *** TODO
+//    bprintf("OSD fbOsdDrawScreen");
+    return false;
+//     return true;
 }
 
 bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)

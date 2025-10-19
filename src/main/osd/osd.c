@@ -1408,7 +1408,7 @@ void osdUpdate(timeUs_t currentTimeUs)
     // no, wasn't proper test (hadn't saved)
     void osdUpdateCallback(uint32_t currentTimeUs);
     osdUpdateCallback((uint32_t)currentTimeUs);
-    return;
+///////////    return;
 #endif
     timeUs_t executeTimeUs;
     osdState_e osdCurrentState = osdState;

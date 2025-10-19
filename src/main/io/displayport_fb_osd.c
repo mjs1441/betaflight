@@ -200,6 +200,7 @@ static const displayPortVTable_t fbOsdVTable = {
 
 bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displayPort)
 {
+    bprintf("OSD fbOsdDisplayPortInit");
     fbOsdVcdProfile = vcdProfile;
 
     switch (fbOsdInit(NULL /* fbOsdConfig() */ , fbOsdVcdProfile)) {
@@ -225,6 +226,7 @@ bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displa
         // fb device configured and detected
         displayInit(&fbOsdDisplayPort, &fbOsdVTable, DISPLAYPORT_DEVICE_TYPE_FBOSD);
         *displayPort = &fbOsdDisplayPort;
+        bprintf("OSD fbOsdDisplayPortInit OK");
 
         break;
     }
