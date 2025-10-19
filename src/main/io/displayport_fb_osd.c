@@ -29,7 +29,7 @@
 #include "common/utils.h"
 
 #include "drivers/display.h"
-#include "drivers/fb_osd.h
+#include "drivers/fb_osd.h"
 #include "drivers/osd.h"
 
 #include "config/config.h"
@@ -160,11 +160,11 @@ static bool checkReady(displayPort_t *displayPort, bool rescan)
             return false;
         } else {
             // Try to initialize the device
-            if (fbOsdInit(NULL /* fbOsdConfig() */, fbOsdVcdProfile) != MAX7456_INIT_OK) {
+            if (fbOsdInit(NULL /* fbOsdConfig() */, fbOsdVcdProfile) != FB_OSD_INIT_OK) {
                 return false;
             }
             // At this point the device has been initialized and detected
-            redraw(&max7456DisplayPort);
+            redraw(&fbOsdDisplayPort);
         }
     }
 
@@ -177,7 +177,7 @@ static void setBackgroundType(displayPort_t *displayPort, displayPortBackground_
     fbOsdSetBackgroundType(backgroundType);
 }
 
-static const displayPortVTable_t max7456VTable = {
+static const displayPortVTable_t fbOsdVTable = {
     .grab = grab,
     .release = release,
     .clearScreen = clearScreen,
@@ -198,12 +198,12 @@ static const displayPortVTable_t max7456VTable = {
     .setBackgroundType = setBackgroundType,
 };
 
-** TODO call from fc/init.c
+////** TODO call from fc/init.c
 bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displayPort)
 {
     fbOsdVcdProfile = vcdProfile;
 
-    switch (fbOsdInit(fbOsdConfig(), fbOsdVcdProfile, systemConfig()->cpu_overclock)) {
+    switch (fbOsdInit(NULL /* fbOsdConfig() */ , fbOsdVcdProfile)) {
     case FB_OSD_INIT_NOT_CONFIGURED:
         // fb device IO pins are not defined. We either don't have
         // it on board or either the configuration for it has
@@ -213,7 +213,7 @@ bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displa
         return false;
 
         break;
-    case FBOSD_INIT_NOT_FOUND:
+    case FB_OSD_INIT_NOT_FOUND:
         // fb device IO pins are defined, but it's not fully up and running.
         // Delay full initialization to heckReady() with 'rescan' enabled.
         displayInit(&fbOsdDisplayPort, &fbOsdVTable, DISPLAYPORT_DEVICE_TYPE_FBOSD);
@@ -222,7 +222,7 @@ bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displa
         return false;
 
         break;
-    case FBOSD_INIT_OK:
+    case FB_OSD_INIT_OK:
         // fb device configured and detected
         displayInit(&fbOsdDisplayPort, &fbOsdVTable, DISPLAYPORT_DEVICE_TYPE_FBOSD);
         *displayPort = &fbOsdDisplayPort;

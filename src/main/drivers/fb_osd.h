@@ -38,10 +38,10 @@ typedef enum {
     FB_OSD_INIT_NOT_FOUND = -1,
     // No fb IO defined, which means either the we don't have it or it's not properly configured
     FB_OSD_INIT_NOT_CONFIGURED = -2,
-} fbOSDInitStatus_e;
+} fbOsdInitStatus_e;
 
 // extern uint16_t maxScreenSize;
-// struct fbOsdConfig_s;
+ struct fbOsdConfig_s;
 
 // void    fbOsdHardwareReset(void);
 // void    fbOsdPreinit(const struct fbOsdConfig_s *fbOsdConfig);
