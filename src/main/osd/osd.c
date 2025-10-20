@@ -1357,6 +1357,27 @@ typedef enum {
     OSD_STATE_COUNT
 } osdState_e;
 
+#ifdef TEST_PIO_OSD
+const char *osl[] = {
+    "INIT",
+    "IDLE",
+    "CHECK",
+    "PROCESS_STATS1",
+    "REFRESH_STATS",
+    "PROCESS_STATS2",
+    "PROCESS_STATS3",
+    "UPDATE_ALARMS",
+    "REFRESH_PREARM",
+    "UPDATE_CANVAS",
+    "DRAW_ELEMENT",
+    "DISPLAY_ELEMENT",
+    "UPDATE_HEARTBEAT",
+    "COMMIT",
+    "TRANSFER",
+    "COUNT"
+};
+#endif
+
 osdState_e osdState = OSD_STATE_INIT;
 
 #define OSD_UPDATE_INTERVAL_US (1000000 / osdConfig()->framerate_hz)
@@ -1367,7 +1388,7 @@ bool osdUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
     UNUSED(currentDeltaTimeUs);
     static timeUs_t osdUpdateDueUs = 0;
 
-#ifdef TEST_PIO_OSD
+#if 0 // fdef TEST_PIO_OSD
     return true;
 #if 0
     void osdUpdateCallback(uint32_t currentTimeUs);
@@ -1409,6 +1430,12 @@ void osdUpdate(timeUs_t currentTimeUs)
     void osdUpdateCallback(uint32_t currentTimeUs);
     osdUpdateCallback((uint32_t)currentTimeUs);
 ///////////    return;
+
+    static osdState_e lastState = -100;
+    if (osdState != lastState) {
+//        bprintf("OSD state %s -> %s", osl[lastState], osl[osdState]);
+        lastState = osdState;
+    }
 #endif
     timeUs_t executeTimeUs;
     osdState_e osdCurrentState = osdState;

@@ -812,7 +812,7 @@ void testUpdate(void)
 //#define testcard
 #define textpaint
 //#define blockpaint
-#define ahpaint
+//#define ahpaint
 //#define testsprintf
     // none:       0.0
     // blockpaint 39.4
