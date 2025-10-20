@@ -549,20 +549,28 @@ static void vsync_callback(void)
     uint32_t q;
     static uint32_t qtot;
     uint32_t szn = getCycleCounter();
+    int cm = c % 250;
     if (c>20) {
         q = szn-szo;
-        vmax = q > vmax ? q : vmax;
+        if (cm != 1) {
+            vmax = q > vmax ? q : vmax;
+        }
         qtot += q;
     }
-    szo = szn;
-    
+
+    static uint32_t n_to_c;
     if (c % 250 == 0) {
-        bprintf("%d vsync_callback busy %d %d",c, business, busybuf);
+        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
         // NB ave wraps quickly (~1000 vsyncs)
         bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
-        bprintf("tus %d, tusr %d, ave %.1f calls per vsync, %.1f rounds per vsync, max_us ave %.1f [painted %d]",
-                tus, tusr, (double)tus/c, (double)tusr/c, (double)maxcycles/150.0/tusr, paintedmaxcycles/tusr);
-        maxcycles = 0;
+        bprintf("tus %d, tusr %d, ave %.1f calls per VS, %.1f rds per VS, %.1f calls/rd",
+                tus, tusr,
+                (double)tus/250, (double)tusr/250, (double)tus/tusr);
+        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
+                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
+//                max_us ave %.1f [painted %d]",
+        maxcycles = 0; paintedmaxcycles = 0;
+        tus = 0; tusr = 0;
         vmax = 0;
 #if 0
 #ifdef unsafetestloop
@@ -576,8 +584,11 @@ static void vsync_callback(void)
         bprintf("ouccount %d of which unsafe %d ~ %d of 20000 ~ %.3f cf %d (%d)", ouccount, oucunsafe, (int)((float)oucunsafe * 20000.0f / (float)ouccount), ((double)oucunsafe)/ouccount, 20000 - safe_zone_period, (int)((float)oucunsafe * 20000.0f / (float)ouccount) - (20000 - safe_zone_period));        
 #endif
 #endif
+        n_to_c = getCycleCounter() - szn;        
     }
 
+    szo = szn;
+    
     szc=getCycleCounter();
 }
 
