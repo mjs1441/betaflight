@@ -55,12 +55,13 @@ bool fbOsdReInitIfRequired(bool forceStallCheck)
 }
 
 // Return true if screen still being transferred
-#define DRAWSCREEN_TIME_LIMIT_US 20
+#define DRAWSCREEN_TIME_LIMIT_US 15
 bool fbOsdDrawScreen(void)
 {
     // Spend no more than DRAWSCREEN_TIME_LIMIT_US on each iteration, will keep
     // on calling in here until we return false for "all done".
     return osdDrawScreenUntil(micros() + DRAWSCREEN_TIME_LIMIT_US);
+//    return osdDrawScreenUntil(micros() - 1);
 }
 
 bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)

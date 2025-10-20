@@ -115,6 +115,9 @@ static volatile uint32_t szc;
 static volatile uint32_t szd;
 static volatile uint32_t sze;
 static volatile int tus;
+static volatile int tusr;
+static volatile uint32_t maxcycles;
+static volatile uint32_t paintedmaxcycles;
 
 static const int charsPerLine = 30;
 static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
@@ -557,7 +560,9 @@ static void vsync_callback(void)
         bprintf("%d vsync_callback busy %d %d",c, business, busybuf);
         // NB ave wraps quickly (~1000 vsyncs)
         bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
-        bprintf("tus %d, ave %.1f per vsync", tus, (double)tus/c);
+        bprintf("tus %d, tusr %d, ave %.1f calls per vsync, %.1f rounds per vsync, max_us ave %.1f [painted %d]",
+                tus, tusr, (double)tus/c, (double)tusr/c, (double)maxcycles/150.0/tusr, paintedmaxcycles/tusr);
+        maxcycles = 0;
         vmax = 0;
 #if 0
 #ifdef unsafetestloop
@@ -817,11 +822,16 @@ void osdUpdateCallback(uint32_t t_us)
 // Return false when complete (no more to do).
 bool osdDrawScreenUntil(uint32_t limit_micros)
 {
+    uint32_t c1 = getCycleCounter();
+    static uint32_t maxcyclesthisround;
+    static int paintedmaxcyclesthisround;
+
     static int currentLine;
     static int currentChar;
     static uint8_t * currentPtr;
 
     // *** TODO rationalise / rename / #define?
+#if 0
     const int hoffs = 0; //4; // 0..7
     const int pxpc = 12;
     const int bxpc = pxpc / 4; // 4 pixels per byte -> 3 bytes to go across by 1 char
@@ -829,14 +839,30 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
     const int bpc  = bxpc * pypc;
     const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte3
     const int fbbpcl = pypc * fbbpl; // byte increment for next line of chars
-
-    tus++;
+#endif
+    
+#define hoffs 0
+#define pxpc 12
+#define bxpc (pxpc / 4)
+#define pypc 18
+#define bpc  (bxpc * pypc)
+#define fbbpl (fb_nx / 4)
+#define fbbpcl (pypc * fbbpl)
 
     if (0 == currentLine) {
         currentPtr = osdBuffer1 + hoffs;
         currentChar = 0;
+        maxcycles += maxcyclesthisround;
+        paintedmaxcycles += paintedmaxcyclesthisround;
+        tusr++;
+        maxcyclesthisround = 0;
+        paintedmaxcyclesthisround = 0;
+        // tus = 0;
     }
 
+    tus++;
+
+    int painted = 0;
     while (cmpTimeUs(limit_micros, micros()) > 0 && currentLine < charLines) {
         uint8_t * topLeftBufPtr = currentPtr; // pointer to topleft of char dest on osdBuffer1
         for (int x = 0; x < charsPerLine; ++x) {
@@ -859,11 +885,21 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
             }
 
             topLeftBufPtr += bxpc;
+            painted++;
         }
 
         currentLine++;
         currentPtr += fbbpcl;
     }
+
+    uint32_t cd = getCycleCounter() - c1;
+//    if (!vsyncflag && cd > maxcyclesthisround) {
+    if (cd > maxcyclesthisround) {
+        maxcyclesthisround = cd;
+        paintedmaxcyclesthisround = painted;
+    }
+
+//    vsyncflag = 0;
 
     if (currentLine == charLines) {
         currentLine = 0;
@@ -871,6 +907,14 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
     }
 
     return true;
+    
+#undef hoffs
+#undef pxpc
+#undef bxpc
+#undef pypc
+#undef bpc
+#undef fbbpl
+#undef fbbpcl
 }
 
 void testUpdate(void)
