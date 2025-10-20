@@ -70,6 +70,7 @@
 // 23 -> 23*4*4 = 368 pixels -> 30.67 chars
 // 288 for PAL field
 // _BUF_ in bytes
+// PIO hard coded to 23 words of pixel data per line (=> 368 pixels)
 #define PICO_OSD_LINE_WORDS 23
 #define PICO_OSD_BUF_WIDTH (PICO_OSD_LINE_WORDS*4)
 #define PICO_OSD_BUF_HEIGHT 288
@@ -562,12 +563,12 @@ static void vsync_callback(void)
     if (c % 250 == 0) {
         bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
         // NB ave wraps quickly (~1000 vsyncs)
-        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
-        bprintf("tus %d, tusr %d, ave %.1f calls per VS, %.1f rds per VS, %.1f calls/rd",
-                tus, tusr,
-                (double)tus/250, (double)tusr/250, (double)tus/tusr);
-        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
-                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
+//        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
+//        bprintf("tus %d, tusr %d, ave %.1f calls per VS, %.1f rds per VS, %.1f calls/rd",
+//                tus, tusr,
+//                (double)tus/250, (double)tusr/250, (double)tus/tusr);
+//        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
+//                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
 //                max_us ave %.1f [painted %d]",
         maxcycles = 0; paintedmaxcycles = 0;
         tus = 0; tusr = 0;
@@ -584,7 +585,8 @@ static void vsync_callback(void)
         bprintf("ouccount %d of which unsafe %d ~ %d of 20000 ~ %.3f cf %d (%d)", ouccount, oucunsafe, (int)((float)oucunsafe * 20000.0f / (float)ouccount), ((double)oucunsafe)/ouccount, 20000 - safe_zone_period, (int)((float)oucunsafe * 20000.0f / (float)ouccount) - (20000 - safe_zone_period));        
 #endif
 #endif
-        n_to_c = getCycleCounter() - szn;        
+        n_to_c = getCycleCounter() - szn;
+        UNUSED(n_to_c);
     }
 
     szo = szn;
@@ -837,11 +839,16 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
     static uint32_t maxcyclesthisround;
     static int paintedmaxcyclesthisround;
 
-    static int currentLine;
+    // Saved state.
+    // Position: currentChar (and cached currentY, currentX, currentPtr).
     static int currentChar;
-    static uint8_t * currentPtr;
+    static int currentY;
+    static int currentX;
+    static uint8_t *currentPtr;
 
     // *** TODO rationalise / rename / #define?
+    // ** BEWARE charsPerLine doesn't correspond with pixels or bytes per line,
+    // because we have some spare: 368 pixels not 360 for alignment reasons
 #if 0
     const int hoffs = 0; //4; // 0..7
     const int pxpc = 12;
@@ -849,7 +856,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
     const int pypc = 18;
     const int bpc  = bxpc * pypc;
     const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte3
-    const int fbbpcl = pypc * fbbpl; // byte increment for next line of chars
+    const int fbbpNextLine = pypc * fbbpl - charsPerLine * bxpc; // byte increment from  (top left of) last char of line to first of next line.
 #endif
     
 #define hoffs 0
@@ -859,61 +866,66 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
 #define bpc  (bxpc * pypc)
 #define fbbpl (fb_nx / 4)
 #define fbbpcl (pypc * fbbpl)
+#define fbbpNextLine (pypc * fbbpl - charsPerLine * bxpc)
 
-    if (0 == currentLine) {
+    if (0 == currentChar) {
+        currentY = 0;
+        currentX = 0;
         currentPtr = osdBuffer1 + hoffs;
-        currentChar = 0;
         maxcycles += maxcyclesthisround;
         paintedmaxcycles += paintedmaxcyclesthisround;
         tusr++;
         maxcyclesthisround = 0;
         paintedmaxcyclesthisround = 0;
-        // tus = 0;
     }
 
     tus++;
 
     int painted = 0;
-    while (cmpTimeUs(limit_micros, micros()) > 0 && currentLine < charLines) {
-        uint8_t * topLeftBufPtr = currentPtr; // pointer to topleft of char dest on osdBuffer1
-        for (int x = 0; x < charsPerLine; ++x) {
+    while (currentY < charLines) {
+        // currentPtr is pointer to topleft of char dest on osdBuffer1
+        while (cmpTimeUs(limit_micros, micros()) > 0 && currentX < charsPerLine) {
             uint8_t c = osdCharBuffer[currentChar++];
             // Buffer is always cleared after vsync before we start updating it. So, we can
             // ignore empty characters.
-            if (!c || c==0x20) {
-                topLeftBufPtr += bxpc;
-                continue; // *** TODO check char 0 and char 32 (spc) are always transparent
-            }
-            // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
+            // *** TODO check char 0 and char 32 (spc) are always transparent
+            if (c!=0 && c!=0x20) {
+                // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
 
-            const uint8_t * fontp = &fontData[c*bpc]; // 3 bytes per 12 pixel char line, 18 lines
-            uint8_t * bufPtr = topLeftBufPtr;
-            for (int j=0; j<pypc; ++j) {
-                for (int b=0; b<3; ++b) {
+                const uint8_t * fontp = &fontData[c*bpc]; // 3 bytes per 12 pixel char line, 18 lines
+                uint8_t * bufPtr = currentPtr;
+                for (int j=0; j<pypc; ++j) {
                     *bufPtr++ = *fontp++;
+                    *bufPtr++ = *fontp++;
+                    *bufPtr++ = *fontp++;
+                    bufPtr += fbbpl - 3; // new line, back 3 bytes
                 }
-                bufPtr += fbbpl - 3; // new line, back 3 bytes
+
+                painted++;
             }
 
-            topLeftBufPtr += bxpc;
-            painted++;
+            currentPtr += bxpc;
+            currentX++;
         }
 
-        currentLine++;
-        currentPtr += fbbpcl;
+        if (currentX < charsPerLine) {
+            break;
+        }
+
+        currentX = 0;
+        currentY++;
+        currentPtr += fbbpNextLine;
     }
 
     uint32_t cd = getCycleCounter() - c1;
-//    if (!vsyncflag && cd > maxcyclesthisround) {
     if (cd > maxcyclesthisround) {
         maxcyclesthisround = cd;
         paintedmaxcyclesthisround = painted;
     }
 
-//    vsyncflag = 0;
-
-    if (currentLine == charLines) {
-        currentLine = 0;
+    if (currentChar == numChars) { // equivalently currentY == charLines
+        // Reached the end, reset.
+        currentChar = 0;
         return false;
     }
 
@@ -926,6 +938,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
 #undef bpc
 #undef fbbpl
 #undef fbbpcl
+#undef fbbpNextLine
 }
 
 void testUpdate(void)

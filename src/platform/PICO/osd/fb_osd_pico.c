@@ -55,7 +55,7 @@ bool fbOsdReInitIfRequired(bool forceStallCheck)
 }
 
 // Return true if screen still being transferred
-#define DRAWSCREEN_TIME_LIMIT_US 9
+#define DRAWSCREEN_TIME_LIMIT_US 14
 bool fbOsdDrawScreen(void)
 {
     // Spend no more than DRAWSCREEN_TIME_LIMIT_US on each iteration, will keep
