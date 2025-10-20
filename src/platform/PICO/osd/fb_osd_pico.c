@@ -28,6 +28,7 @@
 #ifdef USE_FB_OSD
 
 #include "drivers/fb_osd_impl.h"
+#include "drivers/time.h"
 #include "osd_pico.h"
 
 // void    fbOsdHardwareReset(void);
@@ -54,14 +55,12 @@ bool fbOsdReInitIfRequired(bool forceStallCheck)
 }
 
 // Return true if screen still being transferred
+#define DRAWSCREEN_TIME_LIMIT_US 20
 bool fbOsdDrawScreen(void)
 {
-    // static time, spend no more than... 10?us per iteration
-// *** TODO
-//    bprintf("OSD fbOsdDrawScreen");
-    void testUpdate(void);
-    testUpdate();
-    return false; // false = all done
+    // Spend no more than DRAWSCREEN_TIME_LIMIT_US on each iteration, will keep
+    // on calling in here until we return false for "all done".
+    return osdDrawScreenUntil(micros() + DRAWSCREEN_TIME_LIMIT_US);
 }
 
 bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)

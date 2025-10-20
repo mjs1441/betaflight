@@ -45,6 +45,7 @@
 #include "hardware/dma.h"
 
 #include "osd_tx.pio.h"
+#include "font_betaflight.h"
 
 // each char 12 x 18 pixels
 #define PICO_OSD_CHAR_WIDTH  12
@@ -778,6 +779,7 @@ void testOSDtaskOffPidLoop(void)
 
 void osdUpdateCallback(uint32_t t_us)
 {
+    bprintf("\n*** not in use *** \n");
 #if 0
     ouccount++;
     if (!osdBuffer1Safe()) {
@@ -808,6 +810,67 @@ void osdUpdateCallback(uint32_t t_us)
         oucunsafe++;
     }
 #endif
+}
+
+// Update screen buffer (paint characters etc to buffer), up until a time limit.
+// Store state so that we can resume.
+// Return false when complete (no more to do).
+bool osdDrawScreenUntil(uint32_t limit_micros)
+{
+    static int currentLine;
+    static int currentChar;
+    static uint8_t * currentPtr;
+
+    // *** TODO rationalise / rename / #define?
+    const int hoffs = 0; //4; // 0..7
+    const int pxpc = 12;
+    const int bxpc = pxpc / 4; // 4 pixels per byte -> 3 bytes to go across by 1 char
+    const int pypc = 18;
+    const int bpc  = bxpc * pypc;
+    const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte3
+    const int fbbpcl = pypc * fbbpl; // byte increment for next line of chars
+
+    tus++;
+
+    if (0 == currentLine) {
+        currentPtr = osdBuffer1 + hoffs;
+        currentChar = 0;
+    }
+
+    while (cmpTimeUs(limit_micros, micros()) > 0 && currentLine < charLines) {
+        uint8_t * topLeftBufPtr = currentPtr; // pointer to topleft of char dest on osdBuffer1
+        for (int x = 0; x < charsPerLine; ++x) {
+            uint8_t c = osdCharBuffer[currentChar++];
+            // Buffer is always cleared after vsync before we start updating it. So, we can
+            // ignore empty characters.
+            if (!c || c==0x20) {
+                topLeftBufPtr += bxpc;
+                continue; // *** TODO check char 0 and char 32 (spc) are always transparent
+            }
+            // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
+
+            const uint8_t * fontp = &fontData[c*bpc]; // 3 bytes per 12 pixel char line, 18 lines
+            uint8_t * bufPtr = topLeftBufPtr;
+            for (int j=0; j<pypc; ++j) {
+                for (int b=0; b<3; ++b) {
+                    *bufPtr++ = *fontp++;
+                }
+                bufPtr += fbbpl - 3; // new line, back 3 bytes
+            }
+
+            topLeftBufPtr += bxpc;
+        }
+
+        currentLine++;
+        currentPtr += fbbpcl;
+    }
+
+    if (currentLine == charLines) {
+        currentLine = 0;
+        return false;
+    }
+
+    return true;
 }
 
 void testUpdate(void)
