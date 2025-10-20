@@ -50,8 +50,12 @@ extern const char * const osdTimerSourceNames[OSD_NUM_TIMER_TYPES];
 #define OSD_CAMERA_FRAME_MAX_HEIGHT 16    // Rows supported by MAX7456 (PAL)
 
 #define OSD_FRAMERATE_MIN_HZ 1
+#ifndef OSD_FRAMERATE_MAX_HZ
 #define OSD_FRAMERATE_MAX_HZ 60
+#endif
+#ifndef OSD_FRAMERATE_DEFAULT_HZ
 #define OSD_FRAMERATE_DEFAULT_HZ 12
+#endif
 
 #define OSD_PROFILE_BITS_POS 11
 #define OSD_PROFILE_MASK    (((1 << OSD_PROFILE_COUNT) - 1) << OSD_PROFILE_BITS_POS)

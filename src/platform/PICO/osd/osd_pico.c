@@ -113,6 +113,7 @@ static volatile uint32_t szb;
 static volatile uint32_t szc;
 static volatile uint32_t szd;
 static volatile uint32_t sze;
+static volatile int tus;
 
 static const int charsPerLine = 30;
 static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
@@ -192,7 +193,7 @@ static void plotBorder(void)
 void osd_test_init(void)
 {
     safe_zone_period = 18000;
-//    safe_zone_period = 10000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+    safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
     in_safe_zone = true;
 
     bprintf("osd_test_init");
@@ -555,7 +556,9 @@ static void vsync_callback(void)
         bprintf("%d vsync_callback busy %d %d",c, business, busybuf);
         // NB ave wraps quickly (~1000 vsyncs)
         bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
+        bprintf("tus %d, ave %.1f per vsync", tus, (double)tus/c);
         vmax = 0;
+#if 0
 #ifdef unsafetestloop
         bprintf("ouccount %d of which unsafe %d %d %d (%.3f %.3f %.3f of 20000)", ouccount,
                 oucunsafe, oucunsafe2, oucunsafe3,
@@ -564,7 +567,8 @@ static void vsync_callback(void)
                 (double)(((float)oucunsafe3)*20000.0f/ouccount)
                );
 #else
-        bprintf("ouccount %d of which unsafe %d ~ %d of 20000 ~ %.3f cf %d (%d)", ouccount, oucunsafe, (int)((float)oucunsafe * 20000.0f / (float)ouccount), ((double)oucunsafe)/ouccount, 20000 - safe_zone_period, (int)((float)oucunsafe * 20000.0f / (float)ouccount) - (20000 - safe_zone_period));
+        bprintf("ouccount %d of which unsafe %d ~ %d of 20000 ~ %.3f cf %d (%d)", ouccount, oucunsafe, (int)((float)oucunsafe * 20000.0f / (float)ouccount), ((double)oucunsafe)/ouccount, 20000 - safe_zone_period, (int)((float)oucunsafe * 20000.0f / (float)ouccount) - (20000 - safe_zone_period));        
+#endif
 #endif
     }
 
@@ -808,6 +812,7 @@ void osdUpdateCallback(uint32_t t_us)
 
 void testUpdate(void)
 {
+    tus++;
 //#define clearscreen
 //#define testcard
 #define textpaint
@@ -1012,6 +1017,7 @@ void testUpdate(void)
     const int bpc  = bxpc * pypc;
     const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte3
 
+//    for (int i=0; i<10; ++i) {
     for (int i=0; i<numChars; ++i) {
         uint8_t c = osdCharBuffer[i];
         if (!c) {

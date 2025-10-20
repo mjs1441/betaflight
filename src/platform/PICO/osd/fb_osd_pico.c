@@ -59,8 +59,9 @@ bool fbOsdDrawScreen(void)
     // static time, spend no more than... 10?us per iteration
 // *** TODO
 //    bprintf("OSD fbOsdDrawScreen");
-    return false;
-//     return true;
+    void testUpdate(void);
+    testUpdate();
+    return false; // false = all done
 }
 
 bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)
@@ -105,7 +106,7 @@ void fbOsdRefreshAll(void)
 
 bool fbOsdBufferInUse(void)
 {
-    return osdBuffer1Safe();
+    return !osdBuffer1Safe();
 }
 
 bool fbOsdLayerSupported(displayPortLayer_e layer)

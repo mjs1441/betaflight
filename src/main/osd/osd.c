@@ -1428,7 +1428,7 @@ void osdUpdate(timeUs_t currentTimeUs)
     // xx in testing, never busy at this point, because we passed updatecheck and were scheduled v. soon after
     // no, wasn't proper test (hadn't saved)
     void osdUpdateCallback(uint32_t currentTimeUs);
-    osdUpdateCallback((uint32_t)currentTimeUs);
+//    osdUpdateCallback((uint32_t)currentTimeUs);
 ///////////    return;
 
     static osdState_e lastState = -100;
