@@ -119,10 +119,14 @@ static volatile int tus;
 static volatile int tusr;
 static volatile uint32_t maxcycles;
 static volatile uint32_t paintedmaxcycles;
+static volatile int nisz;
+static volatile int dmb;
 
 static const int charsPerLine = 30;
 static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
 static const int numChars = charsPerLine * charLines;
+
+static volatile bool transferredSinceVsync;
 
 //static uint8_t osdCharBuffer[numChars];
 uint8_t osdCharBuffer[480];
@@ -143,9 +147,27 @@ int64_t safe_zone_callback(alarm_id_t id, void * user_data)
     return 0; // don't automatically reschedule
 }
 
-bool osdBuffer1Safe(void)
+bool osdBufferAvailable(void)
 {
-    return in_safe_zone && !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
+#if 1
+    if (transferredSinceVsync) {
+        return false;
+    }
+
+    if (!in_safe_zone) {
+        nisz++;
+        return false;
+    }
+
+    if (dma_channel_is_busy(dma_chan_buf1_to_buf2) || dma_channel_is_busy(dma_chan_zero_to_buf1)) {
+        dmb++;
+        return false;
+    }
+
+    return true;
+#else
+    return !transferredSinceVsync && in_safe_zone && !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
+#endif
 }
 
 void testUpdate(void);
@@ -440,11 +462,10 @@ volatile int oucunsafe2;
 volatile int oucunsafe3;
 #endif
 //static volatile int vdelay;
-static volatile int vsyncflag;
 
 static void vsync_callback(void)
 {
-    vsyncflag = 1;
+    transferredSinceVsync = 0;
     // 50 per second (PAL)
     static int c=0;
     // Need to clear the IRQ flag state from the PIO.
@@ -561,15 +582,17 @@ static void vsync_callback(void)
 
     static uint32_t n_to_c;
     if (c % 250 == 0) {
-        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
+//        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
+        bprintf("%d vsync_callback busy %d %d nisz %d dmb %d (previous tainted n to c %d)",
+                c, business, busybuf, nisz, dmb, n_to_c);
+        nisz = 0; dmb = 0;
         // NB ave wraps quickly (~1000 vsyncs)
 //        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
-//        bprintf("tus %d, tusr %d, ave %.1f calls per VS, %.1f rds per VS, %.1f calls/rd",
-//                tus, tusr,
-//                (double)tus/250, (double)tusr/250, (double)tus/tusr);
-//        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
-//                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
-//                max_us ave %.1f [painted %d]",
+        bprintf("tus %d, tusr %d, ave %.1f calls per VS, %.1f rds per VS, %.1f calls/rd",
+                tus, tusr,
+                (double)tus/250, (double)tusr/250, (double)tus/tusr);
+        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
+                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
         maxcycles = 0; paintedmaxcycles = 0;
         tus = 0; tusr = 0;
         vmax = 0;
@@ -800,7 +823,7 @@ void osdUpdateCallback(uint32_t t_us)
     bprintf("\n*** not in use *** \n");
 #if 0
     ouccount++;
-    if (!osdBuffer1Safe()) {
+    if (!osdBufferAvailable()) {
         oucunsafe++;
         testUpdate();
     } else {
@@ -822,7 +845,7 @@ void osdUpdateCallback(uint32_t t_us)
     sze = getCycleCounter();
     osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
     osdPioWrite(2,0,oucbuf);
-    if (osdBuffer1Safe()) {
+    if (osdBufferAvailable()) {
         testUpdate();
     } else {
         oucunsafe++;
@@ -926,6 +949,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
     if (currentChar == numChars) { // equivalently currentY == charLines
         // Reached the end, reset.
         currentChar = 0;
+        transferredSinceVsync = true;
         return false;
     }
 

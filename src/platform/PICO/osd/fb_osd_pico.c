@@ -106,7 +106,7 @@ void fbOsdRefreshAll(void)
 
 bool fbOsdBufferInUse(void)
 {
-    return !osdBuffer1Safe();
+    return !osdBufferAvailable();
 }
 
 bool fbOsdLayerSupported(displayPortLayer_e layer)

@@ -26,5 +26,5 @@ extern uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
-bool osdBuffer1Safe(void);
+bool osdBufferAvailable(void);
 bool osdDrawScreenUntil(uint32_t limit_micros);
