@@ -876,6 +876,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
             // Buffer is always cleared after vsync before we start updating it. So, we can
             // ignore empty characters.
             // *** TODO check char 0 and char 32 (spc) are always transparent
+//            if (currentY >= 14 && currentY <= 15) c = 0x17; // <-- bad with PiB output
             if (c!=0 && c!=0x20) {
 //            if (currentX > 5 && currentX < 20 && c!=0 && c!=0x20) {
                 // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
