@@ -100,13 +100,12 @@ static int osd_tx_sm;
 // (also gcc14.3)
 __attribute__((aligned(4))) static uint32_t osdBuffer1W[PICO_OSD_BUF_LENGTH/4];
 __attribute__((aligned(4))) static uint32_t osdBuffer2W[PICO_OSD_BUF_LENGTH/4];
-static uint8_t* osdBuffer1 = (uint8_t *)osdBuffer1W;
-static uint8_t* osdBuffer2 = (uint8_t *)osdBuffer2W;
+static uint8_t* osdBufferA = (uint8_t *)osdBuffer1W;
+static uint8_t* osdBufferB = (uint8_t *)osdBuffer2W;
 
 static const uint32_t zero;
-static int dma_chan_buf1_to_buf2;
-static int dma_chan_zero_to_buf1;
-static int dma_chan_buf2_to_fifo;
+static int dma_chan_zero_to_bufA;
+static int dma_chan_bufB_to_fifo;
 
 static volatile bool in_safe_zone;
 static volatile uint32_t safe_zone_period;
@@ -159,14 +158,14 @@ bool osdBufferAvailable(void)
         return false;
     }
 
-    if (dma_channel_is_busy(dma_chan_buf1_to_buf2) || dma_channel_is_busy(dma_chan_zero_to_buf1)) {
+    if (dma_channel_is_busy(dma_chan_zero_to_bufA)) {
         dmb++;
         return false;
     }
 
     return true;
 #else
-    return !transferredSinceVsync && in_safe_zone && !dma_channel_is_busy(dma_chan_buf1_to_buf2) && !dma_channel_is_busy(dma_chan_zero_to_buf1);
+    return !transferredSinceVsync && in_safe_zone && !dma_channel_is_busy(dma_chan_zero_to_bufA);
 #endif
 }
 
@@ -185,10 +184,10 @@ void plot(int x, int y, int c)
         return;
     }
 
-    uint8_t * pbyte = osdBuffer1 + PICO_OSD_BUF_WIDTH * y;
+    uint8_t * pbyte = osdBufferA + PICO_OSD_BUF_WIDTH * y;
     pbyte += (int)(x/4); // 4 pixels per byte
-    if (pbyte<osdBuffer1 || pbyte>=osdBuffer1 + PICO_OSD_BUF_LENGTH) {
-        bprintf("huh %p (%p) %d, %d, %d",pbyte,osdBuffer1, x,y,c);
+    if (pbyte<osdBufferA || pbyte>=osdBufferA + PICO_OSD_BUF_LENGTH) {
+        bprintf("huh %p (%p) %d, %d, %d",pbyte,osdBufferA, x,y,c);
     }
     static uint8_t masks[4] = {0b00000011, 0b00001100, 0b00110000, 0b11000000};
     static uint8_t  cols[4] = {0b00000000, 0b10101010, 0b11111111, 0b00000000};
@@ -220,12 +219,12 @@ static void plotBorder(void)
 void osd_test_init(void)
 {
     safe_zone_period = 18000;
-    safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBuffer1) during final 10000 or so
+    safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBufferA) during final 10000 or so
     in_safe_zone = true;
 
     bprintf("osd_test_init");
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT, PICO_OSD_BUF_LENGTH);
-    bprintf("osdBuffer1: %p osdBuffer2: %p", osdBuffer1, osdBuffer2);
+    bprintf("osdBuffer1: %p osdBuffer2: %p", osdBuffer1W, osdBuffer2W);
     bprintf("nx %d, ny %d", fb_nx, fb_ny);
     for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
 //        int y = i / PICO_OSD_BUF_WIDTH;
@@ -234,7 +233,7 @@ void osd_test_init(void)
 //        monoBuffer[i] = dd < 15000 ? 0xff : 0;
 //        osdBuffer1[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
 //        osdBuffer1[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
-        osdBuffer1[i] = 0;
+        osdBufferA[i] = 0;
 //        (void)dd;
     }
 
@@ -372,35 +371,27 @@ void osd_test_init(void)
 
     // TODO *** consistent dma_claim vs dmaAllocate in PICO, probably follow SPI example
 
-    dma_chan_buf1_to_buf2 = dma_claim_unused_channel(false);
-    if (-1 == dma_chan_buf1_to_buf2) {
-        bprintf("**** failed to claim dma channel (buf1 to buf2) for osd pico");
+    dma_chan_zero_to_bufA = dma_claim_unused_channel(false);
+    if (-1 == dma_chan_zero_to_bufA) {
+        bprintf("**** failed to claim dma channel (zero to bufA) for osd pico");
         return;
     }
 
-    dma_chan_zero_to_buf1 = dma_claim_unused_channel(false);
-    if (-1 == dma_chan_zero_to_buf1) {
-        bprintf("**** failed to claim dma channel (zero to buf1) for osd pico");
-        dma_channel_unclaim(dma_chan_buf1_to_buf2);
-        return;
-    }
-
-    dma_chan_buf2_to_fifo = dma_claim_unused_channel(false);
-    if (-1 == dma_chan_buf2_to_fifo) {
+    dma_chan_bufB_to_fifo = dma_claim_unused_channel(false);
+    if (-1 == dma_chan_bufB_to_fifo) {
         bprintf("**** failed to claim dma channel (buf2 to fifo) for osd pico");
-        dma_channel_unclaim(dma_chan_zero_to_buf1);
-        dma_channel_unclaim(dma_chan_buf1_to_buf2);
+        dma_channel_unclaim(dma_chan_zero_to_bufA);
         return;
     }
 
-    dma_channel_config c = dma_channel_get_default_config(dma_chan_buf2_to_fifo);
+    dma_channel_config c = dma_channel_get_default_config(dma_chan_bufB_to_fifo);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
     channel_config_set_read_increment(&c, true);
     channel_config_set_write_increment(&c, false);
     channel_config_set_dreq(&c, pio_get_dreq(osdPio, osd_tx_sm, true));
 
     dma_channel_configure(
-        dma_chan_buf2_to_fifo,
+        dma_chan_bufB_to_fifo,
         &c,
         &osdPio->txf[osd_tx_sm],  // Write address (fixed PIO TX FIFO)
         NULL,                     // Read address (reset each time)
@@ -408,32 +399,17 @@ void osd_test_init(void)
         false                     // Don't start immediately
     );
 
-    c = dma_channel_get_default_config(dma_chan_zero_to_buf1);
+    c = dma_channel_get_default_config(dma_chan_zero_to_bufA);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
     channel_config_set_read_increment(&c, false);
     channel_config_set_write_increment(&c, true);
-    channel_config_set_chain_to(&c, dma_chan_buf2_to_fifo); // DMA to PIO fifo starts immediately on completion of clearing buf1
+    channel_config_set_chain_to(&c, dma_chan_bufB_to_fifo); // DMA to PIO fifo starts immediately on completion of clearing buf1
 
     dma_channel_configure(
-        dma_chan_zero_to_buf1,
+        dma_chan_zero_to_bufA,
         &c,
         NULL,                     // Write address (reset each time)
         &zero,                    // Read address (fixed)
-        PICO_OSD_BUF_WORDS,       // Number of transfers
-        false                     // Don't start immediately
-    );
-
-    c = dma_channel_get_default_config(dma_chan_buf1_to_buf2);
-    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
-    channel_config_set_read_increment(&c, true);
-    channel_config_set_write_increment(&c, true);
-    channel_config_set_chain_to(&c, dma_chan_zero_to_buf1); // DMA to clear buf1 starts immediately on completion of buffer flip
-
-    dma_channel_configure(
-        dma_chan_buf1_to_buf2,
-        &c,
-        NULL,                     // Write address (reset each time)
-        NULL,                     // Read address (reset each time)
         PICO_OSD_BUF_WORDS,       // Number of transfers
         false                     // Don't start immediately
     );
@@ -465,6 +441,12 @@ volatile int oucunsafe3;
 
 static void vsync_callback(void)
 {
+    static int fieldOddEven;
+    fieldOddEven = fieldOddEven ^ 0x1;  // odd or even field (we can't tell which is which), alternate 0, 1
+    uint8_t * tptr = osdBufferA;
+    osdBufferA = osdBufferB;
+    osdBufferB = tptr;
+
     transferredSinceVsync = 0;
     // 50 per second (PAL)
     static int c=0;
@@ -488,32 +470,28 @@ static void vsync_callback(void)
 
     sza=getCycleCounter();
 
-    if (dma_channel_is_busy(dma_chan_buf1_to_buf2) || dma_channel_is_busy(dma_chan_zero_to_buf1)) {
+    if (dma_channel_is_busy(dma_chan_zero_to_bufA)) {
         // Unexpected, PIO shouldn't get back to vsync IRQ unless dma buf2->fifo has started
         // unless sync signals are rather mixed up (detected vsync pulse but no hsync pulses on any line)
         busybuf++;
-        dma_channel_abort(dma_chan_zero_to_buf1);
-        dma_channel_abort(dma_chan_buf1_to_buf2);
+        dma_channel_abort(dma_chan_zero_to_bufA);
     }
 
     // Ensure that DMA (buf2 to PIO FIFO) is not in progress, and that the PIO FIFO is empty.
     // (Can happen if some lines were skipped due to not detecting hsync pulse)
-    if (dma_channel_is_busy(dma_chan_buf2_to_fifo)) {
+    if (dma_channel_is_busy(dma_chan_bufB_to_fifo)) {
         ++business;
-        dma_channel_abort(dma_chan_buf2_to_fifo);
+        dma_channel_abort(dma_chan_bufB_to_fifo);
     }
 
     pio_sm_clear_fifos(osdPio, osd_tx_sm);
 
     // Reset the incrementing addresses
-    dma_channel_set_read_addr(dma_chan_buf2_to_fifo, osdBuffer2, false);
-    dma_channel_set_read_addr(dma_chan_buf1_to_buf2, osdBuffer1, false);
-    dma_channel_set_write_addr(dma_chan_buf1_to_buf2, osdBuffer2, false);
-    dma_channel_set_write_addr(dma_chan_zero_to_buf1, osdBuffer1, false);
+    dma_channel_set_read_addr(dma_chan_bufB_to_fifo, osdBufferB, false);
+    dma_channel_set_write_addr(dma_chan_zero_to_bufA, osdBufferA, false);
     
-    // Start DMA flipping osdBuffer1 to osdBuffer2
-    // chains to DMA for zero->osdBuffer1 (clears screen buffer)
-    // chains to DMA for buf2 -> screen
+    // Start DMA for zero->osdBufferA (clears screen buffer)
+    // chains to DMA for osdBufferB -> screen
 
 // testing dma speed
 //    if (c==123) {
@@ -525,7 +503,7 @@ static void vsync_callback(void)
 //         bprintf("* dc3-dc1 %d dc3-dc2 %d buf1 %p werc %p buf2 %p", dc3-dc1, dc3-dc2, osdBuffer1, &werc[0], osdBuffer2);
 //     }
 
-    dma_channel_start(dma_chan_buf1_to_buf2);
+    dma_channel_start(dma_chan_zero_to_bufA);
 
     // probably best clear at end, just in case there are re-trigger issues if cleared earlier...
     pio_interrupt_clear(osdPio, 0);
@@ -632,7 +610,7 @@ bool timer_callback(repeating_timer_t *rt)
 {
 #ifdef PICO_TRACE
     uint8_t *buffer = (uint8_t *)rt->user_data;
-    bprintf("buffer = %p, osdBuffer1 = %p", buffer, osdBuffer1);
+    bprintf("buffer = %p, osdBufferA = %p", buffer, osdBufferA);
 #else
     UNUSED(rt);
 #endif
@@ -701,22 +679,7 @@ void osd_test(void)
 
         bprintf("      ENABLE");
         enable();
-#if 0
-        int cc = 0;
-        int cj = 0;
-        while (1) {
-            for (int j=0; j<PICO_OSD_BUF_HEIGHT; ++j) {
-                int jj = PICO_OSD_BUF_WIDTH * j;
-                for (int i=0; i<PICO_OSD_BUF_LINEWORDS; ++i) {
-                    uint32_t w = *(uint32_t*)(&osdBuffer1[4*i + jj]);
-                    pio_sm_put_blocking(osdPio, osd_tx_sm, w);
-                    cj++;
-                }
-            }
-            cc += 1;
-            if (cc%200 == 0) { bprintf("cc %d (%d words)", cc, cj); }
-        }
-#endif
+
 
 #if 1
         (void)hist;
@@ -834,9 +797,8 @@ void osdUpdateCallback(uint32_t t_us)
     UNUSED(t_us);
     while (true) {
         ouccount++;
-        oucunsafe  += dma_channel_is_busy(dma_chan_buf1_to_buf2);
-        oucunsafe2 += dma_channel_is_busy(dma_chan_zero_to_buf1);
-        oucunsafe3 += dma_channel_is_busy(dma_chan_buf2_to_fifo);
+        oucunsafe2 += dma_channel_is_busy(dma_chan_zero_to_bufA);
+        oucunsafe3 += dma_channel_is_busy(dma_chan_bufB_to_fifo);
 //        zero++;
     }
 #else
@@ -894,7 +856,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
     if (0 == currentChar) {
         currentY = 0;
         currentX = 0;
-        currentPtr = osdBuffer1 + hoffs;
+        currentPtr = osdBufferA + hoffs;
         maxcycles += maxcyclesthisround;
         paintedmaxcycles += paintedmaxcyclesthisround;
         tusr++;
@@ -906,7 +868,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
 
     int painted = 0;
     while (currentY < charLines) {
-        // currentPtr is pointer to topleft of char dest on osdBuffer1
+        // currentPtr is pointer to topleft of char dest on osdBufferA
         while (cmpTimeUs(limit_micros, micros()) > 0 && currentX < charsPerLine) {
             uint8_t c = osdCharBuffer[currentChar++];
 //            uint8_t c = (currentY == 0 || currentY == 15) ?  osdCharBuffer[currentChar] : 0; currentChar++;
@@ -959,7 +921,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
 //        int bs = 262; int bx = 8; // ok
 //        int bs = 252; int bx = 8; // ok
         for (int badline = bs; badline < bs + bx; badline+=1) {
-            uint32_t *ptr = (uint32_t *)(osdBuffer1 + (fbbpl * badline));
+            uint32_t *ptr = (uint32_t *)(osdBufferA + (fbbpl * badline));
             for (int x=0; x<92/4 /*92*/; ++x) {
 //                *ptr++ = 0xf5555f55; // 0xff; // 55;
 //                *ptr++ = 0x55555f55; // 0xff; // 55;
@@ -971,7 +933,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
 //        int bs = 262; int bx = 8; // ok
 //        int bs = 252; int bx = 8; // ok
         for (int badline = bs; badline < bs + bx; badline+=1) {
-            uint8_t *ptr = (osdBuffer1 + (fbbpl * badline));
+            uint8_t *ptr = (osdBufferA + (fbbpl * badline));
             for (int x=0; x<92 /*92*/; ++x) {
 //                *ptr++ = 0xf5555f55; // 0xff; // 55;
 //                *ptr++ = 0x55555f55; // 0xff; // 55;
@@ -1038,14 +1000,14 @@ void testUpdate(void)
 #endif
 #ifdef clearscreen
 //    for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
-//        osdBuffer1[i] = 0;
+//        osdBufferA[i] = 0;
 //    }
     {
         void *__aeabi_memset(void *s, size_t n, int c); // maybe , size_t n);    
-//        __aeabi_memset(osdBuffer1, PICO_OSD_BUF_LENGTH, 0xff);
-        __aeabi_memset(osdBuffer1, PICO_OSD_BUF_LENGTH, 0);
+//        __aeabi_memset(osdBufferA, PICO_OSD_BUF_LENGTH, 0xff);
+        __aeabi_memset(osdBufferA, PICO_OSD_BUF_LENGTH, 0);
 
-//        uint32_t *p = (uint32_t *)osdBuffer1;
+//        uint32_t *p = (uint32_t *)osdBufferA;
 //        uint32_t *p = osdBuffer1W;
 //        for (int i=0; i<PICO_OSD_BUF_LENGTH/4; ++i) {
 //            *p++ = 0;
@@ -1058,7 +1020,7 @@ void testUpdate(void)
 #ifdef testcard
 //    memset(osdBuffer1, 0b10101010, PICO_OSD_BUF_LENGTH); // black background
 #ifndef clearscreen
-    memset(osdBuffer1, 0, PICO_OSD_BUF_LENGTH); // transparent background
+    memset(osdBufferA, 0, PICO_OSD_BUF_LENGTH); // transparent background
 #endif
     for (int i=0; i<fb_nx; ++i) {
         plot(i, 0, 2);
@@ -1118,8 +1080,8 @@ void testUpdate(void)
     if (1) {
 //    memset(osdBuffer1, 0b10101010, PICO_OSD_BUF_LENGTH/2);
 //    memset(osdBuffer1 + PICO_OSD_BUF_LENGTH/2, 0xff, PICO_OSD_BUF_LENGTH/2);
-    memset(osdBuffer1, 0xff, PICO_OSD_BUF_LENGTH/2);
-    memset(osdBuffer1 + PICO_OSD_BUF_LENGTH/2, 0b10101010, PICO_OSD_BUF_LENGTH/2);
+    memset(osdBufferA, 0xff, PICO_OSD_BUF_LENGTH/2);
+    memset(osdBufferA + PICO_OSD_BUF_LENGTH/2, 0b10101010, PICO_OSD_BUF_LENGTH/2);
 
     // initially with set x,22 in pio
     // not with i=1... nor with j=1...
@@ -1175,17 +1137,17 @@ void testUpdate(void)
 #endif
     
     } else {
-        memset(osdBuffer1, 0, PICO_OSD_BUF_LENGTH);
+        memset(osdBufferA, 0, PICO_OSD_BUF_LENGTH);
     }
 #if 0
   int s = millis()/4234;
     for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
-        osdBuffer1[i] = (0b1010101) * ((s >> 10)&3);
+        osdBufferA[i] = (0b1010101) * ((s >> 10)&3);
         if (i%577 == 234)
             s = s*13+29;
     }
-    memset(osdBuffer1, 0b10101010 /*0xff*/, PICO_OSD_BUF_LENGTH/2);
-    memset(osdBuffer1 + PICO_OSD_BUF_LENGTH/2, 0xff /* 0b10101010*/, PICO_OSD_BUF_LENGTH/2);
+    memset(osdBufferA, 0b10101010 /*0xff*/, PICO_OSD_BUF_LENGTH/2);
+    memset(osdBufferA + PICO_OSD_BUF_LENGTH/2, 0xff /* 0b10101010*/, PICO_OSD_BUF_LENGTH/2);
 #endif
 
 
@@ -1212,14 +1174,14 @@ void testUpdate(void)
         // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
         int x = i % charsPerLine;
         int y = i / charsPerLine; // or loop x,y
-        uint8_t * bufp = osdBuffer1 + hoffs + fbbpl * y * pypc + x * bxpc; // pointer to topleft of char dest on osdBuffer1
+        uint8_t * bufp = osdBufferA + hoffs + fbbpl * y * pypc + x * bxpc; // pointer to topleft of char dest on osdBufferA
         // TODO bufp without multiply, loop x,y etc.
 
         const uint8_t * fontp = &fontData[c*bpc]; // 3 bytes per 12 pixel char line, 18 lines
         // rp2350 don't have to worry about cache, all 1-clock sram
 
 //        bprintf("painting char '%c' (0x%02x) at %d, %d from %p (cf %p) to %p (cf %p)",
-//                c, c, x, y, fontp, fontData, bufp, osdBuffer1);
+//                c, c, x, y, fontp, fontData, bufp, osdBufferA);
         for (int j=0; j<18; ++j) {
             for (int b=0; b<3; ++b) {
                 *bufp++ = *fontp++;
@@ -1231,7 +1193,7 @@ void testUpdate(void)
 
 #endif
 
-    //bzero(osdBuffer1, PICO_OSD_BUF_LENGTH);
+    //bzero(osdBufferA, PICO_OSD_BUF_LENGTH);
     //plotBorder();
 #ifdef blockpaint
     {
@@ -1249,7 +1211,7 @@ void testUpdate(void)
 #endif
 
 #ifdef ahpaint
-    //bzero(osdBuffer1, PICO_OSD_BUF_LENGTH);
+    //bzero(osdBufferA, PICO_OSD_BUF_LENGTH);
     //plotBorder();
 
     /*
@@ -1350,7 +1312,7 @@ osd_ah_invert = OFF
     uint32_t ctime = micros();
     int32_t dtime = (int32_t)(ctime - ttime);
     if (dtime > usPerRun) {
-        bzero(osdBuffer1, PICO_OSD_BUF_LENGTH);
+        bzero(osdBufferA, PICO_OSD_BUF_LENGTH);
         plotBorder();
         int x = 27 + ((int)(ctime*xp)) % nxx;
         (void)xp;
