@@ -909,6 +909,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
         // currentPtr is pointer to topleft of char dest on osdBuffer1
         while (cmpTimeUs(limit_micros, micros()) > 0 && currentX < charsPerLine) {
             uint8_t c = osdCharBuffer[currentChar++];
+//            uint8_t c = currentY == 13 ? 0x8b /*17*/ :  osdCharBuffer[currentChar]; currentChar++;
             // Buffer is always cleared after vsync before we start updating it. So, we can
             // ignore empty characters.
             // *** TODO check char 0 and char 32 (spc) are always transparent
@@ -950,6 +951,19 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
         // Reached the end, reset.
         currentChar = 0;
         transferredSinceVsync = true;
+
+        int bs = 252; int bx = 18; // bad
+//        int bs = 262; int bx = 8; // ok
+//        int bs = 252; int bx = 8; // ok
+        for (int badline = bs; badline < bs + bx; badline+=1) {
+            uint32_t *ptr = (uint32_t *)(osdBuffer1 + (fbbpl * badline));
+            for (int x=0; x<92/4 /*92*/; ++x) {
+//                *ptr++ = 0xf5555f55; // 0xff; // 55;
+//                *ptr++ = 0x55555f55; // 0xff; // 55;
+                *ptr++ = 0x55555555; // 0xff; // 55;
+            }
+        }
+            
         return false;
     }
 
