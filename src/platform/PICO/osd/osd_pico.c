@@ -909,11 +909,13 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
         // currentPtr is pointer to topleft of char dest on osdBuffer1
         while (cmpTimeUs(limit_micros, micros()) > 0 && currentX < charsPerLine) {
             uint8_t c = osdCharBuffer[currentChar++];
+//            uint8_t c = (currentY == 0 || currentY == 15) ?  osdCharBuffer[currentChar] : 0; currentChar++;
 //            uint8_t c = currentY == 13 ? 0x8b /*17*/ :  osdCharBuffer[currentChar]; currentChar++;
             // Buffer is always cleared after vsync before we start updating it. So, we can
             // ignore empty characters.
             // *** TODO check char 0 and char 32 (spc) are always transparent
-            if (c!=0 && c!=0x20) {
+//            if (c!=0 && c!=0x20) {
+            if (currentX > 5 && currentX < 20 && c!=0 && c!=0x20) {
                 // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
 
                 const uint8_t * fontp = &fontData[c*bpc]; // 3 bytes per 12 pixel char line, 18 lines
@@ -952,6 +954,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
         currentChar = 0;
         transferredSinceVsync = true;
 
+#if 0
         int bs = 252; int bx = 18; // bad
 //        int bs = 262; int bx = 8; // ok
 //        int bs = 252; int bx = 8; // ok
@@ -963,7 +966,19 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
                 *ptr++ = 0x55555555; // 0xff; // 55;
             }
         }
-            
+#elif 0
+        int bs = 252; int bx = 18; // bad
+//        int bs = 262; int bx = 8; // ok
+//        int bs = 252; int bx = 8; // ok
+        for (int badline = bs; badline < bs + bx; badline+=1) {
+            uint8_t *ptr = (osdBuffer1 + (fbbpl * badline));
+            for (int x=0; x<92 /*92*/; ++x) {
+//                *ptr++ = 0xf5555f55; // 0xff; // 55;
+//                *ptr++ = 0x55555f55; // 0xff; // 55;
+                *ptr++ = 0xff;
+            }
+        }
+#endif            
         return false;
     }
 
