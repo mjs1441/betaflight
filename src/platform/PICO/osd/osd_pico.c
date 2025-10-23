@@ -73,7 +73,16 @@
 // PIO hard coded to 23 words of pixel data per line (=> 368 pixels)
 #define PICO_OSD_LINE_WORDS 23
 #define PICO_OSD_BUF_WIDTH (PICO_OSD_LINE_WORDS*4)
+
+#define tryntsc
+
+#ifdef tryntsc
+// 18*13 = 234
+#define PICO_OSD_BUF_HEIGHT (PICO_OSD_CHAR_HEIGHT * 13)
+#else
 #define PICO_OSD_BUF_HEIGHT 288
+#endif
+
 //#define PICO_OSD_BUF_HEIGHT 270
 //#define PICO_OSD_BUF_HEIGHT 256
 //#define PICO_OSD_BUF_HEIGHT 272
@@ -122,7 +131,11 @@ static volatile int nisz;
 static volatile int dmb;
 
 static const int charsPerLine = 30;
+#ifdef tryntsc
+static const int charLines = 13;
+#else
 static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
+#endif
 static const int numChars = charsPerLine * charLines;
 
 static volatile bool transferredSinceVsync;
@@ -306,7 +319,6 @@ void osd_test_init(void)
     bprintf("osd_w gpio %d, osd_en gpio %d, osd_sync gpio %d", osd_w_gpio, osd_en_gpio, osd_sync_gpio);
     // *** TODO PIO BASE
 
-#define tryntsc
 #ifdef tryntsc
     osd_tx_offset = pio_add_program(osdPio, &osd_tx_ntsc_program);
 #else

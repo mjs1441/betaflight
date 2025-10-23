@@ -25,12 +25,12 @@
 
 .define clocksPerPixel 10
 
+.program osd_tx_pal
+
 ; First display on "even" field 1 at (second half of) this line (official = 23), on "odd" field 2 at this + 313 (official = 336)
 ; e.g. skip hsync on lines 6,7,...,22 (17 such, so counter = 16)
 .define firstDisplayLine 23
 .define skipHsyncs firstDisplayLine - 7
-
-.program osd_tx_pal
 
 .define hshiftA 28
 .define hshiftB 29
@@ -87,6 +87,9 @@ d6: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 
 .define hshiftA 25
 .define hshiftB 29
 .define hshiftC 24
+
+.define firstDisplayLine 27
+.define skipHsyncs firstDisplayLine - 11
 
 start:
     irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
@@ -160,6 +163,11 @@ hsync:
 .define hshiftA 28
 .define hshiftB 29
 .define hshiftC 24
+
+; First display on "even" field 1 at (second half of) this line (official = 23), on "odd" field 2 at this + 313 (official = 336)
+; e.g. skip hsync on lines 6,7,...,22 (17 such, so counter = 16)
+.define firstDisplayLine 23
+.define skipHsyncs firstDisplayLine - 7
 
     irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
     wait 0 irq 1             ; wait for a VSync pulse
