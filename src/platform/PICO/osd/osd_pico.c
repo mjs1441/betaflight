@@ -776,6 +776,59 @@ void testOSDtaskOffPidLoop(void)
 
 #endif
 
+void plotTestCard(void)
+{
+    for (int i=0; i<fb_nx; ++i) {
+        plot(i, 0, 2);
+        plot(i, fb_ny/2-1, 2);
+        plot(i, fb_ny-1, 2);
+    }
+    for (int i=0; i<fb_ny; ++i) {
+        plot(0, i, 2);
+        plot(fb_nx/2-1, i, 2);
+        plot(fb_nx-1, i, 2);
+    }
+    int xx2 = fb_nx/2;
+    int yy2 = fb_ny/2;
+    for (int k=2; k<10; ++k) {
+        int q = fb_nx/2/k;
+        int r = fb_ny/2/k;
+        for (int j=0; j<16; ++j) {
+            plot(xx2-q,j,2);
+            plot(xx2+q,j,2);
+            plot(xx2-q,fb_ny-1-j,2);
+            plot(xx2+q,fb_ny-1-j,2);
+            plot(j,yy2-r,2);
+            plot(j,yy2+r,2);
+            plot(fb_nx-1-j,yy2-r,2);
+            plot(fb_nx-1-j,yy2+r,2);
+        }
+        for (int i=xx2-q; i<xx2+q; ++i) {
+            plot(i,k-1,2);
+            plot(i,fb_ny - k,2);
+        }
+        for (int i=yy2-r; i<yy2+r; ++i) {
+            plot(k-1,i,2);
+            plot(fb_nx-k,i,2);
+        }
+    }
+    // white diagonals to corners and centres of sides
+    for (int i=0; i<64; ++i) {
+        plot(i, i, 2);
+        plot(i, fb_ny/2 - 1 -i, 2);
+        plot(i, fb_ny/2 + i, 2);
+        plot(i, fb_ny - 1 - i, 2);
+        plot(fb_nx -1 -i, i, 2);
+        plot(fb_nx -1 -i, fb_ny/2 - 1 -i, 2);
+        plot(fb_nx -1 -i, fb_ny/2 + i, 2);
+        plot(fb_nx -1 -i, fb_ny - 1 - i, 2);
+        plot(fb_nx/2 -1 -i, i, 2);
+        plot(fb_nx/2  +i, i, 2);
+        plot(fb_nx/2 -1 -i, fb_ny -1 -i, 2);
+        plot(fb_nx/2  +i, fb_ny -1 -i, 2);
+    }
+}
+
 // osd_elements artificalhorizon attitude.values.*
 // also see sensors/gyro/gyro.ADCf, but note gyro ~ rad/sec, accel ~ rad/sec^2
 // flight/imu.c -> "euler angles" (sic) (pitch, roll, yaw)
@@ -820,6 +873,11 @@ void osdUpdateCallback(uint32_t t_us)
 // Return false when complete (no more to do).
 bool osdDrawScreenUntil(uint32_t limit_micros)
 {
+#if 1
+    UNUSED(limit_micros);
+    plotTestCard();
+    return false;
+#else
     uint32_t c1 = getCycleCounter();
     static uint32_t maxcyclesthisround;
     static int paintedmaxcyclesthisround;
@@ -966,6 +1024,8 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
 #undef fbbpl
 #undef fbbpcl
 #undef fbbpNextLine
+
+#endif
 }
 
 void testUpdate(void)
@@ -1034,56 +1094,8 @@ void testUpdate(void)
 #ifndef clearscreen
     memset(osdBufferA, 0, PICO_OSD_BUF_LENGTH); // transparent background
 #endif
-    for (int i=0; i<fb_nx; ++i) {
-        plot(i, 0, 2);
-        plot(i, fb_ny/2-1, 2);
-        plot(i, fb_ny-1, 2);
-    }
-    for (int i=0; i<fb_ny; ++i) {
-        plot(0, i, 2);
-        plot(fb_nx/2-1, i, 2);
-        plot(fb_nx-1, i, 2);
-    }
-    int xx2 = fb_nx/2;
-    int yy2 = fb_ny/2;
-    for (int k=2; k<10; ++k) {
-        int q = fb_nx/2/k;
-        int r = fb_ny/2/k;
-        for (int j=0; j<16; ++j) {
-            plot(xx2-q,j,2);
-            plot(xx2+q,j,2);
-            plot(xx2-q,fb_ny-1-j,2);
-            plot(xx2+q,fb_ny-1-j,2);
-            plot(j,yy2-r,2);
-            plot(j,yy2+r,2);
-            plot(fb_nx-1-j,yy2-r,2);
-            plot(fb_nx-1-j,yy2+r,2);
-        }
-        for (int i=xx2-q; i<xx2+q; ++i) {
-            plot(i,k-1,2);
-            plot(i,fb_ny - k,2);
-        }
-        for (int i=yy2-r; i<yy2+r; ++i) {
-            plot(k-1,i,2);
-            plot(fb_nx-k,i,2);
-        }
-    }
-    // white diagonals to corners and centres of sides
-    for (int i=0; i<64; ++i) {
-        plot(i, i, 2);
-        plot(i, fb_ny/2 - 1 -i, 2);
-        plot(i, fb_ny/2 + i, 2);
-        plot(i, fb_ny - 1 - i, 2);
-        plot(fb_nx -1 -i, i, 2);
-        plot(fb_nx -1 -i, fb_ny/2 - 1 -i, 2);
-        plot(fb_nx -1 -i, fb_ny/2 + i, 2);
-        plot(fb_nx -1 -i, fb_ny - 1 - i, 2);
-        plot(fb_nx/2 -1 -i, i, 2);
-        plot(fb_nx/2  +i, i, 2);
-        plot(fb_nx/2 -1 -i, fb_ny -1 -i, 2);
-        plot(fb_nx/2  +i, fb_ny -1 -i, 2);
-        
-    }
+
+    plotTestCard();
 
 #elif 0
     if (0 == (millis() % 5000) ) { parity = 1 - parity; }

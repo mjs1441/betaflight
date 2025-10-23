@@ -1,7 +1,5 @@
 .pio_version 1
 
-.program osd_tx
-
 ;
 ; h pixels           368
 ; h display (us)     48
@@ -11,7 +9,8 @@
 ; pixels / us        7.5       us / pixel    0.133333333
 ; clocks / us        75        us / clock    0.013333333
 ; clock divider      2            
-; 
+;
+; Nominal periods/delays
 ; wait ensure vsync                   10      750
 ; wait ensure >= hsync                3.4     255 (could go a bit lower, want between 2.35us and 4.7us)
 ; hsync + back porch                  10.4    780
@@ -19,8 +18,9 @@
 
 ; hsync + back porch = 10.4us (PAL) = 780 clocks
 ; from wait to out PINS is 6 + (1 + hshiftA) * (1 + hshiftB) + hshiftC = 780
-.define clocksPerPixel 10
-.define hshiftA 24
+.define clocksPerPixel 9
+.define hshiftA 26
+;.define hshiftA 24
 .define hshiftB 29
 .define hshiftC 24
 
@@ -28,6 +28,8 @@
 ; e.g. skip hsync on lines 6,7,...,22 (17 such, so counter = 16)
 .define firstDisplayLine 23
 .define skipHsyncs firstDisplayLine - 7
+
+.program osd_tx
 
 start:
     irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
@@ -54,7 +56,7 @@ lh_cont:
     jmp x--, loop_hsync      ; loop until skipped (skipHsyncs + 1) lines with hsyncs
 
     mov x, isr               ; isr prepared with 287 (or number of lines - 1)
-      
+
 wait_next_hsync:
     wait 0 PIN, 0
     set y, hshiftA [hshiftC]
@@ -74,4 +76,52 @@ d6: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 
     set PINS, 0
     jmp x--, wait_next_hsync
 ; that's a wrap
+
+.program osd_sync
+start:
+    set x, 8
+    set y, 5
+    irq clear 1              ; clear IRQ flags
+    irq clear 2              ; other SM waiting on flag will have seen it after 1 clock
+restart:
+    wait 0 PIN, 0
+d1: jmp x--, d1       [28]   ; wait then test for PIN being high
+    jmp PIN, restart         ; shorter than HSync pulse at ~ 9*29/75 ~ 3.5us
+d2: jmp y--, d2       [28]
+    jmp PIN, hsync           ; shorter than VSync pulse at ~ 15*29/75 ~ 5.8us
+    irq 1                    ; set flag for VSync
+    jmp start
+hsync:
+    irq 2                    ; set flag for HSync
+    ; wrap
+
+.program osd_tx2
+    irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
+    wait 0 irq 1             ; wait for a VSync pulse
+    set x, skipHsyncs
+loop_hsync_skip:
+    wait 1 irq 2             ; wait for an HSync pulse (and clear it)
+    jmp x--, loop_hsync_skip
+
+    mov x, isr               ; x = (num lines in field - 1). isr prepared with 287 (PAL)
+
+; TODO safer: detect either-or hs, vs, if vs back to start
+wait_next_hsync:
+    wait 1 irq 2             ; wait for an HSync pulse (and clear it)
+
+    ; delay until visible area
+    set y, hshiftA [hshiftC] ; TODO adjust this
+d1: jmp y--, d1 [hshiftB]    ; from after wait, less adjustment, until out PINS should be hsync + back porch ~ 10.4us = 780 clocks
+
+    ; write line of pixels
+    set y, 22                ; (num words of pixel data in line) - 1
+line_loop:
+    pull noblock             ; NB no autopull
+d2: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
+    jmp !osre d2        [clocksPerPixel - 2]
+    jmp y--, line_loop  [clocksPerPixel - 4]
+
+    set PINS, 0
+    jmp x--, wait_next_hsync
+
 

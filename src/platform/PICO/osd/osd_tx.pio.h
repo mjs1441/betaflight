@@ -37,15 +37,15 @@ static const uint16_t osd_tx_program_instructions[] = {
     0x0048, // 16: jmp    x--, 8
     0xa026, // 17: mov    x, isr
     0x2020, // 18: wait   0 pin, 0
-    0xf858, // 19: set    y, 24                  [24]
+    0xf85a, // 19: set    y, 26                  [24]
     0x1d94, // 20: jmp    y--, 20                [29]
     0x00d7, // 21: jmp    pin, 23
     0x0000, // 22: jmp    0
     0xe056, // 23: set    y, 22
     0x8080, // 24: pull   noblock
     0x6002, // 25: out    pins, 2
-    0x08f9, // 26: jmp    !osre, 25              [8]
-    0x0698, // 27: jmp    y--, 24                [6]
+    0x07f9, // 26: jmp    !osre, 25              [7]
+    0x0598, // 27: jmp    y--, 24                [5]
     0xe000, // 28: set    pins, 0
     0x0052, // 29: jmp    x--, 18
             //     .wrap
@@ -65,6 +65,96 @@ static const struct pio_program osd_tx_program = {
 static inline pio_sm_config osd_tx_program_get_default_config(uint offset) {
     pio_sm_config c = pio_get_default_sm_config();
     sm_config_set_wrap(&c, offset + osd_tx_wrap_target, offset + osd_tx_wrap);
+    return c;
+}
+#endif
+
+// -------- //
+// osd_sync //
+// -------- //
+
+#define osd_sync_wrap_target 0
+#define osd_sync_wrap 11
+#define osd_sync_pio_version 1
+
+static const uint16_t osd_sync_program_instructions[] = {
+            //     .wrap_target
+    0xe028, //  0: set    x, 8
+    0xe045, //  1: set    y, 5
+    0xc041, //  2: irq    clear 1
+    0xc042, //  3: irq    clear 2
+    0x2020, //  4: wait   0 pin, 0
+    0x1c45, //  5: jmp    x--, 5                 [28]
+    0x00c4, //  6: jmp    pin, 4
+    0x1c87, //  7: jmp    y--, 7                 [28]
+    0x00cb, //  8: jmp    pin, 11
+    0xc001, //  9: irq    nowait 1
+    0x0000, // 10: jmp    0
+    0xc002, // 11: irq    nowait 2
+            //     .wrap
+};
+
+#if !PICO_NO_HARDWARE
+static const struct pio_program osd_sync_program = {
+    .instructions = osd_sync_program_instructions,
+    .length = 12,
+    .origin = -1,
+    .pio_version = osd_sync_pio_version,
+#if PICO_PIO_VERSION > 0
+    .used_gpio_ranges = 0x0
+#endif
+};
+
+static inline pio_sm_config osd_sync_program_get_default_config(uint offset) {
+    pio_sm_config c = pio_get_default_sm_config();
+    sm_config_set_wrap(&c, offset + osd_sync_wrap_target, offset + osd_sync_wrap);
+    return c;
+}
+#endif
+
+// ------- //
+// osd_tx2 //
+// ------- //
+
+#define osd_tx2_wrap_target 0
+#define osd_tx2_wrap 15
+#define osd_tx2_pio_version 1
+
+static const uint16_t osd_tx2_program_instructions[] = {
+            //     .wrap_target
+    0xc000, //  0: irq    nowait 0
+    0x2041, //  1: wait   0 irq, 1
+    0xe030, //  2: set    x, 16
+    0x20c2, //  3: wait   1 irq, 2
+    0x0043, //  4: jmp    x--, 3
+    0xa026, //  5: mov    x, isr
+    0x20c2, //  6: wait   1 irq, 2
+    0xf85a, //  7: set    y, 26                  [24]
+    0x1d88, //  8: jmp    y--, 8                 [29]
+    0xe056, //  9: set    y, 22
+    0x8080, // 10: pull   noblock
+    0x6002, // 11: out    pins, 2
+    0x07eb, // 12: jmp    !osre, 11              [7]
+    0x058a, // 13: jmp    y--, 10                [5]
+    0xe000, // 14: set    pins, 0
+    0x0046, // 15: jmp    x--, 6
+            //     .wrap
+};
+
+#if !PICO_NO_HARDWARE
+static const struct pio_program osd_tx2_program = {
+    .instructions = osd_tx2_program_instructions,
+    .length = 16,
+    .origin = -1,
+    .pio_version = osd_tx2_pio_version,
+#if PICO_PIO_VERSION > 0
+    .used_gpio_ranges = 0x0
+#endif
+};
+
+static inline pio_sm_config osd_tx2_program_get_default_config(uint offset) {
+    pio_sm_config c = pio_get_default_sm_config();
+    sm_config_set_wrap(&c, offset + osd_tx2_wrap_target, offset + osd_tx2_wrap);
     return c;
 }
 #endif
