@@ -22,9 +22,6 @@
 ; .define hshiftA 24
 ; .define hshiftB 29
 ; .define hshiftC 24
-.define hshiftA 28
-.define hshiftB 29
-.define hshiftC 24
 
 .define clocksPerPixel 10
 
@@ -33,7 +30,63 @@
 .define firstDisplayLine 23
 .define skipHsyncs firstDisplayLine - 7
 
-.program osd_tx
+.program osd_tx_pal
+
+.define hshiftA 28
+.define hshiftB 29
+.define hshiftC 24
+
+start:
+    irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
+await_vsync:
+    wait 1 PIN, 0            ; wait for high on the sync pin
+detected_vsync:
+    wait 0 PIN, 0            ; transition to low on the sync pin, then delay
+    set  y, 22     [12]
+d1: jmp  y--, d1   [31]
+    jmp PIN, await_vsync     ; too short (high after 750 clocks = 10us), wasn't vsync
+
+    wait 1 PIN, 0            ; wait out until end of that long pulse
+    set x, skipHsyncs        ; ignore up to and including hsync on line 22 (say)
+loop_hsync:
+    set y, 15
+    wait 0 PIN, 0  [9]
+d2: jmp y--, d2    [14]      ; wait 16*15 + 10
+    jmp PIN, loop_hsync      ; too short (high after ~251clocks ~3.35us, looks like a short sync pulse)
+    set y, 24
+d3: jmp y--, d3    [26]      ; wait from low total of 10 + 16*15 + 2 + 25*27 = 927 ~ 12.4us
+    jmp PIN, lh_cont         ; sync high, detected an hsync pulse
+    jmp loop_hsync           ; still amongst the (long) vsync pulses, don't count it, look again for hsync
+lh_cont:
+    jmp x--, loop_hsync      ; loop until skipped (skipHsyncs + 1) lines with hsyncs
+
+    mov x, isr               ; isr prepared with 287 (or number of lines - 1)
+
+wait_next_hsync:
+    wait 0 PIN, 0
+    set y, hshiftA [hshiftC]
+d4: jmp y--, d4 [hshiftB]    ; from after wait until out PINS should be hsync + back porch ~ 10.4us = 780 clocks
+    jmp PIN, next_line
+    jmp start                ; (unusual) sync still low, suppose we are in a vsync pulse
+
+next_line:
+    set y, 22                ; (num words of pixel data in line) - 1
+
+line_loop:
+    pull noblock             ; NB no autopull
+d6: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
+    jmp !osre d6        [clocksPerPixel - 2]
+    jmp y--, line_loop  [clocksPerPixel - 4]
+
+    set PINS, 0
+    jmp x--, wait_next_hsync
+; that's a wrap
+
+.program osd_tx_ntsc
+
+.define hshiftA 25
+.define hshiftB 29
+.define hshiftC 24
 
 start:
     irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
@@ -103,6 +156,11 @@ hsync:
     ; wrap
 
 .program osd_tx2
+
+.define hshiftA 28
+.define hshiftB 29
+.define hshiftC 24
+
     irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
     wait 0 irq 1             ; wait for a VSync pulse
     set x, skipHsyncs

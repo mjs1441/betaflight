@@ -306,7 +306,12 @@ void osd_test_init(void)
     bprintf("osd_w gpio %d, osd_en gpio %d, osd_sync gpio %d", osd_w_gpio, osd_en_gpio, osd_sync_gpio);
     // *** TODO PIO BASE
 
-    osd_tx_offset = pio_add_program(osdPio, &osd_tx_program);
+#define tryntsc
+#ifdef tryntsc
+    osd_tx_offset = pio_add_program(osdPio, &osd_tx_ntsc_program);
+#else
+    osd_tx_offset = pio_add_program(osdPio, &osd_tx_pal_program);
+#endif
     osd_tx_sm = pio_claim_unused_sm(osdPio, false);
     if (osd_tx_sm < 0) {
         bprintf("*** pico osd tx failed to claim state machine");
@@ -320,7 +325,11 @@ void osd_test_init(void)
     pio_gpio_init(osdPio, osd_en_gpio);
 
     // [00:37:44.679969 0.002269] osd_w gpio 16, osd_en gpio 17, osd_sync gpio 18
-    pio_sm_config config = osd_tx_program_get_default_config(osd_tx_offset); // default config with wrap set
+#ifdef tryntsc
+    pio_sm_config config = osd_tx_ntsc_program_get_default_config(osd_tx_offset); // default config with wrap set
+#else
+    pio_sm_config config = osd_tx_pal_program_get_default_config(osd_tx_offset); // default config with wrap set
+#endif
     pio_sm_set_consecutive_pindirs(osdPio, osd_tx_sm, osd_w_gpio, 2, true /* output */);
     pio_sm_set_consecutive_pindirs(osdPio, osd_tx_sm, osd_sync_gpio, 1, false /* input */);
     sm_config_set_in_pin_base(&config, osd_sync_gpio); // in PIN set SYNC (for WAIT)
@@ -337,7 +346,11 @@ void osd_test_init(void)
 //    int pioclock = (int)75e6; // TODO
 //    int pioclock = (int)75e6 * 1.01; // TODO
 //    int pioclock = (int)75e6 * 1.01; // TODO acceptable "slack"? clock should be accurate to ~ 1.00003 ?
+#ifdef tryntsc
+    int pioclock = (int)75e6 * 1.038;
+#else
     int pioclock = (int)75e6 * 1.057; // Empirically found multiplier to centre horizontally (PAL)
+#endif
     float div = (float)SystemCoreClock / pioclock;
     bprintf("pio clock div = %f", (double)div);
     sm_config_set_clkdiv(&config, div);
