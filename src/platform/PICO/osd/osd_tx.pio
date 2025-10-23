@@ -29,7 +29,8 @@
 
 ; First display on "even" field 1 at (second half of) this line (official = 23), on "odd" field 2 at this + 313 (official = 336)
 ; e.g. skip hsync on lines 6,7,...,22 (17 such, so counter = 16)
-.define firstDisplayLine 23
+;.define firstDisplayLine 23
+.define firstDisplayLine 21
 .define skipHsyncs firstDisplayLine - 7
 
 .define hshiftA 28
@@ -48,7 +49,7 @@ d1: jmp  y--, d1   [31]
 
     wait 1 PIN, 0            ; wait out until end of that long pulse
     set x, skipHsyncs        ; ignore up to and including hsync on line 22 (say)
-loop_hsync:
+PUBLIC loop_hsync:
     set y, 15
     wait 0 PIN, 0  [9]
 d2: jmp y--, d2    [14]      ; wait 16*15 + 10

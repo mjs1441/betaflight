@@ -16,6 +16,8 @@
 #define osd_tx_pal_wrap 29
 #define osd_tx_pal_pio_version 1
 
+#define osd_tx_pal_offset_loop_hsync 8u
+
 static const uint16_t osd_tx_pal_program_instructions[] = {
             //     .wrap_target
     0xc000, //  0: irq    nowait 0
@@ -25,7 +27,7 @@ static const uint16_t osd_tx_pal_program_instructions[] = {
     0x1f84, //  4: jmp    y--, 4                 [31]
     0x00c1, //  5: jmp    pin, 1
     0x20a0, //  6: wait   1 pin, 0
-    0xe030, //  7: set    x, 16
+    0xe02e, //  7: set    x, 14
     0xe04f, //  8: set    y, 15
     0x2920, //  9: wait   0 pin, 0               [9]
     0x0e8a, // 10: jmp    y--, 10                [14]

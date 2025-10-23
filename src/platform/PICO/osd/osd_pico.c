@@ -74,7 +74,7 @@
 #define PICO_OSD_LINE_WORDS 23
 #define PICO_OSD_BUF_WIDTH (PICO_OSD_LINE_WORDS*4)
 
-#define tryntsc
+//#define tryntsc
 
 #ifdef tryntsc
 // 18*13 = 234
@@ -899,7 +899,7 @@ void osdUpdateCallback(uint32_t t_us)
 // Return false when complete (no more to do).
 bool osdDrawScreenUntil(uint32_t limit_micros)
 {
-#if 1
+#if 0
     UNUSED(limit_micros);
     plotTestCard();
     return false;
@@ -928,8 +928,8 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
     const int fbbpNextLine = pypc * fbbpl - charsPerLine * bxpc; // byte increment from  (top left of) last char of line to first of next line.
 #endif
     
-//#define hoffs 0
-#define hoffs 1
+#define hoffs 0
+//#define hoffs 1
 #define pxpc 12
 #define bxpc (pxpc / 4)
 #define pypc 18
