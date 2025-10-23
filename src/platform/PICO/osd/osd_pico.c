@@ -931,15 +931,25 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
             }
         }
 #elif 0
-        int bs = 252; int bx = 18; // bad
+//        int bs = 252; int bx = 18; // bad - but maybe just timing
 //        int bs = 262; int bx = 8; // ok
 //        int bs = 252; int bx = 8; // ok
+        int bs = 260; int bx = 3; // ok - fixes frame on row 14
         for (int badline = bs; badline < bs + bx; badline+=1) {
             uint8_t *ptr = (osdBufferA + (fbbpl * badline));
-            for (int x=0; x<92 /*92*/; ++x) {
+//            for (int x=0; x<92 /*92*/; ++x) {
+//            for (int x=24; x<64; ++x) {
+//            for (int x=24; x<28; ++x) { // <-- doesn't clear problem
+            for (int x=44; x<48; ++x) { // clears the problem
+//            for (int x=20; x<60 /*92*/; ++x) {
 //                *ptr++ = 0xf5555f55; // 0xff; // 55;
 //                *ptr++ = 0x55555f55; // 0xff; // 55;
-                *ptr++ = 0xff;
+//                *ptr++ = 0xff; // 
+//                *ptr++ = 0x55;
+//                *ptr++ = (x < 32 || x > 70) ? 0x55 : 0xff;
+//                *ptr++ = (x < 32 || x > 70) ? 0xff : 0x55;
+                ptr[x] = 0xff;
+//                ptr++;
             }
         }
 #endif            
