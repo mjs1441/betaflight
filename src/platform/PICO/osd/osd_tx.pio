@@ -18,11 +18,15 @@
 
 ; hsync + back porch = 10.4us (PAL) = 780 clocks
 ; from wait to out PINS is 6 + (1 + hshiftA) * (1 + hshiftB) + hshiftC = 780
-.define clocksPerPixel 9
-.define hshiftA 26
-;.define hshiftA 24
+; with hshiftA,B,C at nominal 24,29,24 values.
+; .define hshiftA 24
+; .define hshiftB 29
+; .define hshiftC 24
+.define hshiftA 28
 .define hshiftB 29
 .define hshiftC 24
+
+.define clocksPerPixel 10
 
 ; First display on "even" field 1 at (second half of) this line (official = 23), on "odd" field 2 at this + 313 (official = 336)
 ; e.g. skip hsync on lines 6,7,...,22 (17 such, so counter = 16)
@@ -76,6 +80,9 @@ d6: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 
     set PINS, 0
     jmp x--, wait_next_hsync
 ; that's a wrap
+
+
+;;;; prototype 2x SM, one just detects different sync types
 
 .program osd_sync
 start:

@@ -336,7 +336,8 @@ void osd_test_init(void)
 
 //    int pioclock = (int)75e6; // TODO
 //    int pioclock = (int)75e6 * 1.01; // TODO
-    int pioclock = (int)75e6 * 1.01; // TODO acceptable "slack"? clock should be accurate to ~ 1.00003 ?
+//    int pioclock = (int)75e6 * 1.01; // TODO acceptable "slack"? clock should be accurate to ~ 1.00003 ?
+    int pioclock = (int)75e6 * 1.057; // Empirically found multiplier to centre horizontally (PAL)
     float div = (float)SystemCoreClock / pioclock;
     bprintf("pio clock div = %f", (double)div);
     sm_config_set_clkdiv(&config, div);

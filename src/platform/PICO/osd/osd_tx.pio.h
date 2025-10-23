@@ -37,15 +37,15 @@ static const uint16_t osd_tx_program_instructions[] = {
     0x0048, // 16: jmp    x--, 8
     0xa026, // 17: mov    x, isr
     0x2020, // 18: wait   0 pin, 0
-    0xf85a, // 19: set    y, 26                  [24]
+    0xf85c, // 19: set    y, 28                  [24]
     0x1d94, // 20: jmp    y--, 20                [29]
     0x00d7, // 21: jmp    pin, 23
     0x0000, // 22: jmp    0
     0xe056, // 23: set    y, 22
     0x8080, // 24: pull   noblock
     0x6002, // 25: out    pins, 2
-    0x07f9, // 26: jmp    !osre, 25              [7]
-    0x0598, // 27: jmp    y--, 24                [5]
+    0x08f9, // 26: jmp    !osre, 25              [8]
+    0x0698, // 27: jmp    y--, 24                [6]
     0xe000, // 28: set    pins, 0
     0x0052, // 29: jmp    x--, 18
             //     .wrap
@@ -129,13 +129,13 @@ static const uint16_t osd_tx2_program_instructions[] = {
     0x0043, //  4: jmp    x--, 3
     0xa026, //  5: mov    x, isr
     0x20c2, //  6: wait   1 irq, 2
-    0xf85a, //  7: set    y, 26                  [24]
+    0xf85c, //  7: set    y, 28                  [24]
     0x1d88, //  8: jmp    y--, 8                 [29]
     0xe056, //  9: set    y, 22
     0x8080, // 10: pull   noblock
     0x6002, // 11: out    pins, 2
-    0x07eb, // 12: jmp    !osre, 11              [7]
-    0x058a, // 13: jmp    y--, 10                [5]
+    0x08eb, // 12: jmp    !osre, 11              [8]
+    0x068a, // 13: jmp    y--, 10                [6]
     0xe000, // 14: set    pins, 0
     0x0046, // 15: jmp    x--, 6
             //     .wrap
