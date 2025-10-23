@@ -835,7 +835,7 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
     // ** BEWARE charsPerLine doesn't correspond with pixels or bytes per line,
     // because we have some spare: 368 pixels not 360 for alignment reasons
 #if 0
-    const int hoffs = 0; //4; // 0..7
+    const int hoffs = 0; //0..2 (using 90 of 92 bytes)
     const int pxpc = 12;
     const int bxpc = pxpc / 4; // 4 pixels per byte -> 3 bytes to go across by 1 char
     const int pypc = 18;
@@ -844,7 +844,8 @@ bool osdDrawScreenUntil(uint32_t limit_micros)
     const int fbbpNextLine = pypc * fbbpl - charsPerLine * bxpc; // byte increment from  (top left of) last char of line to first of next line.
 #endif
     
-#define hoffs 0
+//#define hoffs 0
+#define hoffs 1
 #define pxpc 12
 #define bxpc (pxpc / 4)
 #define pypc 18
