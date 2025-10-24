@@ -162,12 +162,13 @@ hsync:
 
 .program osd_count_sync
 ; default FIFOs, one IN on JMP pin for wait, jmp
-; prep osr has 1000 say (put 1000 in tx fifo, exec PULL)
+; no autopush (IN doesn't push ISR to fifo)
+; prep osr has initLines (1000 say)
 start:
     IN NULL, 32              ; clear ISR
 restart:
     set x, 8
-    out y, 32                ; shift in 1000 from osr
+    out y, 32                ; shift in initLines from osr
     mov osr, y               ; reset osr
 waitsync:
     wait 0 PIN, 0

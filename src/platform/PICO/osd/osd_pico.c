@@ -460,24 +460,72 @@ otherwise just dma_channel_abort
     */
 }
 
-bool osdPioInitDevice( const struct vcdProfile_s *vcdProfile)
+static void clearCountProgram(void)
 {
-    UNUSED(vcdProfile);
+    pio_remove_program_and_unclaim_sm(&osd_count_sync_program, osdPio, osd_tx_sm, osd_tx_offset);
+}
+
+bool osdPioInitDevice(const struct vcdProfile_s *vcdProfile)
+{
+    UNUSED(vcdProfile); // TODO pass through? cached?
     osd_init_device();
     // *** TODO
     return true;
 }
 
-void osdPioSetNTSC(void)
+void osdPioStartNTSC(void)
 {
-    osdPioInitDevice();
+    bprintf("OSD TODO set NTSC");
+    clearCountProgram();
+    osdPioInitDevice(NULL);
 }
 
-void osdPioSetPAL(void)
+void osdPioStartPAL(void)
 {
-    osdPioInitDevice();
+    bprintf("OSD TODO set PAL");
+    clearCountProgram();
+    osdPioInitDevice(NULL);
 }
 
+static const int initLines = 1000;
+
+void osdPioDetectStart(void)
+{
+    osd_tx_offset = pio_add_program(osdPio, &osd_count_sync_program);
+    osd_tx_sm = pio_claim_unused_sm(osdPio, false);
+    pio_sm_config config = osd_count_sync_program_get_default_config(osd_tx_offset);
+
+    pio_sm_set_consecutive_pindirs(osdPio, osd_tx_sm, osd_sync_gpio, 1, false /* input */);
+    sm_config_set_in_pin_base(&config, osd_sync_gpio); // in PIN set SYNC (for WAIT)
+    sm_config_set_in_pin_count(&config, 1);
+    sm_config_set_jmp_pin(&config, osd_sync_gpio);     // jmp PIN is SYNC
+
+    sm_config_set_out_shift(&config, true, false, 32); // no autopull
+    sm_config_set_in_shift(&config, true, false, 32); // no autopush
+
+    int pioclock = (int)75e6;
+    float div = (float)SystemCoreClock / pioclock;
+    bprintf("OSD Detect pio clock div = %f", (double)div);
+    sm_config_set_clkdiv(&config, div);
+
+    pio_sm_init(osdPio, osd_tx_sm, osd_tx_offset, &config);
+    // Prepare OSR with the initial hsync count for the decrementing loop.
+    pio_sm_put(osdPio, osd_tx_sm, initLines);
+    pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
+
+    // Start counting...
+    pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+}
+
+int osdPioCountHSyncs(void)
+{
+    pio_sm_set_enabled(osdPio, osd_tx_sm, false);
+    pio_sm_clear_fifos(osdPio, osd_tx_sm);
+    pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_push(false, false));
+    int hsyncs = initLines - pio_sm_get(osdPio, osd_tx_sm);
+    pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+    return hsyncs;
+}
 
 volatile int ouccount;
 volatile int oucunsafe;

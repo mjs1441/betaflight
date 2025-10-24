@@ -241,7 +241,7 @@ bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displa
 
     displayInit(&fbOsdDisplayPort, &fbOsdVTable, DISPLAYPORT_DEVICE_TYPE_FBOSD);
 
-    fbOsdDeviceDetected = (initResult == FB_OSD_INIT_OK;
+    fbOsdDeviceDetected = initResult == FB_OSD_INIT_OK;
     // could be FB_OSD_INIT_INITIALISING, in which case
     // fb device IO pins are defined, but it's not fully up and running.
     // Delay full initialization to checkReady() with 'rescan' enabled.

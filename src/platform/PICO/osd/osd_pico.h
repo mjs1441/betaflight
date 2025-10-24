@@ -35,8 +35,8 @@ bool osdPioBufferAvailable(void);
 bool osdPioDrawScreenUntil(uint32_t limit_micros);
 void osdPioDetectStart(void);
 int osdPioCountHSyncs(void);
-void osdPioSetNTSC(void);
-void osdPioSetPAL(void);
+void osdPioStartNTSC(void);
+void osdPioStartPAL(void);
 
 // testing, probably don't need
 bool osdPioInitDevice( const struct vcdProfile_s *vcdProfile);

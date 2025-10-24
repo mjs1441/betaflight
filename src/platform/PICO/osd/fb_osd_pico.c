@@ -43,16 +43,20 @@
 fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struct vcdProfile_s *vcdProfile)
 {
     UNUSED(fbOsdConfig);
+    UNUSED(vcdProfile); // TODO
     static bool notFirst;
+    static int count;
+
+    count++;
 
     if (notFirst) {
         int hsyncs = osdPioCountHSyncs();
-        bprintf("OSD detected %d hsyncs");
+        bprintf("OSD %d detected %d hsyncs", count, hsyncs);
         if (hsyncs == 254) { // TODO *** 3 or so in a row? in a range to allow for variants and slight non-compliance?
-            osdPioSetNTSC();
+            osdPioStartNTSC();
             return FB_OSD_INIT_OK;
         } else if (hsyncs == 305) {
-            osdPioSetPAL();
+            osdPioStartPAL();
             return FB_OSD_INIT_OK;
         } else {
             return FB_OSD_INIT_INITIALISING;
