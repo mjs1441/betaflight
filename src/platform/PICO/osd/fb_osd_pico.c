@@ -43,20 +43,25 @@
 fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struct vcdProfile_s *vcdProfile)
 {
     UNUSED(fbOsdConfig);
+    static bool notFirst;
 
-    static bool second;
-    if (!second) {
-        bprintf("OSD first init attempt");
-        osdPioInitDevice(vcdProfile); // TODO return -> NOT_CONFIGURED or usually NOT_FOUND to defer full init
-    
-        // *** TODO
-        second = true;
-        return FB_OSD_INIT_NOT_FOUND;
+    if (notFirst) {
+        int hsyncs = osdPioCountHSyncs();
+        bprintf("OSD detected %d hsyncs");
+        if (hsyncs == 254) { // TODO *** 3 or so in a row? in a range to allow for variants and slight non-compliance?
+            osdPioSetNTSC();
+            return FB_OSD_INIT_OK;
+        } else if (hsyncs == 305) {
+            osdPioSetPAL();
+            return FB_OSD_INIT_OK;
+        } else {
+            return FB_OSD_INIT_INITIALISING;
+        }
+    } else {
+        osdPioDetectStart();
+        notFirst = true;
+        return FB_OSD_INIT_INITIALISING;
     }
-
-    bprintf("OSD simulate delayed init completion");
-    osdPioEnableDevice();
-    return FB_OSD_INIT_OK;
 }
 
 bool fbOsdReInitIfRequired(bool forceStallCheck)

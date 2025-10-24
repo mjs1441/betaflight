@@ -33,8 +33,12 @@ void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 bool osdPioBufferAvailable(void);
 bool osdPioDrawScreenUntil(uint32_t limit_micros);
-bool osdPioInitDevice( const struct vcdProfile_s *vcdProfile);
+void osdPioDetectStart(void);
+int osdPioCountHSyncs(void);
+void osdPioSetNTSC(void);
+void osdPioSetPAL(void);
 
 // testing, probably don't need
+bool osdPioInitDevice( const struct vcdProfile_s *vcdProfile);
 void osdPioEnableDevice(void);
 void osdPioDisableDevice(void);

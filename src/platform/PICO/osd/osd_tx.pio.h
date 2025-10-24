@@ -175,6 +175,51 @@ static inline pio_sm_config osd_sync_program_get_default_config(uint offset) {
 }
 #endif
 
+// -------------- //
+// osd_count_sync //
+// -------------- //
+
+#define osd_count_sync_wrap_target 0
+#define osd_count_sync_wrap 13
+#define osd_count_sync_pio_version 1
+
+static const uint16_t osd_count_sync_program_instructions[] = {
+            //     .wrap_target
+    0x4060, //  0: in     null, 32
+    0xe028, //  1: set    x, 8
+    0x6040, //  2: out    y, 32
+    0xa0e2, //  3: mov    osr, y
+    0x2020, //  4: wait   0 pin, 0
+    0x1c45, //  5: jmp    x--, 5                 [28]
+    0x00c4, //  6: jmp    pin, 4
+    0xe025, //  7: set    x, 5
+    0x1c48, //  8: jmp    x--, 8                 [28]
+    0x00cc, //  9: jmp    pin, 12
+    0x4040, // 10: in     y, 32
+    0x0001, // 11: jmp    1
+    0x0081, // 12: jmp    y--, 1
+    0x0004, // 13: jmp    4
+            //     .wrap
+};
+
+#if !PICO_NO_HARDWARE
+static const struct pio_program osd_count_sync_program = {
+    .instructions = osd_count_sync_program_instructions,
+    .length = 14,
+    .origin = -1,
+    .pio_version = osd_count_sync_pio_version,
+#if PICO_PIO_VERSION > 0
+    .used_gpio_ranges = 0x0
+#endif
+};
+
+static inline pio_sm_config osd_count_sync_program_get_default_config(uint offset) {
+    pio_sm_config c = pio_get_default_sm_config();
+    sm_config_set_wrap(&c, offset + osd_count_sync_wrap_target, offset + osd_count_sync_wrap);
+    return c;
+}
+#endif
+
 // ------- //
 // osd_tx2 //
 // ------- //

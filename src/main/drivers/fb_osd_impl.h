@@ -33,7 +33,7 @@
 
 typedef enum {
     FB_OSD_INIT_OK = 0,              // IO defined and fb device was detected
-    FB_OSD_INIT_NOT_FOUND = -1,      // IO defined, but fb device not fully up and running (e.g. syncs not yet correctly detected)
+    FB_OSD_INIT_INITIALISING = -1,   // IO defined, but fb device not fully up and running (e.g. syncs not yet correctly detected)
     FB_OSD_INIT_NOT_CONFIGURED = -2, // No fb IO defined, which means either the we don't have it or it's not properly configured
 } fbOsdInitStatus_e;
 

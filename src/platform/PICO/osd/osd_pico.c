@@ -468,7 +468,15 @@ bool osdPioInitDevice( const struct vcdProfile_s *vcdProfile)
     return true;
 }
 
+void osdPioSetNTSC(void)
+{
+    osdPioInitDevice();
+}
 
+void osdPioSetPAL(void)
+{
+    osdPioInitDevice();
+}
 
 
 volatile int ouccount;

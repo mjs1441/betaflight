@@ -142,6 +142,7 @@ d6: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 
 ;;;; prototype 2x SM, one just detects different sync types
 
 .program osd_sync
+; no FIFO, one IN pin for WAIT, one JMP pin
 start:
     set x, 8
     set y, 5
@@ -158,6 +159,30 @@ d2: jmp y--, d2       [28]
 hsync:
     irq 2                    ; set flag for HSync
     ; wrap
+
+.program osd_count_sync
+; default FIFOs, one IN on JMP pin for wait, jmp
+; prep osr has 1000 say (put 1000 in tx fifo, exec PULL)
+start:
+    IN NULL, 32              ; clear ISR
+restart:
+    set x, 8
+    out y, 32                ; shift in 1000 from osr
+    mov osr, y               ; reset osr
+waitsync:
+    wait 0 PIN, 0
+d1: jmp x--, d1       [28]   ; wait then test for PIN being high
+    jmp PIN, waitsync        ; shorter than HSync pulse at ~ 9*29/75 ~ 3.5us
+    set x, 5
+d2: jmp x--, d2       [28]
+    jmp PIN, hsync           ; shorter than VSync pulse at ~ 15*29/75 ~ 5.8us
+                             ; suppose VSync
+    IN y, 32                 ; put count into ISR
+    jmp restart
+hsync:
+    jmp y-- restart
+    jmp waitsync
+
 
 .program osd_tx2
 

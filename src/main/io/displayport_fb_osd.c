@@ -167,6 +167,7 @@ static bool checkReady(displayPort_t *displayPort, bool rescan)
         }
         // At this point the device has been initialized and detected
         fbOsdDeviceDetected = true;
+        fbOsdDisplayPort.rows = fbOsdGetRowsCount() + displayPortProfileFbOsd()->rowAdjust;
         redraw(&fbOsdDisplayPort);
     }
 
@@ -233,14 +234,15 @@ bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displa
         break;
     }
 
+    *displayPort = &fbOsdDisplayPort;
+
     fbOsdDisplayPort.rows = displayRows + displayPortProfileFbOsd()->rowAdjust;
     fbOsdDisplayPort.cols = 30 + displayPortProfileFbOsd()->colAdjust;
 
     displayInit(&fbOsdDisplayPort, &fbOsdVTable, DISPLAYPORT_DEVICE_TYPE_FBOSD);
-    *displayPort = &fbOsdDisplayPort;
 
-    fbOsdDeviceDetected = initResult == FB_OSD_INIT_OK;
-    // could be FB_OSD_INIT_NOT_FOUND, in which case
+    fbOsdDeviceDetected = (initResult == FB_OSD_INIT_OK;
+    // could be FB_OSD_INIT_INITIALISING, in which case
     // fb device IO pins are defined, but it's not fully up and running.
     // Delay full initialization to checkReady() with 'rescan' enabled.
 
