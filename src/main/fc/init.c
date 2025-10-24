@@ -880,11 +880,13 @@ void init(void)
             device = OSD_DISPLAYPORT_DEVICE_MSP;
         } else {
             device = osdConfig()->displayPortDevice;
+            bprintf("INIT OSD from config, displayPortDevice = %d", device);
         }
 
         switch(device) {
 
         case OSD_DISPLAYPORT_DEVICE_AUTO:
+            bprintf("INIT OSD displayport device was auto");
             FALLTHROUGH;
 
 #if defined(USE_FRSKYOSD)
@@ -922,6 +924,7 @@ void init(void)
 
 #if defined(USE_FB_OSD)
         case OSD_DISPLAYPORT_DEVICE_FBOSD:
+            bprintf("INIT OSD test FBOSD");
             if (fbOsdDisplayPortInit(vcdProfile(), &osdDisplayPort) || device == OSD_DISPLAYPORT_DEVICE_FBOSD) {
                 osdDisplayPortDevice = OSD_DISPLAYPORT_DEVICE_FBOSD;
                 break;
@@ -940,11 +943,7 @@ void init(void)
         osdInit(osdDisplayPort, osdDisplayPortDevice);
 
         if (osdDisplayPortDevice == OSD_DISPLAYPORT_DEVICE_NONE) {
-#ifdef TEST_PIO_OSD
-            bprintf("... would disable feature OSD here");
-#else
             featureDisableImmediate(FEATURE_OSD);
-#endif
         }
     }
 #endif // USE_OSD

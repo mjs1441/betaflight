@@ -616,12 +616,8 @@ void tasksInit(void)
 
 #ifdef USE_OSD
     rescheduleTask(TASK_OSD, TASK_PERIOD_HZ(osdConfig()->framerate_hz));
-#ifdef TEST_PIO_OSD
-    bprintf("settaskenabled task_osd func %p", getTask(TASK_OSD)->attribute->taskFunc);
-    setTaskEnabled(TASK_OSD, true);
-#else
+    bprintf("OSD enable TASK_OSD %d %d", featureIsEnabled(FEATURE_OSD), osdGetDisplayPort(NULL));
     setTaskEnabled(TASK_OSD, featureIsEnabled(FEATURE_OSD) && osdGetDisplayPort(NULL));
-#endif
 #endif
 
 #ifdef USE_BST

@@ -32,16 +32,13 @@
 // #define VIDEO_BUFFER_CHARS_PAL    480
 
 typedef enum {
-    // IO defined and fb device was detected
-    FB_OSD_INIT_OK = 0,
-    // IO defined, but fb device not fully up and running (e.g. syncs not yet correctly detected)
-    FB_OSD_INIT_NOT_FOUND = -1,
-    // No fb IO defined, which means either the we don't have it or it's not properly configured
-    FB_OSD_INIT_NOT_CONFIGURED = -2,
+    FB_OSD_INIT_OK = 0,              // IO defined and fb device was detected
+    FB_OSD_INIT_NOT_FOUND = -1,      // IO defined, but fb device not fully up and running (e.g. syncs not yet correctly detected)
+    FB_OSD_INIT_NOT_CONFIGURED = -2, // No fb IO defined, which means either the we don't have it or it's not properly configured
 } fbOsdInitStatus_e;
 
 // extern uint16_t maxScreenSize;
- struct fbOsdConfig_s;
+struct fbOsdConfig_s;
 
 // Per platform implementation of framebuffer OSD.
 
@@ -63,5 +60,5 @@ bool    fbOsdBufferInUse(void);
 bool    fbOsdLayerSupported(displayPortLayer_e layer);
 bool    fbOsdLayerSelect(displayPortLayer_e layer);
 bool    fbOsdLayerCopy(displayPortLayer_e destLayer, displayPortLayer_e sourceLayer);
-bool    fbOsdIsDeviceDetected(void);
+// bool    fbOsdIsDeviceDetected(void);
 void    fbOsdSetBackgroundType(displayPortBackground_e backgroundType);

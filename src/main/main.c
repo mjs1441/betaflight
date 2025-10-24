@@ -42,7 +42,7 @@ int main(int argc, char * argv[])
     init();
 
 #ifdef TEST_PIO_OSD
-    osd_test();
+    // osd_test();
 #endif
     
     run();

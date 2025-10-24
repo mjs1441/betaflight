@@ -43,8 +43,19 @@
 fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struct vcdProfile_s *vcdProfile)
 {
     UNUSED(fbOsdConfig);
-    UNUSED(vcdProfile);
-    // *** TODO
+
+    static bool second;
+    if (!second) {
+        bprintf("OSD first init attempt");
+        osdPioInitDevice(vcdProfile); // TODO return -> NOT_CONFIGURED or usually NOT_FOUND to defer full init
+    
+        // *** TODO
+        second = true;
+        return FB_OSD_INIT_NOT_FOUND;
+    }
+
+    bprintf("OSD simulate delayed init completion");
+    osdPioEnableDevice();
     return FB_OSD_INIT_OK;
 }
 
@@ -60,7 +71,7 @@ bool fbOsdDrawScreen(void)
 {
     // Spend no more than DRAWSCREEN_TIME_LIMIT_US on each iteration, will keep
     // on calling in here until we return false for "all done".
-    return osdDrawScreenUntil(micros() + DRAWSCREEN_TIME_LIMIT_US);
+    return osdPioDrawScreenUntil(micros() + DRAWSCREEN_TIME_LIMIT_US);
 //    return osdDrawScreenUntil(micros() - 1);
 }
 
@@ -106,7 +117,7 @@ void fbOsdRefreshAll(void)
 
 bool fbOsdBufferInUse(void)
 {
-    return !osdBufferAvailable();
+    return !osdPioBufferAvailable();
 }
 
 bool fbOsdLayerSupported(displayPortLayer_e layer)
@@ -124,12 +135,6 @@ bool fbOsdLayerCopy(displayPortLayer_e destLayer, displayPortLayer_e sourceLayer
     UNUSED(destLayer);
     UNUSED(sourceLayer);
     return false;
-}
-
-bool fbOsdIsDeviceDetected(void)
-{
-    // *** TODO
-    return true;
 }
 
 void fbOsdSetBackgroundType(displayPortBackground_e backgroundType)

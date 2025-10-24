@@ -46,6 +46,7 @@
 
 static displayPort_t fbOsdDisplayPort;
 static vcdProfile_t const *fbOsdVcdProfile;
+static bool fbOsdDeviceDetected;
 
 static int grab(displayPort_t *displayPort)
 {
@@ -155,17 +156,18 @@ static bool writeFontCharacter(displayPort_t *displayPort, uint16_t addr, const 
 static bool checkReady(displayPort_t *displayPort, bool rescan)
 {
     UNUSED(displayPort);
-    if (!fbOsdIsDeviceDetected()) { // haven't returned true from init function...
-        if (!rescan) {
+    UNUSED(rescan);
+    if (!fbOsdDeviceDetected) { // haven't returned OK from fbOsdInit function...
+//        if (!rescan) {
+//            return false;
+//        } else {
+        // Try to initialize the device
+        if (fbOsdInit(NULL /* fbOsdConfig() */, fbOsdVcdProfile) != FB_OSD_INIT_OK) {
             return false;
-        } else {
-            // Try to initialize the device
-            if (fbOsdInit(NULL /* fbOsdConfig() */, fbOsdVcdProfile) != FB_OSD_INIT_OK) {
-                return false;
-            }
-            // At this point the device has been initialized and detected
-            redraw(&fbOsdDisplayPort);
         }
+        // At this point the device has been initialized and detected
+        fbOsdDeviceDetected = true;
+        redraw(&fbOsdDisplayPort);
     }
 
     return true;
@@ -203,32 +205,15 @@ bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displa
     bprintf("OSD fbOsdDisplayPortInit");
     fbOsdVcdProfile = vcdProfile;
 
-    switch (fbOsdInit(NULL /* fbOsdConfig() */ , fbOsdVcdProfile)) {
-    case FB_OSD_INIT_NOT_CONFIGURED:
+    fbOsdInitStatus_e initResult = fbOsdInit(NULL /* fbOsdConfig() */ , fbOsdVcdProfile);
+    bprintf("OSD fbOsdDisplayPortInit %d", initResult);
+
+    if (initResult == FB_OSD_INIT_NOT_CONFIGURED) {
         // fb device IO pins are not defined. We either don't have
         // it on board or either the configuration for it has
         // not been set.
         *displayPort = NULL;
-
         return false;
-
-        break;
-    case FB_OSD_INIT_NOT_FOUND:
-        // fb device IO pins are defined, but it's not fully up and running.
-        // Delay full initialization to heckReady() with 'rescan' enabled.
-        displayInit(&fbOsdDisplayPort, &fbOsdVTable, DISPLAYPORT_DEVICE_TYPE_FBOSD);
-        *displayPort = &fbOsdDisplayPort;
-
-        return false;
-
-        break;
-    case FB_OSD_INIT_OK:
-        // fb device configured and detected
-        displayInit(&fbOsdDisplayPort, &fbOsdVTable, DISPLAYPORT_DEVICE_TYPE_FBOSD);
-        *displayPort = &fbOsdDisplayPort;
-        bprintf("OSD fbOsdDisplayPortInit OK");
-
-        break;
     }
 
     uint8_t displayRows;
@@ -250,6 +235,14 @@ bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displa
 
     fbOsdDisplayPort.rows = displayRows + displayPortProfileFbOsd()->rowAdjust;
     fbOsdDisplayPort.cols = 30 + displayPortProfileFbOsd()->colAdjust;
+
+    displayInit(&fbOsdDisplayPort, &fbOsdVTable, DISPLAYPORT_DEVICE_TYPE_FBOSD);
+    *displayPort = &fbOsdDisplayPort;
+
+    fbOsdDeviceDetected = initResult == FB_OSD_INIT_OK;
+    // could be FB_OSD_INIT_NOT_FOUND, in which case
+    // fb device IO pins are defined, but it's not fully up and running.
+    // Delay full initialization to checkReady() with 'rescan' enabled.
 
     return true;
 }

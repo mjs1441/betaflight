@@ -22,7 +22,12 @@
 #include "platform.h"
 
 //#ifdef USE_OSD_SD
-#ifdef TEST_PIO_OSD
+//#ifdef TEST_PIO_OSD
+#ifdef USE_FB_OSD
+
+#if !(defined OSD_W_PIN && defined OSD_EN_PIN && defined OSD_SYNC_PIN)
+#error This PICO OSD requires OSD_W_PIN, OSD_EN_PIN and OSD_SYNC_PIN to be defined
+#endif
 
 #include <string.h>
 #include <stdlib.h>
@@ -30,20 +35,20 @@
 #include "common/printf.h"
 #include "drivers/io.h"
 #include "drivers/io_impl.h"
+#include "drivers/osd.h"
 #include "drivers/system.h"
 #include "drivers/time.h"
 #include "flight/imu.h"
-
-#if !(defined OSD_W_PIN && defined OSD_EN_PIN && defined OSD_SYNC_PIN)
-#error This PICO OSD requires OSD_W_PIN, OSD_EN_PIN and OSD_SYNC_PIN to be defined
-#endif
-
 #include "osd/osd.h"
+#include "pg/vcd.h"
 
+// pico sdk
 #include "hardware/irq.h"
 #include "hardware/pio.h"
 #include "hardware/dma.h"
 
+// local
+#include "osd_pico.h"
 #include "osd_tx.pio.h"
 #include "font_betaflight.h"
 
@@ -159,7 +164,7 @@ int64_t safe_zone_callback(alarm_id_t id, void * user_data)
     return 0; // don't automatically reschedule
 }
 
-bool osdBufferAvailable(void)
+bool osdPioBufferAvailable(void)
 {
 #if 1
     if (transferredSinceVsync) {
@@ -229,13 +234,13 @@ static void plotBorder(void)
     }
 }
 
-void osd_test_init(void)
+void osd_init_device(void)
 {
     safe_zone_period = 18000;
     safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBufferA) during final 10000 or so
     in_safe_zone = true;
 
-    bprintf("osd_test_init");
+    bprintf("OSD osd_init_device");
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT, PICO_OSD_BUF_LENGTH);
     bprintf("osdBuffer1: %p osdBuffer2: %p", osdBuffer1W, osdBuffer2W);
     bprintf("nx %d, ny %d", fb_nx, fb_ny);
@@ -455,6 +460,17 @@ otherwise just dma_channel_abort
     */
 }
 
+bool osdPioInitDevice( const struct vcdProfile_s *vcdProfile)
+{
+    UNUSED(vcdProfile);
+    osd_init_device();
+    // *** TODO
+    return true;
+}
+
+
+
+
 volatile int ouccount;
 volatile int oucunsafe;
 
@@ -657,7 +673,7 @@ static void enable(void)
 //    gpio_set_pulls(osd_w_gpio, true, false);
 }
 
-#ifdef oldtests
+// maybe don't need...
 static void disable(void)
 {
     pio_sm_set_enabled(osdPio, osd_tx_sm, false);
@@ -666,11 +682,18 @@ static void disable(void)
     gpio_init(osd_en_gpio);
 //    gpio_set_pulls(osd_w_gpio, true, false);
 }
-#endif
+
+void osdPioEnableDevice(void) {
+    enable();
+}
+
+void osdPioDisableDevice(void) {
+    disable();
+}
 
 void osd_test(void)
 {
-    osd_test_init();
+    osd_init_device();
 
     (void)rtdata;
 /*
@@ -789,19 +812,6 @@ void osd_test(void)
 #endif
 }
 
-
-#ifdef TEST_PIO_OSD
-void testOSDtaskOffPidLoop(void)
-{
-#if 1
-    return;
-#else
-    testUpdate();
-#endif
-}
-
-#endif
-
 void plotTestCard(void)
 {
     for (int i=0; i<fb_nx; ++i) {
@@ -865,7 +875,7 @@ void osdUpdateCallback(uint32_t t_us)
     bprintf("\n*** not in use *** \n");
 #if 0
     ouccount++;
-    if (!osdBufferAvailable()) {
+    if (!osdPioBufferAvailable()) {
         oucunsafe++;
         testUpdate();
     } else {
@@ -886,7 +896,7 @@ void osdUpdateCallback(uint32_t t_us)
     sze = getCycleCounter();
     osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
     osdPioWrite(2,0,oucbuf);
-    if (osdBufferAvailable()) {
+    if (osdPioBufferAvailable()) {
         testUpdate();
     } else {
         oucunsafe++;
@@ -897,7 +907,7 @@ void osdUpdateCallback(uint32_t t_us)
 // Update screen buffer (paint characters etc to buffer), up until a time limit.
 // Store state so that we can resume.
 // Return false when complete (no more to do).
-bool osdDrawScreenUntil(uint32_t limit_micros)
+bool osdPioDrawScreenUntil(uint32_t limit_micros)
 {
 #if 0
     UNUSED(limit_micros);
