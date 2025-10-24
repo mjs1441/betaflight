@@ -40,32 +40,85 @@
 // *** TODO merge osd_pico.c into fb_osd_pico.c (probably - might tease out some lower level stuff, pio-related)
 // osd_pico -> osd_pio, DMA, IRQ or so
 
+static bool inNTSCrange(int n)
+{
+    return n >= 253 && n <= 255;
+}
+
+static bool inPALrange(int n)
+{
+    return n >= 304 && n <= 306;
+}
+
 fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struct vcdProfile_s *vcdProfile)
 {
     UNUSED(fbOsdConfig);
     UNUSED(vcdProfile); // TODO
-    static bool notFirst;
+    static bool first = true;
     static int count;
+
+    const int repeatTarget = 100;
+    static int repeatCount;
+    static int lastHSyncs = -1;
+    static uint32_t lastMicros;
 
     count++;
 
-    if (notFirst) {
-        int hsyncs = osdPioCountHSyncs();
-        bprintf("OSD %d detected %d hsyncs", count, hsyncs);
-        if (hsyncs == 254) { // TODO *** 3 or so in a row? in a range to allow for variants and slight non-compliance?
-            osdPioStartNTSC();
-            return FB_OSD_INIT_OK;
-        } else if (hsyncs == 305) {
-            osdPioStartPAL();
-            return FB_OSD_INIT_OK;
-        } else {
-            return FB_OSD_INIT_INITIALISING;
-        }
-    } else {
+    if (first) {
         osdPioDetectStart();
-        notFirst = true;
+        first = false;
+        lastMicros = micros();
         return FB_OSD_INIT_INITIALISING;
     }
+
+    UNUSED(lastMicros);
+#if 0
+    uint32_t now = micros();
+    if (cmpTimeUs(now, lastMicros) < 41000) {
+        // Reading involves stopping the PIO program
+        // Allow time to recover from previous read and have fresh VSync cycle to get a good next read.
+        return FB_OSD_INIT_INITIALISING;
+    }
+#endif
+    
+    int hSyncs = osdPioCountHSyncs();
+    if (!hSyncs) {
+        // Invalid - maybe tried to read again too quickly.
+        return FB_OSD_INIT_INITIALISING;
+    }
+
+#if 1
+    if (hSyncs != lastHSyncs) {
+        // bprintf("OSD %d detected %d hSyncs", count, hSyncs);
+    }
+#endif
+
+    // While composite source is warming up, might expect to see hSyncs increasing over a period of seconds
+    // from zero to a stable number.
+    
+    if (lastHSyncs == hSyncs) {
+        repeatCount++;
+        if (0 == (repeatCount % 5)) {
+            bprintf("repeat %d of %d", repeatCount, hSyncs);
+        }
+    } else {
+        repeatCount = 0;
+    }
+    
+    if (repeatCount == repeatTarget) {
+        if (inNTSCrange(hSyncs)) {
+            bprintf("OSD %d repeat %d of %d (NTSC)", count, repeatCount, hSyncs);
+            osdPioStartNTSC();
+            return FB_OSD_INIT_OK;
+        } else if (inPALrange(hSyncs)) {
+            bprintf("OSD %d repeat %d of %d (PAL)", count, repeatCount, hSyncs);
+            osdPioStartPAL();
+            return FB_OSD_INIT_OK;
+        }
+    }
+    
+    lastHSyncs = hSyncs;
+    return FB_OSD_INIT_INITIALISING;
 }
 
 bool fbOsdReInitIfRequired(bool forceStallCheck)

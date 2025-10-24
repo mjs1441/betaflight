@@ -164,12 +164,20 @@ hsync:
 ; default FIFOs, one IN on JMP pin for wait, jmp
 ; no autopush (IN doesn't push ISR to fifo)
 ; use tx FIFO for flow control (restart)
-; prep osr has initLines (1000 say)
+;;;; prep osr has initLines (1000 say)
 start:
     IN NULL, 32              ; clear ISR
-restart:
+PUBLIC ready:
+    PULL block               ; (re)start when CPU sends initLines to the tx fifo
+recover:
     out y, 32                ; shift in initLines from osr
     mov osr, y               ; reset osr
+    wait 1 PIN, 0
+waitInitialVSync:
+    wait 0 PIN, 0
+    set x, 14
+d0: jmp x--, d0       [28]
+    jmp PIN, waitInitialVSync
     wait 1 PIN, 0
 waitsync:
     wait 0 PIN, 0
@@ -181,13 +189,10 @@ d2: jmp x--, d2       [28]
     jmp PIN, hsync           ; shorter than VSync pulse at ~ 15*29/75 ~ 5.8us
 vsync:
     IN y, 32                 ; put count into ISR
-    PULL block               ; restart when CPU sends initLines again to the tx fifo
-;;    set y,31
-;;    jmp waitsync
-    jmp restart
+    jmp ready
 hsync:
     jmp y--, waitsync
-    jmp restart
+    jmp recover              ; counted beyond initLines - unusual, try find another VSync
 
 
 .program osd_tx2

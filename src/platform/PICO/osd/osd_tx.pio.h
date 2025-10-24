@@ -180,32 +180,41 @@ static inline pio_sm_config osd_sync_program_get_default_config(uint offset) {
 // -------------- //
 
 #define osd_count_sync_wrap_target 0
-#define osd_count_sync_wrap 13
+#define osd_count_sync_wrap 20
 #define osd_count_sync_pio_version 1
+
+#define osd_count_sync_offset_ready 1u
 
 static const uint16_t osd_count_sync_program_instructions[] = {
             //     .wrap_target
     0x4060, //  0: in     null, 32
-    0xe028, //  1: set    x, 8
+    0x80a0, //  1: pull   block
     0x6040, //  2: out    y, 32
     0xa0e2, //  3: mov    osr, y
-    0x2020, //  4: wait   0 pin, 0
-    0x1c45, //  5: jmp    x--, 5                 [28]
-    0x00c4, //  6: jmp    pin, 4
-    0xe025, //  7: set    x, 5
-    0x1c48, //  8: jmp    x--, 8                 [28]
-    0x00cc, //  9: jmp    pin, 12
-    0x4040, // 10: in     y, 32
-    0x0001, // 11: jmp    1
-    0x0081, // 12: jmp    y--, 1
-    0x0004, // 13: jmp    4
+    0x20a0, //  4: wait   1 pin, 0
+    0x2020, //  5: wait   0 pin, 0
+    0xe02e, //  6: set    x, 14
+    0x1c47, //  7: jmp    x--, 7                 [28]
+    0x00c5, //  8: jmp    pin, 5
+    0x20a0, //  9: wait   1 pin, 0
+    0x2020, // 10: wait   0 pin, 0
+    0xe028, // 11: set    x, 8
+    0x1c4c, // 12: jmp    x--, 12                [28]
+    0x00ca, // 13: jmp    pin, 10
+    0xe025, // 14: set    x, 5
+    0x1c4f, // 15: jmp    x--, 15                [28]
+    0x00d3, // 16: jmp    pin, 19
+    0x4040, // 17: in     y, 32
+    0x0001, // 18: jmp    1
+    0x008a, // 19: jmp    y--, 10
+    0x0002, // 20: jmp    2
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program osd_count_sync_program = {
     .instructions = osd_count_sync_program_instructions,
-    .length = 14,
+    .length = 21,
     .origin = -1,
     .pio_version = osd_count_sync_pio_version,
 #if PICO_PIO_VERSION > 0

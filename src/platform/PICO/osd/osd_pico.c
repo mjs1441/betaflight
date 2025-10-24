@@ -151,6 +151,28 @@ uint8_t osdCharBuffer[480];
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 
+static void init_gpios(void)
+{
+    static bool did;
+    if (!did) {
+        osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
+        osd_w_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_W_PIN));
+        if (osd_en_gpio != osd_w_gpio + 1) {
+            bprintf("*** OSD_EN_GPIO must be next pin up from OSD_W_GPIO (%d vs %d)", osd_en_gpio, osd_w_gpio);
+        }
+        
+        osd_sync_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_SYNC_PIN));
+        if (osd_sync_gpio != osd_en_gpio + 1) {
+            // might relax this... wait GPIO vs wait PINS if single SM, or just separate SMs
+        bprintf("*** OSD_SYNC_GPIO must be next pin up from OSD_EN_GPIO (%d vs %d)", osd_sync_gpio, osd_en_gpio);
+        }
+        
+        bprintf("osd_w gpio %d, osd_en gpio %d, osd_sync gpio %d", osd_w_gpio, osd_en_gpio, osd_sync_gpio);
+        // *** TODO PIO BASE
+        did = true;
+    }
+}
+
 int64_t safe_zone_callback(alarm_id_t id, void * user_data)
 {
     static int cc;
@@ -308,21 +330,8 @@ void osd_init_device(void)
         plot(367, i, 2);
     }
 #endif
-    
-    osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
-    osd_w_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_W_PIN));
-    if (osd_en_gpio != osd_w_gpio + 1) {
-        bprintf("*** OSD_EN_GPIO must be next pin up from OSD_W_GPIO (%d vs %d)", osd_en_gpio, osd_w_gpio);
-    }
 
-    osd_sync_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_SYNC_PIN));
-    if (osd_sync_gpio != osd_en_gpio + 1) {
-        // might relax this... wait GPIO vs wait PINS if single SM, or just separate SMs
-        bprintf("*** OSD_SYNC_GPIO must be next pin up from OSD_EN_GPIO (%d vs %d)", osd_sync_gpio, osd_en_gpio);
-    }
-
-    bprintf("osd_w gpio %d, osd_en gpio %d, osd_sync gpio %d", osd_w_gpio, osd_en_gpio, osd_sync_gpio);
-    // *** TODO PIO BASE
+    init_gpios();
 
 #ifdef tryntsc
     osd_tx_offset = pio_add_program(osdPio, &osd_tx_ntsc_program);
@@ -491,6 +500,7 @@ static const int initLines = 1000;
 
 void osdPioDetectStart(void)
 {
+    init_gpios();
     osd_tx_offset = pio_add_program(osdPio, &osd_count_sync_program);
     osd_tx_sm = pio_claim_unused_sm(osdPio, false);
     pio_sm_config config = osd_count_sync_program_get_default_config(osd_tx_offset);
@@ -511,7 +521,7 @@ void osdPioDetectStart(void)
     pio_sm_init(osdPio, osd_tx_sm, osd_tx_offset, &config);
     // Prepare OSR with the initial hsync count for the decrementing loop.
     pio_sm_put(osdPio, osd_tx_sm, initLines);
-    pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
+    // this now in PIO code: pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
 
     // Start counting...
     pio_sm_set_enabled(osdPio, osd_tx_sm, true);
@@ -519,11 +529,17 @@ void osdPioDetectStart(void)
 
 int osdPioCountHSyncs(void)
 {
-    pio_sm_set_enabled(osdPio, osd_tx_sm, false);
-    pio_sm_clear_fifos(osdPio, osd_tx_sm);
-    pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_push(false, false));
-    int hsyncs = initLines - pio_sm_get(osdPio, osd_tx_sm);
-    pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+    // Non-blocking, understand return of 0 as invalid / not ready.
+    int hsyncs = 0;
+    int pc = pio_sm_get_pc(osdPio, osd_tx_sm);
+    if (pc - osd_tx_offset == osd_count_sync_offset_ready) {
+        // Program has reached "pull block". Extract from ISR, then restart by sending to TX fifo.
+        pio_sm_clear_fifos(osdPio, osd_tx_sm);
+        pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_push(false, false));
+        hsyncs = initLines - pio_sm_get(osdPio, osd_tx_sm);
+        pio_sm_put(osdPio, osd_tx_sm, initLines);
+    }
+
     return hsyncs;
 }
 
