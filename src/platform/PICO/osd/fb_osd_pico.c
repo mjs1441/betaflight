@@ -42,12 +42,14 @@
 
 static bool inNTSCrange(int n)
 {
-    return n >= 253 && n <= 255;
+    const int ntscHsyncs = 254;
+    return n >= ntscHsyncs - 1 && n <= ntscHsyncs + 1;
 }
 
 static bool inPALrange(int n)
 {
-    return n >= 304 && n <= 306;
+    const int palHsyncs = 305;
+    return n >= palHsyncs - 1 && n <= palHsyncs + 1;
 }
 
 fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struct vcdProfile_s *vcdProfile)
@@ -55,43 +57,32 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
     UNUSED(fbOsdConfig);
     UNUSED(vcdProfile); // TODO
     static bool first = true;
-    static int count;
 
-    const int repeatTarget = 100;
+    const int repeatTarget = 15;
     static int repeatCount;
     static int lastHSyncs = -1;
-    static uint32_t lastMicros;
 
-    count++;
 
     if (first) {
         osdPioDetectStart();
         first = false;
-        lastMicros = micros();
         return FB_OSD_INIT_INITIALISING;
     }
-
-    UNUSED(lastMicros);
-#if 0
-    uint32_t now = micros();
-    if (cmpTimeUs(now, lastMicros) < 41000) {
-        // Reading involves stopping the PIO program
-        // Allow time to recover from previous read and have fresh VSync cycle to get a good next read.
-        return FB_OSD_INIT_INITIALISING;
-    }
-#endif
     
     int hSyncs = osdPioCountHSyncs();
+    
+#ifdef PICO_TRACE
+    static int count;
+    count++;
+    if ((count % 100000 == 0) || (hSyncs && hSyncs != lastHSyncs)) {
+        bprintf("OSD %d detected %d hSyncs", count, hSyncs);
+    }
+#endif
+
     if (!hSyncs) {
         // Invalid - maybe tried to read again too quickly.
         return FB_OSD_INIT_INITIALISING;
     }
-
-#if 1
-    if (hSyncs != lastHSyncs) {
-        // bprintf("OSD %d detected %d hSyncs", count, hSyncs);
-    }
-#endif
 
     // While composite source is warming up, might expect to see hSyncs increasing over a period of seconds
     // from zero to a stable number.
@@ -99,7 +90,7 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
     if (lastHSyncs == hSyncs) {
         repeatCount++;
         if (0 == (repeatCount % 5)) {
-            bprintf("repeat %d of %d", repeatCount, hSyncs);
+            bprintf("OSD repeat %d of %d", repeatCount, hSyncs);
         }
     } else {
         repeatCount = 0;
@@ -107,11 +98,11 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
     
     if (repeatCount == repeatTarget) {
         if (inNTSCrange(hSyncs)) {
-            bprintf("OSD %d repeat %d of %d (NTSC)", count, repeatCount, hSyncs);
+            bprintf("OSD repeat %d of %d (NTSC)", repeatCount, hSyncs);
             osdPioStartNTSC();
             return FB_OSD_INIT_OK;
         } else if (inPALrange(hSyncs)) {
-            bprintf("OSD %d repeat %d of %d (PAL)", count, repeatCount, hSyncs);
+            bprintf("OSD repeat %d of %d (PAL)", repeatCount, hSyncs);
             osdPioStartPAL();
             return FB_OSD_INIT_OK;
         }

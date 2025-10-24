@@ -471,6 +471,7 @@ otherwise just dma_channel_abort
 
 static void clearCountProgram(void)
 {
+    pio_sm_set_enabled(osdPio, osd_tx_sm, false);
     pio_remove_program_and_unclaim_sm(&osd_count_sync_program, osdPio, osd_tx_sm, osd_tx_offset);
 }
 
@@ -478,7 +479,6 @@ bool osdPioInitDevice(const struct vcdProfile_s *vcdProfile)
 {
     UNUSED(vcdProfile); // TODO pass through? cached?
     osd_init_device();
-    // *** TODO
     return true;
 }
 
@@ -487,6 +487,7 @@ void osdPioStartNTSC(void)
     bprintf("OSD TODO set NTSC");
     clearCountProgram();
     osdPioInitDevice(NULL);
+    osdPioEnableDevice();
 }
 
 void osdPioStartPAL(void)
@@ -494,6 +495,7 @@ void osdPioStartPAL(void)
     bprintf("OSD TODO set PAL");
     clearCountProgram();
     osdPioInitDevice(NULL);
+    osdPioEnableDevice();
 }
 
 static const int initLines = 1000;
