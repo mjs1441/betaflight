@@ -42,8 +42,9 @@
 
 static bool inNTSCrange(int n)
 {
-    const int ntscHsyncs = 254;
-    return n >= ntscHsyncs - 1 && n <= ntscHsyncs + 1;
+    const int ntscHsyncsMin = 253;
+    const int ntscHsyncsMax = 254;
+    return n >= ntscHsyncsMin - 1 && n <= ntscHsyncsMax + 1;
 }
 
 static bool inPALrange(int n)
@@ -61,6 +62,7 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
     const int repeatTarget = 15;
     static int repeatCount;
     static int lastHSyncs = -1;
+    static int lastRange; // 1 = NTSC range, -1 = PAL range, 0 = neither
 
 
     if (first) {
@@ -74,7 +76,7 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
 #ifdef PICO_TRACE
     static int count;
     count++;
-    if ((count % 100000 == 0) || (hSyncs && hSyncs != lastHSyncs)) {
+    if (false) { // ((count % 100017 == 0) || (hSyncs && hSyncs != lastHSyncs)) {
         bprintf("OSD %d detected %d hSyncs", count, hSyncs);
     }
 #endif
@@ -84,31 +86,38 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
         return FB_OSD_INIT_INITIALISING;
     }
 
+#ifdef PICO_TRACE    
+    if (count % 7 == 0 && hSyncs != lastHSyncs) {
+        bprintf("OSD %d detected %d hSyncs", count, hSyncs);
+    }
+#endif
+
     // While composite source is warming up, might expect to see hSyncs increasing over a period of seconds
     // from zero to a stable number.
-    
-    if (lastHSyncs == hSyncs) {
+    int range = inNTSCrange(hSyncs) ? 1 : inPALrange(hSyncs) ? -1 : 0;
+    if (lastRange == range) {
         repeatCount++;
-        if (0 == (repeatCount % 5)) {
-            bprintf("OSD repeat %d of %d", repeatCount, hSyncs);
+        if (0 == (repeatCount % 4)) {
+            bprintf("OSD repeat %d of %d (%s)", repeatCount, hSyncs, range == 1 ? "NTSC" : range == -1 ? "PAL" : "neither PAL nor NTSC");
         }
     } else {
         repeatCount = 0;
     }
     
     if (repeatCount == repeatTarget) {
-        if (inNTSCrange(hSyncs)) {
-            bprintf("OSD repeat %d of %d (NTSC)", repeatCount, hSyncs);
+        if (range == 1) {
+            bprintf("OSD seen %d of %d (NTSC)", repeatCount, hSyncs);
             osdPioStartNTSC();
             return FB_OSD_INIT_OK;
-        } else if (inPALrange(hSyncs)) {
-            bprintf("OSD repeat %d of %d (PAL)", repeatCount, hSyncs);
+        } else if (range == -1) {
+            bprintf("OSD seen %d of %d (PAL)", repeatCount, hSyncs);
             osdPioStartPAL();
             return FB_OSD_INIT_OK;
         }
     }
     
     lastHSyncs = hSyncs;
+    lastRange = range;
     return FB_OSD_INIT_INITIALISING;
 }
 
