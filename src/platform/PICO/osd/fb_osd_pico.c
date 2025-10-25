@@ -28,6 +28,7 @@
 #ifdef USE_FB_OSD
 
 #include "drivers/fb_osd_impl.h"
+#include "drivers/osd.h"
 #include "drivers/time.h"
 #include "osd_pico.h"
 
@@ -55,23 +56,39 @@ static bool inPALrange(int n)
 
 fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struct vcdProfile_s *vcdProfile)
 {
-    UNUSED(fbOsdConfig);
-    UNUSED(vcdProfile); // TODO
-    static bool first = true;
+#if 0 // def PICO_TRACE
+    static int vs1 = -2;
+    static int vs2 = -2;
+    int nvs1 = vcdProfile->video_system;
+    int nvs2 = vcdProfileMutable()->video_system;
+    if (vs1 != nvs1 || vs2 != nvs2) {
+        bprintf("fbOsdInit vcdProfile %p video system %d from %d", vcdProfile, nvs1, vs1);
+        bprintf("fbOsdInit vcdProfileMutable %p video system %d from %d", vcdProfileMutable(), nvs2, vs2);
+        vs1 = nvs1;
+        vs2 = nvs2;
+    }
+#endif
 
+    UNUSED(fbOsdConfig);
+
+    static bool first = true;
     const int repeatTarget = 15;
     static int repeatCount;
-    static int lastHSyncs = -1;
     static int lastRange; // 1 = NTSC range, -1 = PAL range, 0 = neither
 
+    static int lastHSyncs = -1;
+
+    videoSystem_e videoSystem = vcdProfile->video_system;
 
     if (first) {
         osdPioDetectStart();
         first = false;
+        bprintf("fbOsdInit vcdProfile %p video system %d", vcdProfile, videoSystem);
         return FB_OSD_INIT_INITIALISING;
     }
     
     int hSyncs = osdPioCountHSyncs();
+
     
 #ifdef PICO_TRACE
     static int count;
@@ -107,13 +124,23 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
     if (repeatCount == repeatTarget) {
         if (range == 1) {
             bprintf("OSD seen %d of %d (NTSC)", repeatCount, hSyncs);
-            osdPioStartNTSC();
-            return FB_OSD_INIT_OK;
-        } else if (range == -1) {
+            if (videoSystem == VIDEO_SYSTEM_PAL) {
+                bprintf("*** Warning: detected NTSC sync pattern but starting as PAL due to configuration ***");
+                osdPioStartPAL();
+            } else {
+                osdPioStartNTSC();
+            }
+        } else {
             bprintf("OSD seen %d of %d (PAL)", repeatCount, hSyncs);
-            osdPioStartPAL();
-            return FB_OSD_INIT_OK;
+            if (videoSystem == VIDEO_SYSTEM_NTSC) {
+                bprintf("*** Warning: detected PAL sync pattern but starting as NTSC due to configuration ***");
+                osdPioStartNTSC();
+            } else {
+                osdPioStartPAL();
+            }
         }
+
+        return FB_OSD_INIT_OK;
     }
     
     lastHSyncs = hSyncs;
