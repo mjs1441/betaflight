@@ -95,7 +95,7 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
     // While composite source is warming up, might expect to see hSyncs increasing over a period of seconds
     // from zero to a stable number.
     int range = inNTSCrange(hSyncs) ? 1 : inPALrange(hSyncs) ? -1 : 0;
-    if (lastRange == range) {
+    if (range && (lastRange == range)) {
         repeatCount++;
         if (0 == (repeatCount % 4)) {
             bprintf("OSD repeat %d of %d (%s)", repeatCount, hSyncs, range == 1 ? "NTSC" : range == -1 ? "PAL" : "neither PAL nor NTSC");
