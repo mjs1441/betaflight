@@ -79,26 +79,28 @@
 #define PICO_OSD_LINE_WORDS 23
 #define PICO_OSD_BUF_WIDTH (PICO_OSD_LINE_WORDS*4)
 
-//#define tryntsc
+#define PICO_OSD_BUF_HEIGHT_NTSC (PICO_OSD_CHAR_HEIGHT * VIDEO_LINES_NTSC)
+#define PICO_OSD_BUF_HEIGHT_PAL (PICO_OSD_CHAR_HEIGHT * VIDEO_LINES_PAL)
+#define PICO_OSD_BUF_HEIGHT_MAX PICO_OSD_BUF_HEIGHT_PAL
+#define PICO_OSD_BUF_LENGTH (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT_MAX)
 
-#ifdef tryntsc
-// 18*13 = 234
-#define PICO_OSD_BUF_HEIGHT (PICO_OSD_CHAR_HEIGHT * 13)
-#else
-#define PICO_OSD_BUF_HEIGHT 288
-#endif
+// 18*13 = 234, 18*16 = 288
+STATIC_ASSERT(PICO_OSD_BUF_HEIGHT_NTSC == 234, pico_ntsc_lines_failed);
+STATIC_ASSERT(PICO_OSD_BUF_HEIGHT_PAL == 288, pico_pal_lines_failed);
 
-//#define PICO_OSD_BUF_HEIGHT 270
-//#define PICO_OSD_BUF_HEIGHT 256
-//#define PICO_OSD_BUF_HEIGHT 272
-//#define PICO_OSD_BUF_HEIGHT 266
-#define PICO_OSD_BUF_LENGTH  (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT)
-#define PICO_OSD_BUF_WORDS   (PICO_OSD_BUF_LENGTH / 4)
+#define PICO_OSD_DISPLAY_WORDS_NTSC (PICO_OSD_LINE_WORDS * PICO_OSD_BUF_HEIGHT_NTSC)
+#define PICO_OSD_DISPLAY_WORDS_PAL  (PICO_OSD_LINE_WORDS * PICO_OSD_BUF_HEIGHT_PAL)
 
 static const PIO osdPio = PIO_INSTANCE(PIO_OSD_INDEX);
 static const uint osdPioIrq = PIO_IRQ_NUM(osdPio, 0);
+
 static const int fb_nx = PICO_OSD_BUF_WIDTH * 4;
-static const int fb_ny = PICO_OSD_BUF_HEIGHT;
+static const int charsPerLine = 30;
+
+// PAL / NTSC, require initialisation.
+static int fb_ny;
+static int charLines;
+static int numChars;
 
 static int osd_tx_offset;
 static int osd_en_gpio;
@@ -134,14 +136,6 @@ static volatile uint32_t maxcycles;
 static volatile uint32_t paintedmaxcycles;
 static volatile int nisz;
 static volatile int dmb;
-
-static const int charsPerLine = 30;
-#ifdef tryntsc
-static const int charLines = 13;
-#else
-static const int charLines = 16; // enough for VIDEO_LINES_PAL = 16 and VIDEO_LINES_NTSC = 13
-#endif
-static const int numChars = charsPerLine * charLines;
 
 static volatile bool transferredSinceVsync;
 
@@ -256,14 +250,14 @@ static void plotBorder(void)
     }
 }
 
-void osd_init_device(void)
+static void osd_init_device(int displayLines, int transferWords)
 {
     safe_zone_period = 18000;
     safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBufferA) during final 10000 or so
     in_safe_zone = true;
 
-    bprintf("OSD osd_init_device");
-    bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT, PICO_OSD_BUF_LENGTH);
+    bprintf("OSD osd_init_device lines %d words %d", displayLines, transferWords);
+    bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT_MAX, PICO_OSD_BUF_LENGTH);
     bprintf("osdBuffer1: %p osdBuffer2: %p", osdBuffer1W, osdBuffer2W);
     bprintf("nx %d, ny %d", fb_nx, fb_ny);
     for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
@@ -399,7 +393,7 @@ void osd_init_device(void)
     // prepare value for vert pixel loop
 //    pio_sm_put(osdPio, osd_tx_sm, 255);
 //    pio_sm_put(osdPio, osd_tx_sm, 287);
-    pio_sm_put(osdPio, osd_tx_sm, PICO_OSD_BUF_HEIGHT - 1);
+    pio_sm_put(osdPio, osd_tx_sm, displayLines - 1);
 #endif
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_mov(pio_isr, pio_osr));
@@ -435,7 +429,7 @@ void osd_init_device(void)
         &c,
         &osdPio->txf[osd_tx_sm],  // Write address (fixed PIO TX FIFO)
         NULL,                     // Read address (reset each time)
-        PICO_OSD_BUF_WORDS,       // Number of transfers
+        transferWords,           // Number of transfers
         false                     // Don't start immediately
     );
 
@@ -450,7 +444,7 @@ void osd_init_device(void)
         &c,
         NULL,                     // Write address (reset each time)
         &zero,                    // Read address (fixed)
-        PICO_OSD_BUF_WORDS,       // Number of transfers
+        transferWords,           // Number of transfers
         false                     // Don't start immediately
     );
 
@@ -475,26 +469,26 @@ static void clearCountProgram(void)
     pio_remove_program_and_unclaim_sm(&osd_count_sync_program, osdPio, osd_tx_sm, osd_tx_offset);
 }
 
-bool osdPioInitDevice(const struct vcdProfile_s *vcdProfile)
-{
-    UNUSED(vcdProfile); // TODO pass through? cached?
-    osd_init_device();
-    return true;
-}
-
 void osdPioStartNTSC(void)
 {
-    bprintf("OSD TODO set NTSC");
+    fb_ny = PICO_OSD_BUF_HEIGHT_NTSC;
+    charLines = VIDEO_LINES_NTSC;
+    numChars = charsPerLine * charLines;
+    bprintf("OSD set NTSC buf height %d char lines %d numChars %d", fb_ny, charLines, numChars);
     clearCountProgram();
-    osdPioInitDevice(NULL);
+    osd_init_device(PICO_OSD_BUF_HEIGHT_NTSC, PICO_OSD_DISPLAY_WORDS_NTSC);
     osdPioEnableDevice();
 }
 
 void osdPioStartPAL(void)
 {
     bprintf("OSD TODO set PAL");
+    fb_ny = PICO_OSD_BUF_HEIGHT_PAL;
+    charLines = VIDEO_LINES_PAL;
+    numChars = charsPerLine * charLines;
+    bprintf("OSD set PAL buf height %d char lines %d numChars %d", fb_ny, charLines, numChars);
     clearCountProgram();
-    osdPioInitDevice(NULL);
+    osd_init_device(PICO_OSD_BUF_HEIGHT_PAL, PICO_OSD_DISPLAY_WORDS_PAL);
     osdPioEnableDevice();
 }
 
@@ -767,7 +761,7 @@ void osdPioDisableDevice(void) {
 
 void osd_test(void)
 {
-    osd_init_device();
+    osd_init_device(PICO_OSD_BUF_HEIGHT_PAL, PICO_OSD_DISPLAY_WORDS_PAL);
 
     (void)rtdata;
 /*

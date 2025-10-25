@@ -29,16 +29,17 @@
 #define OSD_CHAR_BUFFER_LENGTH 480
 extern uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
 
+int osdPioCountHSyncs(void);
+void osdPioDetectStart(void);
+void osdPioStartNTSC(void);
+void osdPioStartPAL(void);
+
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 bool osdPioBufferAvailable(void);
 bool osdPioDrawScreenUntil(uint32_t limit_micros);
-void osdPioDetectStart(void);
-int osdPioCountHSyncs(void);
-void osdPioStartNTSC(void);
-void osdPioStartPAL(void);
 
 // testing, probably don't need
-bool osdPioInitDevice( const struct vcdProfile_s *vcdProfile);
+// bool osdPioInitDevice( const struct vcdProfile_s *vcdProfile);
 void osdPioEnableDevice(void);
 void osdPioDisableDevice(void);
