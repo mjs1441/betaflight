@@ -246,10 +246,11 @@ static void plotBorder(void)
     }
 }
 
-static void osd_init_device(int displayLines, int transferWords)
+static void osd_init_device(bool isPAL, int displayLines, int transferWords)
 {
-    safe_zone_period = 18000;
-    safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBufferA) during final 10000 or so
+//    safe_zone_period = 18000;
+    safe_zone_period = 16000;
+//     safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBufferA) during final 10000 or so
     in_safe_zone = true;
 
     bprintf("OSD osd_init_device lines %d words %d", displayLines, transferWords);
@@ -282,9 +283,11 @@ static void osd_init_device(int displayLines, int transferWords)
 #endif
     
 #if 1
-    plotBorder();
+    // plotBorder();
+    UNUSED(plotBorder);
 
 #elif 1
+    UNUSED(plotBorder);
     // this pattern particularly hard for small old screen
     for (int i=0; i<360; ++i) {
         plot(i, 256-1, 1);
@@ -323,11 +326,7 @@ static void osd_init_device(int displayLines, int transferWords)
 
     init_gpios();
 
-#ifdef tryntsc
-    osd_tx_offset = pio_add_program(osdPio, &osd_tx_ntsc_program);
-#else
-    osd_tx_offset = pio_add_program(osdPio, &osd_tx_pal_program);
-#endif
+    osd_tx_offset = pio_add_program(osdPio, isPAL ? &osd_tx_pal_program : &osd_tx_ntsc_program);
     osd_tx_sm = pio_claim_unused_sm(osdPio, false);
     if (osd_tx_sm < 0) {
         bprintf("*** pico osd tx failed to claim state machine");
@@ -340,12 +339,10 @@ static void osd_init_device(int displayLines, int transferWords)
     pio_gpio_init(osdPio, osd_w_gpio);
     pio_gpio_init(osdPio, osd_en_gpio);
 
-    // [00:37:44.679969 0.002269] osd_w gpio 16, osd_en gpio 17, osd_sync gpio 18
-#ifdef tryntsc
-    pio_sm_config config = osd_tx_ntsc_program_get_default_config(osd_tx_offset); // default config with wrap set
-#else
-    pio_sm_config config = osd_tx_pal_program_get_default_config(osd_tx_offset); // default config with wrap set
-#endif
+    // default config with wrap set    
+    pio_sm_config config = isPAL ? osd_tx_pal_program_get_default_config(osd_tx_offset)
+        : osd_tx_ntsc_program_get_default_config(osd_tx_offset);
+
     pio_sm_set_consecutive_pindirs(osdPio, osd_tx_sm, osd_w_gpio, 2, true /* output */);
     pio_sm_set_consecutive_pindirs(osdPio, osd_tx_sm, osd_sync_gpio, 1, false /* input */);
     sm_config_set_in_pin_base(&config, osd_sync_gpio); // in PIN set SYNC (for WAIT)
@@ -359,14 +356,8 @@ static void osd_init_device(int displayLines, int transferWords)
     sm_config_set_out_shift(&config, true, false, 32); // no autopull
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
 
-//    int pioclock = (int)75e6; // TODO
-//    int pioclock = (int)75e6 * 1.01; // TODO
-//    int pioclock = (int)75e6 * 1.01; // TODO acceptable "slack"? clock should be accurate to ~ 1.00003 ?
-#ifdef tryntsc
-    int pioclock = (int)75e6 * 1.038;
-#else
-    int pioclock = (int)75e6 * 1.057; // Empirically found multiplier to centre horizontally (PAL)
-#endif
+    // Empirically found clocks to centre horizontally. Close enough to 75MHz not to affect sync pulse detection.
+    int pioclock = isPAL ? (int)75e6 * 1.057 : (int)75e6 * 1.038;
     float div = (float)SystemCoreClock / pioclock;
     bprintf("pio clock div = %f", (double)div);
     sm_config_set_clkdiv(&config, div);
@@ -473,7 +464,7 @@ void osdPioStartNTSC(void)
     numChars = charsPerLine * charLines;
     bprintf("OSD set NTSC buf height %d char lines %d numChars %d", fb_ny, charLines, numChars);
     clearCountProgram();
-    osd_init_device(PICO_OSD_BUF_HEIGHT_NTSC, PICO_OSD_DISPLAY_WORDS_NTSC);
+    osd_init_device(false, PICO_OSD_BUF_HEIGHT_NTSC, PICO_OSD_DISPLAY_WORDS_NTSC);
     osdPioEnableDevice();
 }
 
@@ -484,7 +475,7 @@ void osdPioStartPAL(void)
     numChars = charsPerLine * charLines;
     bprintf("OSD set PAL buf height %d char lines %d numChars %d", fb_ny, charLines, numChars);
     clearCountProgram();
-    osd_init_device(PICO_OSD_BUF_HEIGHT_PAL, PICO_OSD_DISPLAY_WORDS_PAL);
+    osd_init_device(true, PICO_OSD_BUF_HEIGHT_PAL, PICO_OSD_DISPLAY_WORDS_PAL);
     osdPioEnableDevice();
 }
 
@@ -757,7 +748,7 @@ void osdPioDisableDevice(void) {
 
 void osd_test(void)
 {
-    osd_init_device(PICO_OSD_BUF_HEIGHT_PAL, PICO_OSD_DISPLAY_WORDS_PAL);
+    osd_init_device(true, PICO_OSD_BUF_HEIGHT_PAL, PICO_OSD_DISPLAY_WORDS_PAL);
 
     (void)rtdata;
 /*
