@@ -38,6 +38,7 @@ void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 bool osdPioBufferAvailable(void);
 bool osdPioDrawScreenUntil(uint32_t limit_micros);
+int osdPioRowsCount(void);
 
 // testing, probably don't need
 // bool osdPioInitDevice( const struct vcdProfile_s *vcdProfile);

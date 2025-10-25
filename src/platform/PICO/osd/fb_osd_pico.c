@@ -175,8 +175,7 @@ bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)
     
 uint8_t fbOsdGetRowsCount(void)
 {
-    // *** TODO support NTSC and return appropriate answer here
-    return VIDEO_LINES_PAL;
+    return osdPioRowsCount();
 }
 
 void fbOsdWrite(uint8_t x, uint8_t y, uint8_t attr, const char *text)

@@ -99,7 +99,7 @@ static const int charsPerLine = 30;
 
 // PAL / NTSC, require initialisation.
 static int fb_ny;
-static int charLines;
+static int charLines = VIDEO_LINES_PAL;
 static int numChars;
 
 static int osd_tx_offset;
@@ -451,6 +451,11 @@ otherwise just dma_channel_abort
     */
 }
 
+int osdPioRowsCount(void)
+{
+    return charLines;
+}
+
 static void clearCountProgram(void)
 {
     pio_sm_set_enabled(osdPio, osd_tx_sm, false);
@@ -663,11 +668,11 @@ static void vsync_callback(void)
         nisz = 0; dmb = 0;
         // NB ave wraps quickly (~1000 vsyncs)
 //        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
-        bprintf("tus %d, tusr %d, ave %.1f calls per VS, %.1f rds per VS, %.1f calls/rd",
-                tus, tusr,
-                (double)tus/250, (double)tusr/250, (double)tus/tusr);
-        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
-                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
+//        bprintf("tus %d, tusr %d, ave %.1f calls per VS, %.1f rds per VS, %.1f calls/rd",
+//                tus, tusr,
+//                (double)tus/250, (double)tusr/250, (double)tus/tusr);
+//        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
+//                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
         maxcycles = 0; paintedmaxcycles = 0;
         tus = 0; tusr = 0;
         vmax = 0;
