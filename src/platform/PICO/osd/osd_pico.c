@@ -244,10 +244,6 @@ static void plotBorder(void)
         plot(0,i,1); plot(fb_nx-1,i,1);
         plot(1,i,2); plot(fb_nx-2,i,2);
     }
-    for (int i=200; i<270; ++i) {
-        plot(i,i,2);
-        plot(i-1,i,1);
-    }
 }
 
 static void osd_init_device(int displayLines, int transferWords)
@@ -449,6 +445,7 @@ static void osd_init_device(int displayLines, int transferWords)
     );
 
     /*
+      dma channel abort, workaround for erratum
     if dma has handler
 // disable the channel on IRQ0
 dma_channel_set_irq0_enabled(channel, false);
@@ -482,7 +479,6 @@ void osdPioStartNTSC(void)
 
 void osdPioStartPAL(void)
 {
-    bprintf("OSD TODO set PAL");
     fb_ny = PICO_OSD_BUF_HEIGHT_PAL;
     charLines = VIDEO_LINES_PAL;
     numChars = charsPerLine * charLines;
