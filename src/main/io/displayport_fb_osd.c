@@ -180,6 +180,12 @@ static void setBackgroundType(displayPort_t *displayPort, displayPortBackground_
     fbOsdSetBackgroundType(backgroundType);
 }
 
+static bool renderOsdItem(displayPort_t *displayPort, uint8_t elemPosX, uint8_t elemPosY, uint8_t /* osd_items_e */ item)
+{
+    UNUSED(displayPort);
+    return fbOsdRenderItem((osd_items_e)item, elemPosX, elemPosY);
+}
+
 static const displayPortVTable_t fbOsdVTable = {
     .grab = grab,
     .release = release,
@@ -199,6 +205,7 @@ static const displayPortVTable_t fbOsdVTable = {
     .writeFontCharacter = writeFontCharacter,
     .checkReady = checkReady,
     .setBackgroundType = setBackgroundType,
+    .renderOsdItem = renderOsdItem,
 };
 
 bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displayPort)
@@ -236,6 +243,8 @@ bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displa
 
     *displayPort = &fbOsdDisplayPort;
 
+    // (compare with) max7456 allows row and col adjust to be changed in settings in order
+    // to reduce the character grid, so can reduce rows by up to 3, cols by up to 6
     fbOsdDisplayPort.rows = displayRows + displayPortProfileFbOsd()->rowAdjust;
     fbOsdDisplayPort.cols = 30 + displayPortProfileFbOsd()->colAdjust;
 

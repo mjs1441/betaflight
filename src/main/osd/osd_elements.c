@@ -2191,6 +2191,9 @@ static bool osdDrawSingleElement(displayPort_t *osdDisplayPort, uint8_t item)
     // Call the element drawing function
     if (IS_SYS_OSD_ELEMENT(item)) {
         displaySys(osdDisplayPort, elemPosX, elemPosY, (displayPortSystemElement_e)(item - OSD_SYS_GOGGLE_VOLTAGE + DISPLAYPORT_SYS_GOGGLE_VOLTAGE));
+    } else if (displayExtended(osdDisplayPort, elemPosX, elemPosY, item)) {
+        // Element has been handled by a specialised handler (e.g. artificial horizon by FBOSD framebuffer driver).
+        activeElement.rendered = true;
     } else {
         osdElementDrawFunction[item](&activeElement);
         if (activeElement.drawElement) {

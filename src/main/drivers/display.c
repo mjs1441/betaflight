@@ -89,6 +89,15 @@ int displaySys(displayPort_t *instance, uint8_t x, uint8_t y, displayPortSystemE
     return 0;
 }
 
+bool displayExtended(displayPort_t *instance, uint8_t x, uint8_t y, uint8_t /* osd_items_e */ item)
+{
+    if (instance->vTable->renderOsdItem) {
+        return instance->vTable->renderOsdItem(instance, x, y, item);
+    }
+
+    return false;
+}
+
 int displayWrite(displayPort_t *instance, uint8_t x, uint8_t y, uint8_t attr, const char *text)
 {
     instance->posX = x + strlen(text);

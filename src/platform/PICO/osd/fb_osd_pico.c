@@ -187,7 +187,7 @@ void fbOsdWrite(uint8_t x, uint8_t y, uint8_t attr, const char *text)
 
 void fbOsdWriteChar(uint8_t x, uint8_t y, uint8_t attr, uint8_t c)
 {
-    // *** TODO implement some attr behaviours
+    // *** TODO possibly implement some attr behaviours
     UNUSED(attr);
     osdPioWriteChar(x, y, c);
 }
@@ -229,6 +229,11 @@ void fbOsdSetBackgroundType(displayPortBackground_e backgroundType)
 {
     // Not currently supporting different background types.
     UNUSED(backgroundType);
+}
+
+bool fbOsdRenderItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+{
+    return osdPioRenderItem(item, elemPosX, elemPosY);
 }
 
 #endif // USE_FB_OSD
