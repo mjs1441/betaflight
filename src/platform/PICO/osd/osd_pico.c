@@ -84,6 +84,9 @@ static const uint osdPioIrq = PIO_IRQ_NUM(osdPio, 0);
 static const int fb_nx = PICO_OSD_BUF_WIDTH * 4;
 static const int charsPerLine = 30;
 
+static const int charWidth = PICO_OSD_CHAR_WIDTH;
+static const int charHeight = PICO_OSD_CHAR_HEIGHT;
+
 // PAL / NTSC, require initialisation.
 static int fb_ny;
 static int charLines = VIDEO_LINES_PAL; // Variable, default to 16 (PAL)
@@ -951,18 +954,90 @@ void osdUpdateCallback(uint32_t t_us)
 #endif
 }
 
+typedef struct {
+    uint16_t x1;
+    uint16_t y1;
+    uint16_t x2;
+//    uint16_t y2;
+} info_sidebars_t;
+
+static info_sidebars_t infoSidebars;
+static bool calculatedSidebars;
+static bool cachedSidebars;
+
+// cf. osd_element.c implementation osdBackgroundHorizonSidebars
+#define AH_SIDEBAR_WIDTH_POS 7
+#define AH_SIDEBAR_HEIGHT_POS 3
+void itemSidebarsCacheInfo(uint8_t x, uint8_t y)
+{
+    // Cache the top left and bottom rightt corners in buffer coords
+    // given the centre in char coords.
+    // Sidebars are static (background), unchanging until reboot,
+    // so only calculate once.
+    if (!calculatedSidebars) {
+        infoSidebars.x1 = (x - AH_SIDEBAR_WIDTH_POS) * charWidth;
+        infoSidebars.y1 = (y - AH_SIDEBAR_HEIGHT_POS) * charHeight + charHeight / 2;
+        infoSidebars.x2 = (x + AH_SIDEBAR_WIDTH_POS) * charWidth;
+//        infoSidebars.y2 = (y + AH_SIDEBAR_HEIGHT_POS) * charHeight;
+        calculatedSidebars = true;
+    }
+
+    cachedSidebars = true;
+}
+
+
 bool osdPioRenderItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
     // Cache information for rendering an osd item later on.
     switch (item) {
     case OSD_HORIZON_SIDEBARS:
-        return elemPosX > elemPosY; //  true;
+        itemSidebarsCacheInfo(elemPosX, elemPosY);
+        return true;
     default:
         // Not handled here
         return false;
     }
 }
 
+void renderSidebarsUntil(uint32_t limit_micros)
+{
+    static int count;
+    static const int maxCount = 2*AH_SIDEBAR_HEIGHT_POS * charHeight + 1;
+    int x1 = infoSidebars.x1;
+    int x2 = infoSidebars.x2;
+    int y1 = infoSidebars.y1;
+    if (cachedSidebars) {
+        int y = count + y1;
+        while (micros() < limit_micros && count < maxCount) {
+            // bprintf("y = %d, x1=%d, x2=%d, y1 = %d", y,x1,x2, y1);
+            if (count == 0 || count == maxCount - 1) {
+                for (int j=-4; j<4; ++j) {
+                    plot(x1+j, y, 2);
+                    plot(x2+j, y, 2);
+                }
+            } else if (count % 16 == 0) {
+                for (int j=-2; j<2; ++j) {
+                    plot(x1+j, y, 2);
+                    plot(x2+j, y, 2);
+                }
+            } else if (count % 8 == 4) {
+                plot(x1, y, 2);
+                plot(x1, y-1, 1);
+                plot(x2, y, 2);
+                plot(x2, y-1, 1);
+            }
+
+            y++;
+            count++;                         
+        }
+
+        if (count == maxCount) {
+            // All done.
+            count = 0;
+            cachedSidebars = false;
+        }
+    }    
+}
 
 
 // Update screen buffer (paint characters etc to buffer), up until a time limit.
@@ -979,6 +1054,8 @@ bool osdPioDrawScreenUntil(uint32_t limit_micros)
     static uint32_t maxcyclesthisround;
     static int paintedmaxcyclesthisround;
 
+    renderSidebarsUntil(limit_micros);
+    
     // Saved state.
     // Position: currentChar (and cached currentY, currentX, currentPtr).
     static int currentChar;
