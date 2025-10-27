@@ -59,22 +59,9 @@
 // chars OSD_SD_ROWS x OSD_SD_COLS (30 x 16)
 // 360 / 8 = 45 x 288
 // 2 bits per pixel
-/*
-#define PICO_OSD_BPP         2
-//#define PICO_OSD_BUF_WIDTH   (OSD_SD_COLS * PICO_OSD_CHAR_WIDTH / 8)
-#define ROUND_WORD(x)        (4 * (((x) + 3)/4))
-//#define PICO_OSD_BUF_WIDTH   ROUND_WORD(OSD_SD_COLS * PICO_OSD_CHAR_WIDTH * PICO_OSD_BPP / 8)
-#define PICO_OSD_BUF_WIDTH   ROUND_WORD(360 * PICO_OSD_BPP / 8)
-#define PICO_OSD_BUF_LINEWORDS (PICO_OSD_BUF_WIDTH/4)
-////#define PICO_OSD_BUF_HEIGHT  (OSD_SD_ROWS * PICO_OSD_CHAR_HEIGHT)
-#define PICO_OSD_BUF_HEIGHT  256
-#define PICO_OSD_BUF_LENGTH  (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT)
-#define PICO_OSD_BUF_WORDS   (PICO_OSD_BUF_LENGTH / 4)
-*/
 
 // 23 -> 23*4*4 = 368 pixels -> 30.67 chars
 // 288 for PAL field
-// _BUF_ in bytes
 // PIO hard coded to 23 words of pixel data per line (=> 368 pixels)
 #define PICO_OSD_LINE_WORDS 23
 #define PICO_OSD_BUF_WIDTH (PICO_OSD_LINE_WORDS*4)
@@ -99,21 +86,18 @@ static const int charsPerLine = 30;
 
 // PAL / NTSC, require initialisation.
 static int fb_ny;
-static int charLines = VIDEO_LINES_PAL;
+static int charLines = VIDEO_LINES_PAL; // Variable, default to 16 (PAL)
 static int numChars;
 
+// PIO program offset and state machine
 static int osd_tx_offset;
+static int osd_tx_sm;
+
+// GPIOs for write enable, white/black, sync-detect
 static int osd_en_gpio;
 static int osd_w_gpio;
 static int osd_sync_gpio;
-static int osd_tx_sm;
 
-// 360 x 288 x 2 bits per pixel
-// **** TODO uint32_t aligned
-// TODO faster memcpy
-// currently building with no-builtin-memcpy
-// and gcc13.3 with nanolib -> just does byte copy (even when known aligned)
-// (also gcc14.3)
 __attribute__((aligned(4))) static uint32_t osdBuffer1W[PICO_OSD_BUF_LENGTH/4];
 __attribute__((aligned(4))) static uint32_t osdBuffer2W[PICO_OSD_BUF_LENGTH/4];
 static uint8_t* osdBufferA = (uint8_t *)osdBuffer1W;
@@ -123,8 +107,12 @@ static const uint32_t zero;
 static int dma_chan_zero_to_bufA;
 static int dma_chan_bufB_to_fifo;
 
+// buffer update control (avoid tearing etc.)
 static volatile bool in_safe_zone;
 static volatile uint32_t safe_zone_period;
+static volatile bool transferredSinceVsync;
+
+// trace / debugging
 static volatile uint32_t sza;
 static volatile uint32_t szb;
 static volatile uint32_t szc;
@@ -137,10 +125,9 @@ static volatile uint32_t paintedmaxcycles;
 static volatile int nisz;
 static volatile int dmb;
 
-static volatile bool transferredSinceVsync;
 
-//static uint8_t osdCharBuffer[numChars];
-uint8_t osdCharBuffer[480];
+// 30 * 16 = 480
+uint8_t osdCharBuffer[OSD_SD_COLS * OSD_SD_ROWS];
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
