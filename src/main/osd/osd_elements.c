@@ -2227,9 +2227,14 @@ static bool osdDrawSingleElementBackground(displayPort_t *osdDisplayPort, uint8_
     activeElement.attr = DISPLAYPORT_SEVERITY_NORMAL;
 
     // Call the element background drawing function
-    osdElementBackgroundFunction[item](&activeElement);
-    if (activeElement.drawElement) {
-        displayPendingBackground = true;
+    if (displayExtended(osdDisplayPort, elemPosX, elemPosY, item)) {
+        // Element has been handled by a specialised handler (e.g. artificial horizon by FBOSD framebuffer driver).
+        activeElement.rendered = true;
+    } else {
+        osdElementBackgroundFunction[item](&activeElement);
+        if (activeElement.drawElement) {
+            displayPendingBackground = true;
+        }
     }
 
     return activeElement.rendered;

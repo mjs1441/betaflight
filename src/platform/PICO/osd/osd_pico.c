@@ -951,6 +951,20 @@ void osdUpdateCallback(uint32_t t_us)
 #endif
 }
 
+bool osdPioRenderItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+{
+    // Cache information for rendering an osd item later on.
+    switch (item) {
+    case OSD_HORIZON_SIDEBARS:
+        return elemPosX > elemPosY; //  true;
+    default:
+        // Not handled here
+        return false;
+    }
+}
+
+
+
 // Update screen buffer (paint characters etc to buffer), up until a time limit.
 // Store state so that we can resume.
 // Return false when complete (no more to do).
