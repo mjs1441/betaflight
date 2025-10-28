@@ -237,6 +237,78 @@ void dhLine(int x, int y, int count)
     }
 }
 
+// WARNING iter line functions are designed to be called iteratively, but only from one source at a time.
+
+typedef struct {
+    int count;
+    int maxCount;
+    float delta;
+    bool shallow;
+    int ic;
+    float fc;
+} iterLineData_t;
+
+static void iterLineDataInit(iterLineData_t *data, int x1, int y1, int x2, int y2)
+{
+    data->count = 0;
+    int dx = x2 - x1;
+    int dy = y2 - y1;
+    bool shallow = ABS(dx) > ABS(dy);
+    data->shallow = shallow;
+    if (shallow) {
+        data->delta = (float)dy / dx;
+        if (x1 < x2) {
+            data->ic = x1;
+            data->fc = (float)y1;
+            data->maxCount = x2 - x1 + 1;
+        } else {
+            data->ic = x2;
+            data->fc = (float)y2;
+            data->maxCount = x1 - x2 + 1;
+        }
+    } else {
+        data->delta = dy == 0 ? 0.0f : (float)dx / dy; // cope with case of a single point.
+        if (y1 < y2) {
+            data->fc = (float)x1;
+            data->ic = y1;
+            data->maxCount = y2 - y1 + 1;
+        } else {
+            data->fc = (float)x2;
+            data->ic = y2;
+            data->maxCount = y1 - y2 + 1;
+        }
+    }
+}
+
+static iterLineData_t iterDLineData;
+static void iterDLineInit(int x1, int y1, int x2, int y2)
+{
+    iterLineDataInit(&iterDLineData, x1, y1, x2, y2);
+}
+
+static bool iterDLineNext(void)
+{
+    if (iterDLineData.count >= iterDLineData.maxCount) {
+        return true; // all done.
+    }
+
+    if (iterDLineData.shallow) {
+        plot(iterDLineData.ic, iterDLineData.fc, 2);
+        plot(iterDLineData.ic, iterDLineData.fc + 1, 1);
+        iterDLineData.ic++;
+        iterDLineData.fc += iterDLineData.delta;
+    } else {
+        plot(iterDLineData.fc, iterDLineData.ic, 2);
+        plot(iterDLineData.fc + 1, iterDLineData.ic, 1);
+        iterDLineData.ic++;
+        iterDLineData.fc += iterDLineData.delta;
+    }
+
+    iterDLineData.count++;
+    return false;
+}
+
+
 static void vsync_callback(void);
 
 static void plotBorder(void)
@@ -1037,8 +1109,6 @@ bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
     }
 }
 
-
-
 static bool renderSidebarsUntil(uint32_t limit_micros)
 {
     static int count;
@@ -1055,9 +1125,9 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
     while (micros() < limit_micros && count < maxCount) {
         // bprintf("y = %d, x1=%d, x2=%d, y1 = %d", y,x1,x2, y1);
         // This is borderline for wanting to break down further (not to exceed limit_micros of around 20us by too much)
-        if (count == 0 || count == maxCount - 1 || (count % 16 == 0)) {
-            dhLine(x1-4, y, 9);
-            dhLine(x2-4, y, 9);
+        if (count % 16 == 0) {
+            dhLine(x1-5, y, 11);
+            dhLine(x2-5, y, 11);
 //            hLine(x2-4, y, 9, 2);
 //            hLine(x1-4, y-1, 9, 1);
 //            hLine(x2-4, y-1, 9, 1);
@@ -1066,9 +1136,9 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
 //            hLine(x2-2, y, 5, 2);
 //            hLine(x1-2, y-1, 5, 1);
 //            hLine(x2-2, y-1, 5, 1);
-        } else if (count % 4 == 0) {
-            hLine(x1-3, y, 7, 2);
-            hLine(x2-3, y, 7, 2);
+        } else if (count % 8 == 0) {
+            dhLine(x1-2, y, 5);
+            dhLine(x2-2, y, 5);
 //            plot(x1, y, 2);
 //            plot(x2, y, 2);
         }
@@ -1089,21 +1159,30 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
 
 static bool renderAHUntil(uint32_t limit_micros)
 {
-#if 0
-    static int count;
+    static bool first = true;
 
     if (!cachedAH) {
         return true; // Nothing to do here.
     }
 
-    int x1 = infoArtificialHorizon.x1;
-    int y1 = infoArtificialHorizon.y1;
-    int x2 = infoArtificialHorizon.x2;
-    int y2 = infoArtificialHorizon.y2;
-#endif
-    UNUSED(infoArtificialHorizon);
-    UNUSED(limit_micros);
-    return true;
+    if (first) {
+        iterDLineInit(infoArtificialHorizon.x1, infoArtificialHorizon.y1, infoArtificialHorizon.x2, infoArtificialHorizon.y2);
+        first = false;
+    }
+
+    bool done = false;
+    while (micros() < limit_micros && !done) {
+        done = iterDLineNext();
+    }
+
+    if (done) {
+        // All done.
+        first = true;
+        cachedAH = false;
+        return true; // Done with AH for this round.
+    }
+
+    return false;
 }
 
 bool renderCharsUntil(uint32_t limit_micros)
