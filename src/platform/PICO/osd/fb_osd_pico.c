@@ -238,9 +238,9 @@ void fbOsdSetBackgroundType(displayPortBackground_e backgroundType)
     UNUSED(backgroundType);
 }
 
-bool fbOsdRenderItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+bool fbOsdDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
-    return osdPioRenderItem(item, elemPosX, elemPosY);
+    return osdPioDrawItem(item, elemPosX, elemPosY);
 }
 
 #endif // USE_FB_OSD

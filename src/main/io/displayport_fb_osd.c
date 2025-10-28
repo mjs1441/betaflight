@@ -180,10 +180,10 @@ static void setBackgroundType(displayPort_t *displayPort, displayPortBackground_
     fbOsdSetBackgroundType(backgroundType);
 }
 
-static bool renderOsdItem(displayPort_t *displayPort, uint8_t elemPosX, uint8_t elemPosY, uint8_t /* osd_items_e */ item)
+static bool drawOsdItem(displayPort_t *displayPort, uint8_t elemPosX, uint8_t elemPosY, uint8_t /* osd_items_e */ item)
 {
     UNUSED(displayPort);
-    return fbOsdRenderItem((osd_items_e)item, elemPosX, elemPosY);
+    return fbOsdDrawItem((osd_items_e)item, elemPosX, elemPosY);
 }
 
 static const displayPortVTable_t fbOsdVTable = {
@@ -205,7 +205,7 @@ static const displayPortVTable_t fbOsdVTable = {
     .writeFontCharacter = writeFontCharacter,
     .checkReady = checkReady,
     .setBackgroundType = setBackgroundType,
-    .renderOsdItem = renderOsdItem,
+    .drawOsdItem = drawOsdItem,
 };
 
 bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displayPort)

@@ -229,6 +229,14 @@ void hLine(int x, int y, int count, int col)
     }
 }
 
+void dhLine(int x, int y, int count)
+{
+    for (int i=x; i < x + count; i++) {
+        plot(i, y, 2);
+        plot(i, y+1, 1);
+    }
+}
+
 static void vsync_callback(void);
 
 static void plotBorder(void)
@@ -983,9 +991,9 @@ static void cacheSidebarsInfo(uint8_t x, uint8_t y)
     // Sidebars are static (background), unchanging until reboot,
     // so only calculate once.
     if (!calculatedSidebars) {
-        infoSidebars.x1 = (x - AH_SIDEBAR_WIDTH_POS) * charWidth;
-        infoSidebars.y1 = (y - AH_SIDEBAR_HEIGHT_POS) * charHeight + charHeight / 2;
-        infoSidebars.x2 = (x + AH_SIDEBAR_WIDTH_POS) * charWidth;
+        infoSidebars.x1 = (x - AH_SIDEBAR_WIDTH_POS) * charWidth + (charWidth / 2);
+        infoSidebars.y1 = (y - AH_SIDEBAR_HEIGHT_POS) * charHeight + (charHeight / 2);
+        infoSidebars.x2 = (x + AH_SIDEBAR_WIDTH_POS) * charWidth + (charWidth / 2);;
 //        infoSidebars.y2 = (y + AH_SIDEBAR_HEIGHT_POS) * charHeight;
         calculatedSidebars = true;
     }
@@ -1009,12 +1017,13 @@ static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
     cachedAH = true;
 }
 
-bool osdPioRenderItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
     // Cache information for rendering an osd item later on.
     switch (item) {
     case OSD_HORIZON_SIDEBARS:
         cacheSidebarsInfo(elemPosX, elemPosY);
+//         cachedSidebars = false;return false;
         return true;
     case OSD_ARTIFICIAL_HORIZON:
         cacheArtificialHorizonInfo(elemPosX, elemPosY);
@@ -1046,19 +1055,22 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
     while (micros() < limit_micros && count < maxCount) {
         // bprintf("y = %d, x1=%d, x2=%d, y1 = %d", y,x1,x2, y1);
         // This is borderline for wanting to break down further (not to exceed limit_micros of around 20us by too much)
-        if (count == 0 || count == maxCount - 1) {
-            hLine(x1-4, y, 9, 2);
-            hLine(x2-4, y, 9, 2);
-            hLine(x1-4, y-1, 9, 1);
-            hLine(x2-4, y-1, 9, 1);
-        } else if (count % 16 == 0) {
-            hLine(x1-2, y, 5, 2);
-            hLine(x2-2, y, 5, 2);
-            hLine(x1-2, y-1, 5, 1);
-            hLine(x2-2, y-1, 5, 1);
-        } else if (count % 4 == 2) {
-            plot(x1, y, 2);
-            plot(x2, y, 2);
+        if (count == 0 || count == maxCount - 1 || (count % 16 == 0)) {
+            dhLine(x1-4, y, 9);
+            dhLine(x2-4, y, 9);
+//            hLine(x2-4, y, 9, 2);
+//            hLine(x1-4, y-1, 9, 1);
+//            hLine(x2-4, y-1, 9, 1);
+//        } else if (count % 16 == 0) {
+//            hLine(x1-2, y, 5, 2);
+//            hLine(x2-2, y, 5, 2);
+//            hLine(x1-2, y-1, 5, 1);
+//            hLine(x2-2, y-1, 5, 1);
+        } else if (count % 4 == 0) {
+            hLine(x1-3, y, 7, 2);
+            hLine(x2-3, y, 7, 2);
+//            plot(x1, y, 2);
+//            plot(x2, y, 2);
         }
 
         y++;

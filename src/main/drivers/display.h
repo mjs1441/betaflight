@@ -143,8 +143,8 @@ typedef struct displayPortVTable_s {
     bool (*getCanvas)(struct displayCanvas_s *canvas, const displayPort_t *displayPort);
     void (*setBackgroundType)(displayPort_t *displayPort, displayPortBackground_e backgroundType);
 
-    // Allow display drivers to render OSD elements, e.g. pixel-based FBOSD (framebuffer) can cache information for AH and draw later.
-    bool (*renderOsdItem)(displayPort_t *displayPort, uint8_t elemPosX, uint8_t elemPosY, uint8_t /* osd_items_e */ item);
+    // Allow display drivers to render OSD elements, e.g. pixel-based FBOSD (framebuffer) can cache information for AH and paint later.
+    bool (*drawOsdItem)(displayPort_t *displayPort, uint8_t elemPosX, uint8_t elemPosY, uint8_t /* osd_items_e */ item);
 } displayPortVTable_t;
 
 void displayGrab(displayPort_t *instance);

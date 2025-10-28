@@ -91,8 +91,8 @@ int displaySys(displayPort_t *instance, uint8_t x, uint8_t y, displayPortSystemE
 
 bool displayExtended(displayPort_t *instance, uint8_t x, uint8_t y, uint8_t /* osd_items_e */ item)
 {
-    if (instance->vTable->renderOsdItem) {
-        return instance->vTable->renderOsdItem(instance, x, y, item);
+    if (instance->vTable->drawOsdItem) {
+        return instance->vTable->drawOsdItem(instance, x, y, item);
     }
 
     return false;
