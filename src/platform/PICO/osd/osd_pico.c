@@ -1060,28 +1060,15 @@ bool renderCharsUntil(uint32_t limit_micros)
     static int currentX;
     static uint8_t *currentPtr;
 
-    // *** TODO rationalise / rename / #define?
-    // ** BEWARE charsPerLine doesn't correspond with pixels or bytes per line,
+    // ** BEWARE ** charsPerLine doesn't correspond with pixels or bytes per line,
     // because we have some spare: 368 pixels not 360 for alignment reasons
-#if 0
     const int hoffs = 0; //0..2 (using 90 of 92 bytes)
-    const int pxpc = 12;
+    const int pxpc = PICO_OSD_CHAR_WIDTH;
     const int bxpc = pxpc / 4; // 4 pixels per byte -> 3 bytes to go across by 1 char
-    const int pypc = 18;
+    const int pypc = PICO_OSD_CHAR_HEIGHT;
     const int bpc  = bxpc * pypc;
     const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte3
     const int fbbpNextLine = pypc * fbbpl - charsPerLine * bxpc; // byte increment from  (top left of) last char of line to first of next line.
-#endif
-    
-#define hoffs 0
-//#define hoffs 1
-#define pxpc PICO_OSD_CHAR_WIDTH
-#define bxpc (pxpc / 4)
-#define pypc PICO_OSD_CHAR_HEIGHT
-#define bpc  (bxpc * pypc)
-#define fbbpl (fb_nx / 4)
-#define fbbpcl (pypc * fbbpl)
-#define fbbpNextLine (pypc * fbbpl - charsPerLine * bxpc)
 
     if (0 == currentChar) {
         currentY = 0;
@@ -1090,8 +1077,6 @@ bool renderCharsUntil(uint32_t limit_micros)
     }
 
     tus++;
-
-    int painted = 0;
     while (currentY < charLines) {
         // currentPtr is pointer to topleft of char dest on osdBufferA
         while (cmpTimeUs(limit_micros, micros()) > 0 && currentX < charsPerLine) {
@@ -1102,19 +1087,16 @@ bool renderCharsUntil(uint32_t limit_micros)
 //            if (currentY >= 14 && currentY <= 15) c = 0x17; // <-- bad with PiB output and PAL
 //            if (currentY >= 14 && currentY <= 15) c = 0x9d; // not a problem
             if (c!=0 && c!=0x20) {
-//            if (currentX > 5 && currentX < 20 && c!=0 && c!=0x20) {
                 // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
-
-                const uint8_t * fontp = &fontData[c*bpc]; // 3 bytes per 12 pixel char line, 18 lines
+                const uint8_t * fontp = &fontData[c * bpc]; // 3 bytes per 12 pixel char line, 18 lines
                 uint8_t * bufPtr = currentPtr;
                 for (int j=0; j<pypc; ++j) {
+                    // write out loop of bxpc (bytes per char = 3)
                     *bufPtr++ = *fontp++;
                     *bufPtr++ = *fontp++;
                     *bufPtr++ = *fontp++;
                     bufPtr += fbbpl - 3; // new line, back 3 bytes
                 }
-
-                painted++;
             }
 
             currentPtr += bxpc;
@@ -1137,16 +1119,6 @@ bool renderCharsUntil(uint32_t limit_micros)
     }
 
     return false;
-
-#undef hoffs
-#undef pxpc
-#undef bxpc
-#undef pypc
-#undef bpc
-#undef fbbpl
-#undef fbbpcl
-#undef fbbpNextLine
-
 }
 
 #if 0
