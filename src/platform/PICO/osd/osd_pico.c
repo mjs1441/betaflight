@@ -124,7 +124,6 @@ static volatile uint32_t sze;
 static volatile int tus;
 static volatile int tusr;
 static volatile uint32_t maxcycles;
-static volatile uint32_t paintedmaxcycles;
 static volatile int nisz;
 static volatile int dmb;
 
@@ -663,7 +662,8 @@ static void vsync_callback(void)
 //                (double)tus/250, (double)tusr/250, (double)tus/tusr);
 //        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
 //                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
-        maxcycles = 0; paintedmaxcycles = 0;
+        bprintf("max (per rd) us per call (max over %d rds) %d", tusr, maxcycles/150);
+        maxcycles = 0;
         tus = 0; tusr = 0;
         vmax = 0;
 #if 0
@@ -999,63 +999,60 @@ bool osdPioRenderItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
     }
 }
 
-void renderSidebarsUntil(uint32_t limit_micros)
+static bool renderSidebarsUntil(uint32_t limit_micros)
 {
     static int count;
     static const int maxCount = 2*AH_SIDEBAR_HEIGHT_POS * charHeight + 1;
     int x1 = infoSidebars.x1;
     int x2 = infoSidebars.x2;
     int y1 = infoSidebars.y1;
-    if (cachedSidebars) {
-        int y = count + y1;
-        while (micros() < limit_micros && count < maxCount) {
-            // bprintf("y = %d, x1=%d, x2=%d, y1 = %d", y,x1,x2, y1);
-            if (count == 0 || count == maxCount - 1) {
-                for (int j=-4; j<4; ++j) {
-                    plot(x1+j, y, 2);
-                    plot(x2+j, y, 2);
-                }
-            } else if (count % 16 == 0) {
-                for (int j=-2; j<2; ++j) {
-                    plot(x1+j, y, 2);
-                    plot(x2+j, y, 2);
-                }
-            } else if (count % 8 == 4) {
-                plot(x1, y, 2);
-                plot(x1, y-1, 1);
-                plot(x2, y, 2);
-                plot(x2, y-1, 1);
+    if (!cachedSidebars) {
+        return true; // Nothing to do here.
+    }
+
+    int y = count + y1;
+    while (micros() < limit_micros && count < maxCount) {
+        // bprintf("y = %d, x1=%d, x2=%d, y1 = %d", y,x1,x2, y1);
+        if (count == 0 || count == maxCount - 1) {
+            for (int j=-4; j<4; ++j) {
+                plot(x1+j, y, 2);
+                plot(x2+j, y, 2);
             }
-
-            y++;
-            count++;                         
+        } else if (count % 16 == 0) {
+            for (int j=-2; j<2; ++j) {
+                plot(x1+j, y, 2);
+                plot(x2+j, y, 2);
+            }
+        } else if (count % 8 == 4) {
+            plot(x1, y, 2);
+            plot(x1, y-1, 1);
+            plot(x2, y, 2);
+            plot(x2, y-1, 1);
         }
 
-        if (count == maxCount) {
-            // All done.
-            count = 0;
-            cachedSidebars = false;
-        }
-    }    
+        y++;
+        count++;
+    }
+
+    if (count == maxCount) {
+        // All done.
+        count = 0;
+        cachedSidebars = false;
+        return true; // All done with Sidebars.
+    }
+
+    return false;
 }
 
-
-// Update screen buffer (paint characters etc to buffer), up until a time limit.
-// Store state so that we can resume.
-// Return false when complete (no more to do).
-bool osdPioDrawScreenUntil(uint32_t limit_micros)
+static bool renderAHUntil(uint32_t limit_micros)
 {
-#if 0
     UNUSED(limit_micros);
-    plotTestCard();
-    return false;
-#else
-    uint32_t c1 = getCycleCounter();
-    static uint32_t maxcyclesthisround;
-    static int paintedmaxcyclesthisround;
+    return true;
+}
 
-    renderSidebarsUntil(limit_micros);
-    
+bool renderCharsUntil(uint32_t limit_micros)
+{
+
     // Saved state.
     // Position: currentChar (and cached currentY, currentX, currentPtr).
     static int currentChar;
@@ -1078,9 +1075,9 @@ bool osdPioDrawScreenUntil(uint32_t limit_micros)
     
 #define hoffs 0
 //#define hoffs 1
-#define pxpc 12
+#define pxpc PICO_OSD_CHAR_WIDTH
 #define bxpc (pxpc / 4)
-#define pypc 18
+#define pypc PICO_OSD_CHAR_HEIGHT
 #define bpc  (bxpc * pypc)
 #define fbbpl (fb_nx / 4)
 #define fbbpcl (pypc * fbbpl)
@@ -1090,11 +1087,6 @@ bool osdPioDrawScreenUntil(uint32_t limit_micros)
         currentY = 0;
         currentX = 0;
         currentPtr = osdBufferA + hoffs;
-        maxcycles += maxcyclesthisround;
-        paintedmaxcycles += paintedmaxcyclesthisround;
-        tusr++;
-        maxcyclesthisround = 0;
-        paintedmaxcyclesthisround = 0;
     }
 
     tus++;
@@ -1104,12 +1096,11 @@ bool osdPioDrawScreenUntil(uint32_t limit_micros)
         // currentPtr is pointer to topleft of char dest on osdBufferA
         while (cmpTimeUs(limit_micros, micros()) > 0 && currentX < charsPerLine) {
             uint8_t c = osdCharBuffer[currentChar++];
-//            uint8_t c = (currentY == 0 || currentY == 15) ?  osdCharBuffer[currentChar] : 0; currentChar++;
-//            uint8_t c = currentY == 13 ? 0x8b /*17*/ :  osdCharBuffer[currentChar]; currentChar++;
             // Buffer is always cleared after vsync before we start updating it. So, we can
             // ignore empty characters.
             // *** TODO check char 0 and char 32 (spc) are always transparent
-//            if (currentY >= 14 && currentY <= 15) c = 0x17; // <-- bad with PiB output
+//            if (currentY >= 14 && currentY <= 15) c = 0x17; // <-- bad with PiB output and PAL
+//            if (currentY >= 14 && currentY <= 15) c = 0x9d; // not a problem
             if (c!=0 && c!=0x20) {
 //            if (currentX > 5 && currentX < 20 && c!=0 && c!=0x20) {
                 // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
@@ -1139,16 +1130,24 @@ bool osdPioDrawScreenUntil(uint32_t limit_micros)
         currentPtr += fbbpNextLine;
     }
 
-    uint32_t cd = getCycleCounter() - c1;
-    if (cd > maxcyclesthisround) {
-        maxcyclesthisround = cd;
-        paintedmaxcyclesthisround = painted;
-    }
-
     if (currentChar == numChars) { // equivalently currentY == charLines
         // Reached the end, reset.
         currentChar = 0;
-        transferredSinceVsync = true;
+        return true;
+    }
+
+    return false;
+
+#undef hoffs
+#undef pxpc
+#undef bxpc
+#undef pypc
+#undef bpc
+#undef fbbpl
+#undef fbbpcl
+#undef fbbpNextLine
+
+}
 
 #if 0
         int bs = 252; int bx = 18; // bad
@@ -1184,22 +1183,42 @@ bool osdPioDrawScreenUntil(uint32_t limit_micros)
 //                ptr++;
             }
         }
-#endif            
-        return false;
+#endif
+
+
+// Update screen buffer (paint characters etc to buffer), up until a time limit.
+// Store state so that we can resume.
+// Return false when complete (no more to do).
+bool osdPioDrawScreenUntil(uint32_t limit_micros)
+{
+#if 0
+    UNUSED(limit_micros);
+    plotTestCard();
+    return false;
+#endif
+
+    static uint32_t maxcyclesthisround;
+
+    uint32_t c1 = getCycleCounter();
+
+    bool complete = renderSidebarsUntil(limit_micros) && renderAHUntil(limit_micros) && renderCharsUntil(limit_micros);
+
+    uint32_t cd = getCycleCounter() - c1;
+    if (cd > maxcyclesthisround) {
+        maxcyclesthisround = cd;
+    }
+
+    if (complete) {
+        // accumulate for averaging: maxcycles += maxcyclesthisround;
+        maxcycles = maxcyclesthisround;
+        tusr++;
+        maxcyclesthisround = 0;
+
+        transferredSinceVsync = true;
+        return false; // Nothing more to draw.
     }
 
     return true;
-    
-#undef hoffs
-#undef pxpc
-#undef bxpc
-#undef pypc
-#undef bpc
-#undef fbbpl
-#undef fbbpcl
-#undef fbbpNextLine
-
-#endif
 }
 
 void testUpdate(void)
