@@ -197,6 +197,7 @@ void testUpdate(void);
 void plot(int x, int y, int c)
 {
     static int badcount = 10;
+
     // c =  0 -> transparent (no overlay)   W=any EN=0
     // c =  1 -> black                      W=0   EN=1
     // c =  2 -> white                      W=1   EN=1
@@ -207,16 +208,25 @@ void plot(int x, int y, int c)
         return;
     }
 
-    uint8_t * pbyte = osdBufferA + PICO_OSD_BUF_WIDTH * y;
-    pbyte += (int)(x/4); // 4 pixels per byte
-    if (pbyte<osdBufferA || pbyte>=osdBufferA + PICO_OSD_BUF_LENGTH) {
-        bprintf("huh %p (%p) %d, %d, %d",pbyte,osdBufferA, x,y,c);
+    uint8_t * pByte = osdBufferA + PICO_OSD_BUF_WIDTH * y;
+    pByte += (int)(x/4); // 4 pixels per byte
+#if 0
+    if (pByte<osdBufferA || pByte>=osdBufferA + PICO_OSD_BUF_LENGTH) {
+        bprintf("huh %p (%p) %d, %d, %d",pByte,osdBufferA, x,y,c);
     }
+#endif
     static uint8_t masks[4] = {0b00000011, 0b00001100, 0b00110000, 0b11000000};
     static uint8_t  cols[4] = {0b00000000, 0b10101010, 0b11111111, 0b00000000};
     uint8_t mask = masks[x%4];
     uint8_t col = cols[c];
-    *pbyte = ((*pbyte) &(~mask)) | (mask&col);
+    *pByte = ((*pByte) &(~mask)) | (mask&col);
+}
+
+void hLine(int x, int y, int count, int col)
+{
+    for (int i=0; i<count; ++i) {
+        plot(x++, y, col);
+    }
 }
 
 static void vsync_callback(void);
@@ -254,7 +264,6 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
 //        osdBuffer1[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
 //        osdBuffer1[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
         osdBufferA[i] = 0;
-//        (void)dd;
     }
 
     for (int i=0; i<numChars; ++i) {
@@ -958,7 +967,6 @@ typedef struct {
     uint16_t x1;
     uint16_t y1;
     uint16_t x2;
-//    uint16_t y2;
 } info_sidebars_t;
 
 static info_sidebars_t infoSidebars;
@@ -968,9 +976,9 @@ static bool cachedSidebars;
 // cf. osd_element.c implementation osdBackgroundHorizonSidebars
 #define AH_SIDEBAR_WIDTH_POS 7
 #define AH_SIDEBAR_HEIGHT_POS 3
-void itemSidebarsCacheInfo(uint8_t x, uint8_t y)
+static void cacheSidebarsInfo(uint8_t x, uint8_t y)
 {
-    // Cache the top left and bottom rightt corners in buffer coords
+    // Cache the top left cornder and right edge in buffer coords
     // given the centre in char coords.
     // Sidebars are static (background), unchanging until reboot,
     // so only calculate once.
@@ -985,49 +993,72 @@ void itemSidebarsCacheInfo(uint8_t x, uint8_t y)
     cachedSidebars = true;
 }
 
+typedef struct {
+    uint16_t x1;
+    uint16_t y1;
+    uint16_t x2;
+    uint16_t y2;
+} info_ah_t;
+
+static info_ah_t infoArtificialHorizon;
+static bool cachedAH;
+
+static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
+{
+    (void)x; (void)y;
+    cachedAH = true;
+}
 
 bool osdPioRenderItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
     // Cache information for rendering an osd item later on.
     switch (item) {
     case OSD_HORIZON_SIDEBARS:
-        itemSidebarsCacheInfo(elemPosX, elemPosY);
+        cacheSidebarsInfo(elemPosX, elemPosY);
         return true;
+    case OSD_ARTIFICIAL_HORIZON:
+        cacheArtificialHorizonInfo(elemPosX, elemPosY);
+        return true;
+// would be nice...
+// case OSD_STICK_OVERLAY_LEFT:
+// case OSD_STICK_OVERLAY_RIGHT:
     default:
         // Not handled here
         return false;
     }
 }
 
+
+
 static bool renderSidebarsUntil(uint32_t limit_micros)
 {
     static int count;
     static const int maxCount = 2*AH_SIDEBAR_HEIGHT_POS * charHeight + 1;
-    int x1 = infoSidebars.x1;
-    int x2 = infoSidebars.x2;
-    int y1 = infoSidebars.y1;
+
     if (!cachedSidebars) {
         return true; // Nothing to do here.
     }
 
+    int x1 = infoSidebars.x1;
+    int x2 = infoSidebars.x2;
+    int y1 = infoSidebars.y1;
     int y = count + y1;
     while (micros() < limit_micros && count < maxCount) {
         // bprintf("y = %d, x1=%d, x2=%d, y1 = %d", y,x1,x2, y1);
+        // This is borderline for wanting to break down further (not to exceed limit_micros of around 20us by too much)
         if (count == 0 || count == maxCount - 1) {
-            for (int j=-4; j<4; ++j) {
-                plot(x1+j, y, 2);
-                plot(x2+j, y, 2);
-            }
+            hLine(x1-4, y, 9, 2);
+            hLine(x2-4, y, 9, 2);
+            hLine(x1-4, y-1, 9, 1);
+            hLine(x2-4, y-1, 9, 1);
         } else if (count % 16 == 0) {
-            for (int j=-2; j<2; ++j) {
-                plot(x1+j, y, 2);
-                plot(x2+j, y, 2);
-            }
-        } else if (count % 8 == 4) {
+            hLine(x1-2, y, 5, 2);
+            hLine(x2-2, y, 5, 2);
+            hLine(x1-2, y-1, 5, 1);
+            hLine(x2-2, y-1, 5, 1);
+        } else if (count % 4 == 2) {
             plot(x1, y, 2);
-            plot(x1, y-1, 1);
             plot(x2, y, 2);
-            plot(x2, y-1, 1);
         }
 
         y++;
@@ -1046,6 +1077,19 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
 
 static bool renderAHUntil(uint32_t limit_micros)
 {
+#if 0
+    static int count;
+
+    if (!cachedAH) {
+        return true; // Nothing to do here.
+    }
+
+    int x1 = infoArtificialHorizon.x1;
+    int y1 = infoArtificialHorizon.y1;
+    int x2 = infoArtificialHorizon.x2;
+    int y2 = infoArtificialHorizon.y2;
+#endif
+    UNUSED(infoArtificialHorizon);
     UNUSED(limit_micros);
     return true;
 }
@@ -1062,6 +1106,8 @@ bool renderCharsUntil(uint32_t limit_micros)
 
     // ** BEWARE ** charsPerLine doesn't correspond with pixels or bytes per line,
     // because we have some spare: 368 pixels not 360 for alignment reasons
+
+    // REM *** if we use hoffs or equivalent, do same in plot and other drawing routines
     const int hoffs = 0; //0..2 (using 90 of 92 bytes)
     const int pxpc = PICO_OSD_CHAR_WIDTH;
     const int bxpc = pxpc / 4; // 4 pixels per byte -> 3 bytes to go across by 1 char

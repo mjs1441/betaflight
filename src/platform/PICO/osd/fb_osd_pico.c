@@ -154,14 +154,21 @@ bool fbOsdReInitIfRequired(bool forceStallCheck)
     return false;
 }
 
+
+// Limit time taken for an individual call to fbOsdDrawScreen.
+// NB not a true limit, we are allowed to start a new operation if time has not gone past this,
+// so it might end up being exceeded by the length of the longest individual operation.
+//#define DRAWSCREEN_TIME_LIMIT_US 20
+
+// diagnose long operations
+#define DRAWSCREEN_TIME_LIMIT_US 5
+
 // Return true if screen still being transferred
-#define DRAWSCREEN_TIME_LIMIT_US 14
 bool fbOsdDrawScreen(void)
 {
     // Spend no more than DRAWSCREEN_TIME_LIMIT_US on each iteration, will keep
     // on calling in here until we return false for "all done".
     return osdPioDrawScreenUntil(micros() + DRAWSCREEN_TIME_LIMIT_US);
-//    return osdDrawScreenUntil(micros() - 1);
 }
 
 bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)
