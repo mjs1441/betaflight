@@ -1082,10 +1082,34 @@ typedef struct {
 
 static info_ah_t infoArtificialHorizon;
 static bool cachedAH;
+#include <math.h>
 
 static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
 {
-    (void)x; (void)y;
+    // Get pitch and roll limits in tenths of degrees
+    const int maxPitch = osdConfig()->ahMaxPitch * 10;
+    const int maxRoll = osdConfig()->ahMaxRoll * 10;
+    const int ahSign = osdConfig()->ahInvert ? -1 : 1;
+    const int rollAngle = constrain(attitude.values.roll * ahSign, -maxRoll, maxRoll);
+    int pitchAngle = constrain(attitude.values.pitch * ahSign, -maxPitch, maxPitch);
+    float scale = 75.0f;
+    const float d2r = 3.14159265f * 2 / 360 / 10;
+    float tp = tanf(pitchAngle * d2r);
+    float cr = cosf(rollAngle * d2r);
+    float sr = sinf(rollAngle * d2r);
+    float tscale = tp * scale;
+    int xc = x * charWidth + (charWidth / 2) - tscale * sr;
+    int yc = y * charHeight + (charHeight / 2) + tscale * cr;
+    infoArtificialHorizon.x1 = xc + scale * cr;
+    infoArtificialHorizon.y1 = yc + scale * sr;
+    infoArtificialHorizon.x2 = xc - scale * cr;
+    infoArtificialHorizon.y2 = yc - scale * sr;
+
+    if (tusr == 234) {
+        bprintf("OSD ah pitch %d roll %d tp %f cr %f sr %f tscale %f xc %d yc %d x1y1 %d %d x2y2 %d %d",
+                pitchAngle, rollAngle, (double)tp, (double)cr, (double)sr, (double)tscale, xc, yc,
+                infoArtificialHorizon.x1, infoArtificialHorizon.y1, infoArtificialHorizon.x2, infoArtificialHorizon.y2);
+    }
     cachedAH = true;
 }
 
@@ -1098,8 +1122,14 @@ bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 //         cachedSidebars = false;return false;
         return true;
     case OSD_ARTIFICIAL_HORIZON:
+//#define testnoahhere
+#ifdef testnoahhere
+        UNUSED(cacheArtificialHorizonInfo);
+        return false;
+#else
         cacheArtificialHorizonInfo(elemPosX, elemPosY);
         return true;
+#endif
 // would be nice...
 // case OSD_STICK_OVERLAY_LEFT:
 // case OSD_STICK_OVERLAY_RIGHT:
