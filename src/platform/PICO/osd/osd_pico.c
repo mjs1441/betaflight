@@ -102,6 +102,7 @@ static int osd_tx_sm;
 static int osd_en_gpio;
 static int osd_w_gpio;
 static int osd_sync_gpio;
+static int osdPioBase;
 
 __attribute__((aligned(4))) static uint32_t osdBuffer1W[PICO_OSD_BUF_LENGTH/4];
 __attribute__((aligned(4))) static uint32_t osdBuffer2W[PICO_OSD_BUF_LENGTH/4];
@@ -141,8 +142,9 @@ static void init_gpios(void)
 {
     static bool did;
     if (!did) {
-        osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
+        // Insist on osd_w_gpio -> osd_en_gpio -> osd_sync_gpio being consecutive.
         osd_w_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_W_PIN));
+        osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
         if (osd_en_gpio != osd_w_gpio + 1) {
             bprintf("*** OSD_EN_GPIO must be next pin up from OSD_W_GPIO (%d vs %d)", osd_en_gpio, osd_w_gpio);
         }
@@ -150,11 +152,11 @@ static void init_gpios(void)
         osd_sync_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_SYNC_PIN));
         if (osd_sync_gpio != osd_en_gpio + 1) {
             // might relax this... wait GPIO vs wait PINS if single SM, or just separate SMs
-        bprintf("*** OSD_SYNC_GPIO must be next pin up from OSD_EN_GPIO (%d vs %d)", osd_sync_gpio, osd_en_gpio);
+            bprintf("*** OSD_SYNC_GPIO must be next pin up from OSD_EN_GPIO (%d vs %d)", osd_sync_gpio, osd_en_gpio);
         }
-        
-        bprintf("osd_w gpio %d, osd_en gpio %d, osd_sync gpio %d", osd_w_gpio, osd_en_gpio, osd_sync_gpio);
-        // *** TODO PIO BASE
+
+        osdPioBase = osd_sync_gpio < 32 ? 0 : 16; // Need the higher range if the highest gpio is not in the low range 0..31.
+        bprintf("osd_w gpio %d, osd_en gpio %d, osd_sync gpio %d osdPioBase %d", osd_w_gpio, osd_en_gpio, osd_sync_gpio, osdPioBase);
         did = true;
     }
 }
@@ -339,6 +341,7 @@ static bool iterDashedDLineNext(void)
 
 static void vsync_callback(void);
 
+#if 0
 static void plotBorder(void)
 {    
     for (int i=0; i<fb_nx; ++i) {
@@ -352,31 +355,7 @@ static void plotBorder(void)
         plot(1,i,2); plot(fb_nx-2,i,2);
     }
 }
-
-static void osd_init_device(bool isPAL, int displayLines, int transferWords)
-{
-//    safe_zone_period = 18000;
-    safe_zone_period = 16000;
-//     safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBufferA) during final 10000 or so
-    in_safe_zone = true;
-
-    bprintf("OSD osd_init_device lines %d words %d", displayLines, transferWords);
-    bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT_MAX, PICO_OSD_BUF_LENGTH);
-    bprintf("osdBuffer1: %p osdBuffer2: %p", osdBuffer1W, osdBuffer2W);
-    bprintf("nx %d, ny %d", fb_nx, fb_ny);
-    for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
-//        int y = i / PICO_OSD_BUF_WIDTH;
-//        int x = (i % PICO_OSD_BUF_WIDTH) * 4; // approx. pixels
-//        int dd = (x-184)*(x-184)+(y-128)*(y-128);
-//        monoBuffer[i] = dd < 15000 ? 0xff : 0;
-//        osdBuffer1[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
-//        osdBuffer1[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
-        osdBufferA[i] = 0;
-    }
-
-    for (int i=0; i<numChars; ++i) {
-        osdCharBuffer[i] = 0;
-    }
+#endif
     
 #if 0
     for (int i=0; i<fb_nx; ++i) {
@@ -388,11 +367,11 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
     
 #endif
     
-#if 1
+#if 0
     // plotBorder();
     UNUSED(plotBorder);
 
-#elif 1
+#elif 0
     UNUSED(plotBorder);
     // this pattern particularly hard for small old screen
     for (int i=0; i<360; ++i) {
@@ -430,8 +409,34 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
     }
 #endif
 
+static void osd_init_device(bool isPAL, int displayLines, int transferWords)
+{
+//    safe_zone_period = 18000;
+    safe_zone_period = 16000;
+//     safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBufferA) during final 10000 or so
+    in_safe_zone = true;
+
+    bprintf("OSD osd_init_device lines %d words %d", displayLines, transferWords);
+    bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT_MAX, PICO_OSD_BUF_LENGTH);
+    bprintf("osdBuffer1: %p osdBuffer2: %p", osdBuffer1W, osdBuffer2W);
+    bprintf("nx %d, ny %d", fb_nx, fb_ny);
+    for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
+//        int y = i / PICO_OSD_BUF_WIDTH;
+//        int x = (i % PICO_OSD_BUF_WIDTH) * 4; // approx. pixels
+//        int dd = (x-184)*(x-184)+(y-128)*(y-128);
+//        monoBuffer[i] = dd < 15000 ? 0xff : 0;
+//        osdBuffer1[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
+//        osdBuffer1[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
+        osdBufferA[i] = 0;
+    }
+
+    for (int i=0; i<numChars; ++i) {
+        osdCharBuffer[i] = 0;
+    }
+
     init_gpios();
 
+    pio_set_gpio_base(osdPio, osdPioBase);
     osd_tx_offset = pio_add_program(osdPio, isPAL ? &osd_tx_pal_program : &osd_tx_ntsc_program);
     osd_tx_sm = pio_claim_unused_sm(osdPio, false);
     if (osd_tx_sm < 0) {
@@ -595,6 +600,7 @@ static const int initLines = 1000;
 void osdPioDetectStart(void)
 {
     init_gpios();
+    pio_set_gpio_base(osdPio, osdPioBase);
     osd_tx_offset = pio_add_program(osdPio, &osd_count_sync_program);
     osd_tx_sm = pio_claim_unused_sm(osdPio, false);
     pio_sm_config config = osd_count_sync_program_get_default_config(osd_tx_offset);
