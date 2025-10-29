@@ -86,6 +86,8 @@ static const int charsPerLine = 30;
 
 static const int charWidth = PICO_OSD_CHAR_WIDTH;
 static const int charHeight = PICO_OSD_CHAR_HEIGHT;
+static const int charHalfWidth = charWidth / 2;
+static const int charHalfHeight = charHeight / 2;
 
 // PAL / NTSC, require initialisation.
 static int fb_ny;
@@ -126,6 +128,7 @@ static volatile int tusr;
 static volatile uint32_t maxcycles;
 static volatile int nisz;
 static volatile int dmb;
+static volatile uint32_t maxAHI;
 
 
 // 30 * 16 = 480
@@ -752,6 +755,7 @@ static void vsync_callback(void)
 //        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
 //                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
         bprintf("max (per rd) us per call (max over %d rds) %d", tusr, maxcycles/150);
+//        bprintf("max ah cache cycles %d", maxAHI);
         maxcycles = 0;
         tus = 0; tusr = 0;
         vmax = 0;
@@ -1047,6 +1051,7 @@ typedef struct {
     uint16_t x1;
     uint16_t y1;
     uint16_t x2;
+    uint16_t yMid;
 } info_sidebars_t;
 
 static info_sidebars_t infoSidebars;
@@ -1062,10 +1067,12 @@ static void cacheSidebarsInfo(uint8_t x, uint8_t y)
     // given the centre in char coords.
     // Sidebars are static (background), unchanging until reboot,
     // so only calculate once.
+
     if (!calculatedSidebars) {
-        infoSidebars.x1 = (x - AH_SIDEBAR_WIDTH_POS) * charWidth + (charWidth / 2);
-        infoSidebars.y1 = (y - AH_SIDEBAR_HEIGHT_POS) * charHeight + (charHeight / 2);
-        infoSidebars.x2 = (x + AH_SIDEBAR_WIDTH_POS) * charWidth + (charWidth / 2);;
+        infoSidebars.x1 = (x - AH_SIDEBAR_WIDTH_POS) * charWidth + charHalfWidth;
+        infoSidebars.y1 = (y - AH_SIDEBAR_HEIGHT_POS) * charHeight; // not  + charHalfHeight because sub 0.5char*charHeight
+        infoSidebars.yMid = y * charHeight + charHalfHeight;
+        infoSidebars.x2 = (x + AH_SIDEBAR_WIDTH_POS) * charWidth + charHalfWidth;;
 //        infoSidebars.y2 = (y + AH_SIDEBAR_HEIGHT_POS) * charHeight;
         calculatedSidebars = true;
     }
@@ -1088,7 +1095,10 @@ static bool cachedAH;
 #define AH_SYMBOL_COUNT 9
 static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
 {
-    y += (AH_SYMBOL_COUNT - 1) / 2; // adjust to central y value of character-based AH element.
+    // takes about 5us (every 20ms)
+//    uint32_t c1 = getCycleCounter();
+    // Adjust to central y value of character-based AH element.
+    y += (AH_SYMBOL_COUNT - 1) / 2;
 
     // Get pitch and roll limits in tenths of degrees
     const int maxPitch = osdConfig()->ahMaxPitch * 10;
@@ -1096,25 +1106,28 @@ static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
     const int ahSign = osdConfig()->ahInvert ? -1 : 1;
     const int rollAngle = constrain(attitude.values.roll * ahSign, -maxRoll, maxRoll);
     int pitchAngle = constrain(attitude.values.pitch * ahSign, -maxPitch, maxPitch);
-    float scale = 75.0f;
+//    float scale = 75.0f;
+    float scale = 55.0f;
     const float d2r = 3.14159265f * 2 / 360 / 10; // extra scale factor of 10 for 10th of degree -> radian.
     float tp = tanf(pitchAngle * d2r);
     float cr = cosf(rollAngle * d2r);
     float sr = sinf(rollAngle * d2r);
     float tscale = tp * scale;
-    int xc = x * charWidth + (charWidth / 2) - tscale * sr;
-    int yc = y * charHeight + (charHeight / 2) + tscale * cr;
+    int xc = x * charWidth + charHalfWidth - tscale * sr;
+    int yc = y * charHeight + charHalfHeight + tscale * cr;
     infoArtificialHorizon.x1 = xc + scale * cr;
     infoArtificialHorizon.y1 = yc + scale * sr;
     infoArtificialHorizon.x2 = xc - scale * cr;
     infoArtificialHorizon.y2 = yc - scale * sr;
 
-    if (tusr == 234) {
+    if (tusr == -234) {
         bprintf("OSD ah pitch %d roll %d tp %f cr %f sr %f tscale %f xc %d yc %d x1y1 %d %d x2y2 %d %d",
                 pitchAngle, rollAngle, (double)tp, (double)cr, (double)sr, (double)tscale, xc, yc,
                 infoArtificialHorizon.x1, infoArtificialHorizon.y1, infoArtificialHorizon.x2, infoArtificialHorizon.y2);
     }
     cachedAH = true;
+//    uint32_t cd = getCycleCounter() - c1;
+//    maxAHI = cd > maxAHI ? cd : maxAHI;
 }
 
 bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
@@ -1145,8 +1158,8 @@ bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 
 static bool renderSidebarsUntil(uint32_t limit_micros)
 {
-    static int count;
-    static const int maxCount = 2*AH_SIDEBAR_HEIGHT_POS * charHeight + 1;
+    static int count = -1;
+    static const int maxCount = (2*AH_SIDEBAR_HEIGHT_POS + 1) * charHeight + 1;
 
     if (!cachedSidebars) {
         return true; // Nothing to do here.
@@ -1154,27 +1167,34 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
 
     int x1 = infoSidebars.x1;
     int x2 = infoSidebars.x2;
-    int y1 = infoSidebars.y1;
-    int y = count + y1;
+
+    if (count < 0) {
+        // Render the central indicators. 
+        int yMid = infoSidebars.yMid;
+        for (int i=1; i<6; ++i) {
+            plot(x1 + 16 - i, yMid + i, 2);
+            plot(x1 + 16 - i, yMid + i - 1, 1);
+            plot(x1 + 16 - i, yMid - i, 2);
+            plot(x1 + 16 - i, yMid - i - 1, 1);
+            plot(x2 - 16 + i, yMid + i, 2);
+            plot(x2 - 16 + i, yMid + i - 1, 1);
+            plot(x2 - 16 + i, yMid - i, 2);
+            plot(x2 - 16 + i, yMid - i - 1, 1);
+        }
+
+        count++;
+    }
+
+    int y = count + infoSidebars.y1;
     while (micros() < limit_micros && count < maxCount) {
         // bprintf("y = %d, x1=%d, x2=%d, y1 = %d", y,x1,x2, y1);
         // This is borderline for wanting to break down further (not to exceed limit_micros of around 20us by too much)
         if (count % 16 == 0) {
-            dhLine(x1-5, y, 11);
-            dhLine(x2-5, y, 11);
-//            hLine(x2-4, y, 9, 2);
-//            hLine(x1-4, y-1, 9, 1);
-//            hLine(x2-4, y-1, 9, 1);
-//        } else if (count % 16 == 0) {
-//            hLine(x1-2, y, 5, 2);
-//            hLine(x2-2, y, 5, 2);
-//            hLine(x1-2, y-1, 5, 1);
-//            hLine(x2-2, y-1, 5, 1);
-        } else if (count % 8 == 0) {
             dhLine(x1-2, y, 5);
             dhLine(x2-2, y, 5);
-//            plot(x1, y, 2);
-//            plot(x2, y, 2);
+        } else if (count % 8 == 0) {
+            dhLine(x1-5, y, 11);
+            dhLine(x2-5, y, 11);
         }
 
         y++;
@@ -1182,8 +1202,7 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
     }
 
     if (count == maxCount) {
-        // All done.
-        count = 0;
+        count = -1; // Restart with central indicators
         cachedSidebars = false;
         return true; // All done with Sidebars.
     }
