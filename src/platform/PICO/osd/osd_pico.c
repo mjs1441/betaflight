@@ -283,31 +283,56 @@ static void iterLineDataInit(iterLineData_t *data, int x1, int y1, int x2, int y
     }
 }
 
-static iterLineData_t iterDLineData;
-static void iterDLineInit(int x1, int y1, int x2, int y2)
+// iterLineData shared amongst all of the iter...Line functions.
+static iterLineData_t iterLineData;
+
+static void iterLineInit(int x1, int y1, int x2, int y2)
 {
-    iterLineDataInit(&iterDLineData, x1, y1, x2, y2);
+    iterLineDataInit(&iterLineData, x1, y1, x2, y2);
 }
 
 static bool iterDLineNext(void)
 {
-    if (iterDLineData.count >= iterDLineData.maxCount) {
+    if (iterLineData.count >= iterLineData.maxCount) {
         return true; // all done.
     }
 
-    if (iterDLineData.shallow) {
-        plot(iterDLineData.ic, iterDLineData.fc, 2);
-        plot(iterDLineData.ic, iterDLineData.fc + 1, 1);
-        iterDLineData.ic++;
-        iterDLineData.fc += iterDLineData.delta;
+    if (iterLineData.shallow) {
+        plot(iterLineData.ic, iterLineData.fc, 2);
+        plot(iterLineData.ic, iterLineData.fc + 1, 1);
+        iterLineData.ic++;
+        iterLineData.fc += iterLineData.delta;
     } else {
-        plot(iterDLineData.fc, iterDLineData.ic, 2);
-        plot(iterDLineData.fc + 1, iterDLineData.ic, 1);
-        iterDLineData.ic++;
-        iterDLineData.fc += iterDLineData.delta;
+        plot(iterLineData.fc, iterLineData.ic, 2);
+        plot(iterLineData.fc + 1, iterLineData.ic, 1);
+        iterLineData.ic++;
+        iterLineData.fc += iterLineData.delta;
     }
 
-    iterDLineData.count++;
+    iterLineData.count++;
+    return false;
+}
+
+static bool iterDashedDLineNext(void)
+{
+    if (iterLineData.count >= iterLineData.maxCount) {
+        return true; // all done.
+    }
+
+    if ((iterLineData.count % 16) < 9) {
+        if (iterLineData.shallow) {
+            plot(iterLineData.ic, iterLineData.fc, 2);
+            plot(iterLineData.ic, iterLineData.fc + 1, 1);
+        }
+        else {
+            plot(iterLineData.fc, iterLineData.ic, 2);
+            plot(iterLineData.fc + 1, iterLineData.ic, 1);
+        }
+    }
+
+    iterLineData.ic++;
+    iterLineData.fc += iterLineData.delta;
+    iterLineData.count++;
     return false;
 }
 
@@ -1085,6 +1110,7 @@ typedef struct {
     uint16_t y1;
     uint16_t x2;
     uint16_t y2;
+    bool outOfRange;
 } info_ah_t;
 
 static info_ah_t infoArtificialHorizon;
@@ -1101,24 +1127,29 @@ static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
     y += (AH_SYMBOL_COUNT - 1) / 2;
 
     // Get pitch and roll limits in tenths of degrees
-    const int maxPitch = osdConfig()->ahMaxPitch * 10;
-    const int maxRoll = 999999; // osdConfig()->ahMaxRoll * 10;
     const int ahSign = osdConfig()->ahInvert ? -1 : 1;
-    const int rollAngle = constrain(attitude.values.roll * ahSign, -maxRoll, maxRoll);
-    int pitchAngle = constrain(attitude.values.pitch * ahSign, -maxPitch, maxPitch);
-//    float scale = 75.0f;
-    float scale = 55.0f;
-    const float d2r = 3.14159265f * 2 / 360 / 10; // extra scale factor of 10 for 10th of degree -> radian.
+    const int maxPitch = osdConfig()->ahMaxPitch * 10;
+    // roll is uncontrained now. // const int maxRoll = osdConfig()->ahMaxRoll * 10;
+    // const int rollAngle = constrain(attitude.values.roll * ahSign, -maxRoll, maxRoll);
+    const int rollAngle = attitude.values.roll * ahSign;
+    int pitchAngleUnconstrained = attitude.values.pitch * ahSign;
+    int pitchAngle = constrain(pitchAngleUnconstrained, -maxPitch, maxPitch);
+
+    infoArtificialHorizon.outOfRange = pitchAngle != pitchAngleUnconstrained;
+
+    static const int barScale = (AH_SIDEBAR_WIDTH_POS - 2) * charWidth; // The AH bar should fit nicely between the Sidebars.
+    const int displacementScale = (fb_ny - 32) / 2; // going to fit maxPitch to screen (vertically).
+    const float d2r = 3.14159265f * 2 / 360 / 10; // Extra scale factor of 10 for 10th of degree -> radian.
     float tp = tanf(pitchAngle * d2r);
     float cr = cosf(rollAngle * d2r);
     float sr = sinf(rollAngle * d2r);
-    float tscale = tp * scale;
+    float tscale = tp * displacementScale / tanf(maxPitch * d2r);
     int xc = x * charWidth + charHalfWidth - tscale * sr;
     int yc = y * charHeight + charHalfHeight + tscale * cr;
-    infoArtificialHorizon.x1 = xc + scale * cr;
-    infoArtificialHorizon.y1 = yc + scale * sr;
-    infoArtificialHorizon.x2 = xc - scale * cr;
-    infoArtificialHorizon.y2 = yc - scale * sr;
+    infoArtificialHorizon.x1 = xc + barScale * cr;
+    infoArtificialHorizon.y1 = yc + barScale * sr;
+    infoArtificialHorizon.x2 = xc - barScale * cr;
+    infoArtificialHorizon.y2 = yc - barScale * sr;
 
     if (tusr == -234) {
         bprintf("OSD ah pitch %d roll %d tp %f cr %f sr %f tscale %f xc %d yc %d x1y1 %d %d x2y2 %d %d",
@@ -1219,13 +1250,14 @@ static bool renderAHUntil(uint32_t limit_micros)
     }
 
     if (first) {
-        iterDLineInit(infoArtificialHorizon.x1, infoArtificialHorizon.y1, infoArtificialHorizon.x2, infoArtificialHorizon.y2);
+        iterLineInit(infoArtificialHorizon.x1, infoArtificialHorizon.y1, infoArtificialHorizon.x2, infoArtificialHorizon.y2);
         first = false;
     }
 
     bool done = false;
+    bool oor = infoArtificialHorizon.outOfRange;
     while (micros() < limit_micros && !done) {
-        done = iterDLineNext();
+        done = oor ? iterDashedDLineNext() :  iterDLineNext();
     }
 
     if (done) {
