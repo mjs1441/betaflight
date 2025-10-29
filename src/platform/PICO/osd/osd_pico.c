@@ -1084,16 +1084,20 @@ static info_ah_t infoArtificialHorizon;
 static bool cachedAH;
 #include <math.h>
 
+// cf. osd_element.c implementation osdElementArtificialHorizon
+#define AH_SYMBOL_COUNT 9
 static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
 {
+    y += (AH_SYMBOL_COUNT - 1) / 2; // adjust to central y value of character-based AH element.
+
     // Get pitch and roll limits in tenths of degrees
     const int maxPitch = osdConfig()->ahMaxPitch * 10;
-    const int maxRoll = osdConfig()->ahMaxRoll * 10;
+    const int maxRoll = 999999; // osdConfig()->ahMaxRoll * 10;
     const int ahSign = osdConfig()->ahInvert ? -1 : 1;
     const int rollAngle = constrain(attitude.values.roll * ahSign, -maxRoll, maxRoll);
     int pitchAngle = constrain(attitude.values.pitch * ahSign, -maxPitch, maxPitch);
     float scale = 75.0f;
-    const float d2r = 3.14159265f * 2 / 360 / 10;
+    const float d2r = 3.14159265f * 2 / 360 / 10; // extra scale factor of 10 for 10th of degree -> radian.
     float tp = tanf(pitchAngle * d2r);
     float cr = cosf(rollAngle * d2r);
     float sr = sinf(rollAngle * d2r);

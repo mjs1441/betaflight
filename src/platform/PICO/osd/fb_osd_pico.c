@@ -96,6 +96,8 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
     if (false) { // ((count % 100017 == 0) || (hSyncs && hSyncs != lastHSyncs)) {
         bprintf("OSD %d detected %d hSyncs", count, hSyncs);
     }
+#else
+    UNUSED(lastHSyncs);
 #endif
 
     if (!hSyncs) {
