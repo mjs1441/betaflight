@@ -38,9 +38,11 @@
 #include "drivers/osd.h"
 #include "drivers/system.h"
 #include "drivers/time.h"
+#include "fc/rc_controls.h"
 #include "flight/imu.h"
 #include "osd/osd.h"
 #include "pg/vcd.h"
+#include "rx/rx.h"
 
 // pico sdk
 #include "hardware/irq.h"
@@ -247,6 +249,43 @@ void dhLine(int x, int y, int count)
     }
 }
 
+void dvLine(int x, int y, int count)
+{
+    for (int i=y; i < y + count; i++) {
+        plot(x, i, 2);
+        plot(x+1, i, 1);
+    }
+}
+
+void plotBlob(int x, int y)
+{
+    plot(x-2, y-2, 2);
+    plot(x-1, y-2, 2);
+    plot(x, y-2, 2);
+    plot(x+1, y-2, 2);
+    plot(x+2, y-2, 2);
+    plot(x-2, y-1, 2);
+    plot(x-2, y, 2);
+    plot(x-2, y+1, 2);
+    plot(x-2, y+2, 2);
+    plot(x-1, y+2, 2);
+    plot(x, y+2, 2);
+    plot(x+1, y+2, 2);
+    plot(x+2, y+2, 2);
+    plot(x+2, y+1, 2);
+    plot(x+2, y, 2);
+    plot(x+2, y-1, 2);
+
+    plot(x-1, y-1, 1);
+    plot(x-1, y, 1);
+    plot(x-1, y+1, 1);
+    plot(x, y+1, 1);
+    plot(x+1, y+1, 1);
+    plot(x+1, y, 1);
+    plot(x+1, y-1, 1);
+    plot(x, y-1, 1);
+}
+    
 // WARNING iter line functions are designed to be called iteratively, but only from one source at a time.
 
 typedef struct {
@@ -1153,6 +1192,76 @@ static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
 //    maxAHI = cd > maxAHI ? cd : maxAHI;
 }
 
+typedef struct {
+    uint16_t xLeft;
+    uint16_t yTop;
+    uint16_t xStick;
+    uint16_t yStick;
+} info_stick_t;
+
+static info_stick_t infoStickLeft;
+static info_stick_t infoStickRight;
+static uint8_t cachedStickLeft;
+static uint8_t cachedStickRight;
+
+
+typedef struct radioControls_s {
+    uint8_t left_vertical;
+    uint8_t left_horizontal;
+    uint8_t right_vertical;
+    uint8_t right_horizontal;
+} radioControls_t;
+
+static const radioControls_t radioModes[4] = {
+    { PITCH,    YAW,    THROTTLE,   ROLL }, // Mode 1
+    { THROTTLE, YAW,    PITCH,      ROLL }, // Mode 2
+    { PITCH,    ROLL,   THROTTLE,   YAW  }, // Mode 3
+    { THROTTLE, ROLL,   PITCH,      YAW  }, // Mode 4
+};
+
+// Stick overlay size
+#define OSD_STICK_OVERLAY_WIDTH 7
+#define OSD_STICK_OVERLAY_HEIGHT 5
+
+static const int stickWidth = charWidth * OSD_STICK_OVERLAY_WIDTH;
+static const int stickHeight = charHeight * OSD_STICK_OVERLAY_HEIGHT;
+
+void cacheStickInfo(info_stick_t *infoPtr, uint8_t x, uint8_t y, rc_alias_e vert, rc_alias_e horiz)
+{
+    infoPtr->xLeft = charWidth * x;
+    infoPtr->yTop = charHeight * y;
+    
+    const float cursorX = constrainf(rcData[horiz], PWM_RANGE_MIN, PWM_RANGE_MAX);
+    infoPtr->xStick = (uint16_t)scaleRangef(cursorX, PWM_RANGE_MIN, PWM_RANGE_MAX, infoPtr->xLeft, infoPtr->xLeft + stickWidth);
+    const float cursorY = constrainf(rcData[vert], PWM_RANGE_MIN, PWM_RANGE_MAX);
+
+    // note y inverted, cf. osd_elements.c
+    infoPtr->yStick = (uint16_t)scaleRangef(cursorY, PWM_RANGE_MIN, PWM_RANGE_MAX, infoPtr->yTop + stickHeight, infoPtr->yTop);
+}
+
+
+void cacheStickLeftInfo(uint8_t x, uint8_t y)
+{
+#if 0
+    float tr = micros()*(6.283f/1000000.0f / 3);
+    uint8_t cursorX = OSD_STICK_OVERLAY_WIDTH/2 * (1 + cosf(tr));
+    uint8_t cursorY = OSD_STICK_OVERLAY_VERTICAL_POSITIONS/2 * (1 + sinf(tr));
+#else
+    rc_alias_e vertical_channel = radioModes[osdConfig()->overlay_radio_mode-1].left_vertical;
+    rc_alias_e horizontal_channel = radioModes[osdConfig()->overlay_radio_mode-1].left_horizontal;
+    cacheStickInfo(&infoStickLeft, x, y, vertical_channel, horizontal_channel);
+#endif
+    cachedStickLeft = 1; // Ready to render background.
+}
+
+void cacheStickRightInfo(uint8_t x, uint8_t y)
+{
+    rc_alias_e vertical_channel = radioModes[osdConfig()->overlay_radio_mode-1].right_vertical;
+    rc_alias_e horizontal_channel = radioModes[osdConfig()->overlay_radio_mode-1].right_horizontal;
+    cacheStickInfo(&infoStickRight, x, y, vertical_channel, horizontal_channel);
+    cachedStickRight = 1; // Ready to render background.
+}
+
 bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
     // Cache information for rendering an osd item later on.
@@ -1170,9 +1279,15 @@ bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
         cacheArtificialHorizonInfo(elemPosX, elemPosY);
         return true;
 #endif
-// would be nice...
-// case OSD_STICK_OVERLAY_LEFT:
-// case OSD_STICK_OVERLAY_RIGHT:
+
+    case OSD_STICK_OVERLAY_LEFT:
+        cacheStickLeftInfo(elemPosX, elemPosY);
+        return true;
+
+    case OSD_STICK_OVERLAY_RIGHT:
+        cacheStickRightInfo(elemPosX, elemPosY);
+        return true;
+        
     default:
         // Not handled here
         return false;
@@ -1371,7 +1486,57 @@ bool renderCharsUntil(uint32_t limit_micros)
         }
 #endif
 
+bool renderSticksBackgroundUntil(uint32_t limit_micros)
+{
+    // cachedStickLeft, cachedStickRight, "state" are the state.
+    static int state;
 
+    while (micros() < limit_micros && cachedStickLeft == 1) {
+        int xMid = infoStickLeft.xLeft + stickWidth / 2;
+        int yMid = infoStickLeft.yTop + stickHeight / 2;
+        if (state == 0) {
+            dhLine(infoStickLeft.xLeft, yMid, stickWidth);
+            state++;
+        } else {
+            dvLine(xMid, infoStickLeft.yTop, stickHeight);
+            state = 0;
+            cachedStickLeft = 2; // next render stick position.
+        }
+    }
+
+    while (micros() < limit_micros && cachedStickRight == 1) {
+        int xMid = infoStickRight.xLeft + stickWidth / 2;
+        int yMid = infoStickRight.yTop + stickHeight / 2;
+        if (state == 0) {
+            dhLine(infoStickRight.xLeft, yMid, stickWidth);
+            state++;
+        } else {
+            dvLine(xMid, infoStickRight.yTop, stickHeight);
+            state = 0;
+            cachedStickRight = 2; // next render stick position.
+        }
+    }
+
+    return (cachedStickLeft != 1 && cachedStickRight != 1);
+}
+
+    
+bool renderSticksForegroundUntil(uint32_t limit_micros)
+{
+    while (micros() < limit_micros && cachedStickLeft == 2) {
+        plotBlob(infoStickLeft.xStick, infoStickLeft.yStick);
+        cachedStickLeft = 0;
+    }
+
+    while (micros() < limit_micros && cachedStickRight == 2) {
+        plotBlob(infoStickRight.xStick, infoStickRight.yStick);
+        cachedStickRight = 0;
+    }
+
+    return (cachedStickLeft == 0 && cachedStickRight == 0);
+}
+
+    
 // Update screen buffer (paint characters etc to buffer), up until a time limit.
 // Store state so that we can resume.
 // Return false when complete (no more to do).
@@ -1387,7 +1552,12 @@ bool osdPioDrawScreenUntil(uint32_t limit_micros)
 
     uint32_t c1 = getCycleCounter();
 
-    bool complete = renderSidebarsUntil(limit_micros) && renderAHUntil(limit_micros) && renderCharsUntil(limit_micros);
+    bool complete =
+        renderSticksBackgroundUntil(limit_micros) &&
+        renderSidebarsUntil(limit_micros) &&
+        renderAHUntil(limit_micros) &&
+        renderCharsUntil(limit_micros) &&
+        renderSticksForegroundUntil(limit_micros);
 
     uint32_t cd = getCycleCounter() - c1;
     if (cd > maxcyclesthisround) {
