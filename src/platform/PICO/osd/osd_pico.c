@@ -472,40 +472,20 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
     sm_config_set_out_shift(&config, true, false, 32); // no autopull
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
 
-    // Empirically found clocks to centre horizontally. Close enough to 75MHz not to affect sync pulse detection.
-    //  int pioclock = isPAL ? (int)75e6 * 1.057 : (int)75e6 * 1.038;
-    int pioclock = (int)75e6; // isPAL ? (int)75e6 * 1.057 : (int)75e6 * 1.038;
+    int pioclock = (int)75e6;
     float div = (float)SystemCoreClock / pioclock;
     bprintf("OSD device clock div = %f", (double)div);
     sm_config_set_clkdiv(&config, div);
     pio_sm_init(osdPio, osd_tx_sm, osd_tx_offset, &config);
 
-    /*
-      must arrange ISR to contain 359 = h pixels - 1
- stop (or not started yet), clear fifos
- send 359 to SM (put in TX fifo)
- pio_sm_exec_wait_blocking(pio, sm, [pull])
- pio_sm_exec_wait_blocking(pio, sm, [mov isr, osr])
-    */
-
-#if 0
-    // prepare value for horiz pixel loop
-//    pio_sm_put(osdPio, osd_tx_sm, 359);
-    pio_sm_put(osdPio, osd_tx_sm, 255); // see how square...
-//    pio_sm_put(osdPio, osd_tx_sm, 344);
-#else
     // prepare value for vert pixel loop
-//    pio_sm_put(osdPio, osd_tx_sm, 255);
-//    pio_sm_put(osdPio, osd_tx_sm, 287);
     pio_sm_put(osdPio, osd_tx_sm, displayLines - 1);
-#endif
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
     pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_mov(pio_isr, pio_osr));
 
     pio_set_irq0_source_enabled(osdPio, pis_interrupt0, true); // enable state machine IRQ 0 => system irq PIO_thisone_IRQ_0
     irq_set_exclusive_handler(osdPioIrq, vsync_callback);
     irq_set_enabled(osdPioIrq, true);
-
 
     // TODO *** consistent dma_claim vs dmaAllocate in PICO, probably follow SPI example
 
