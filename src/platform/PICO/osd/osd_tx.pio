@@ -33,9 +33,10 @@
 .define firstDisplayLine 21
 .define skipHsyncs firstDisplayLine - 7
 
-.define hshiftA 28
+; adjust from nominally correct values to centre on screen
+.define hshiftA 26
 .define hshiftB 29
-.define hshiftC 24
+.define hshiftC 12
 
 start:
     irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
@@ -76,8 +77,11 @@ next_line:
 line_loop:
     pull noblock             ; NB no autopull
 d6: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
-    jmp !osre d6        [clocksPerPixel - 2]
-    jmp y--, line_loop  [clocksPerPixel - 4]
+    jmp !osre osrPath [clocksPerPixel - 4]
+    jmp y--, line_loop       ; if taken, then out PINS to next out PINS is 4 + (clocksPerPixel - 4)
+           ; FALLTHROUGH, will not take jmp !osre
+osrPath:
+    jmp !osre d6 [1]         ; out PINS to out PINS is 3 + (clocksPerPixel - 4) + 1
 
     set PINS, 0
     jmp x--, wait_next_hsync
@@ -85,9 +89,11 @@ d6: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 
 
 .program osd_tx_ntsc
 
+; start of display theoretical 9.2us so A*B+C = 690 cycles
+; adjust (increase, shift right) in order to centre on screen
 .define hshiftA 25
 .define hshiftB 29
-.define hshiftC 24
+.define hshiftC 8
 
 .define firstDisplayLine 27
 .define skipHsyncs firstDisplayLine - 11
@@ -116,7 +122,7 @@ d3: jmp y--, d3    [26]      ; wait from low total of 10 + 16*15 + 2 + 25*27 = 9
 lh_cont:
     jmp x--, loop_hsync      ; loop until skipped (skipHsyncs + 1) lines with hsyncs
 
-    mov x, isr               ; isr prepared with 287 (or number of lines - 1)
+    mov x, isr               ; isr prepared with 233 (number of lines - 1)
 
 wait_next_hsync:
     wait 0 PIN, 0
@@ -131,8 +137,11 @@ next_line:
 line_loop:
     pull noblock             ; NB no autopull
 d6: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
-    jmp !osre d6        [clocksPerPixel - 2]
-    jmp y--, line_loop  [clocksPerPixel - 4]
+    jmp !osre osrPath [clocksPerPixel - 4]
+    jmp y--, line_loop       ; if taken, then out PINS to next out PINS is 4 + (clocksPerPixel - 4)
+           ; FALLTHROUGH, will not take jmp !osre
+osrPath:
+    jmp !osre d6 [1]         ; out PINS to out PINS is 3 + (clocksPerPixel - 4) + 1
 
     set PINS, 0
     jmp x--, wait_next_hsync
@@ -229,7 +238,7 @@ line_loop:
     pull noblock             ; NB no autopull
 d2: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
     jmp !osre d2        [clocksPerPixel - 2]
-    jmp y--, line_loop  [clocksPerPixel - 4]
+    jmp y--, line_loop  [clocksPerPixel - 4] ; <------- *** TODO fix me ***
 
     set PINS, 0
     jmp x--, wait_next_hsync

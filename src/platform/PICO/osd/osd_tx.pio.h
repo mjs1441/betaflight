@@ -13,7 +13,7 @@
 // ---------- //
 
 #define osd_tx_pal_wrap_target 0
-#define osd_tx_pal_wrap 29
+#define osd_tx_pal_wrap 30
 #define osd_tx_pal_pio_version 1
 
 #define osd_tx_pal_offset_loop_hsync 8u
@@ -39,24 +39,25 @@ static const uint16_t osd_tx_pal_program_instructions[] = {
     0x0048, // 16: jmp    x--, 8
     0xa026, // 17: mov    x, isr
     0x2020, // 18: wait   0 pin, 0
-    0xf85c, // 19: set    y, 28                  [24]
+    0xec5a, // 19: set    y, 26                  [12]
     0x1d94, // 20: jmp    y--, 20                [29]
     0x00d7, // 21: jmp    pin, 23
     0x0000, // 22: jmp    0
     0xe056, // 23: set    y, 22
     0x8080, // 24: pull   noblock
     0x6002, // 25: out    pins, 2
-    0x08f9, // 26: jmp    !osre, 25              [8]
-    0x0698, // 27: jmp    y--, 24                [6]
-    0xe000, // 28: set    pins, 0
-    0x0052, // 29: jmp    x--, 18
+    0x06fc, // 26: jmp    !osre, 28              [6]
+    0x0098, // 27: jmp    y--, 24
+    0x01f9, // 28: jmp    !osre, 25              [1]
+    0xe000, // 29: set    pins, 0
+    0x0052, // 30: jmp    x--, 18
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program osd_tx_pal_program = {
     .instructions = osd_tx_pal_program_instructions,
-    .length = 30,
+    .length = 31,
     .origin = -1,
     .pio_version = osd_tx_pal_pio_version,
 #if PICO_PIO_VERSION > 0
@@ -76,7 +77,7 @@ static inline pio_sm_config osd_tx_pal_program_get_default_config(uint offset) {
 // ----------- //
 
 #define osd_tx_ntsc_wrap_target 0
-#define osd_tx_ntsc_wrap 29
+#define osd_tx_ntsc_wrap 30
 #define osd_tx_ntsc_pio_version 1
 
 static const uint16_t osd_tx_ntsc_program_instructions[] = {
@@ -100,24 +101,25 @@ static const uint16_t osd_tx_ntsc_program_instructions[] = {
     0x0048, // 16: jmp    x--, 8
     0xa026, // 17: mov    x, isr
     0x2020, // 18: wait   0 pin, 0
-    0xf859, // 19: set    y, 25                  [24]
+    0xe459, // 19: set    y, 25                  [4]
     0x1d94, // 20: jmp    y--, 20                [29]
     0x00d7, // 21: jmp    pin, 23
     0x0000, // 22: jmp    0
     0xe056, // 23: set    y, 22
     0x8080, // 24: pull   noblock
     0x6002, // 25: out    pins, 2
-    0x08f9, // 26: jmp    !osre, 25              [8]
-    0x0698, // 27: jmp    y--, 24                [6]
-    0xe000, // 28: set    pins, 0
-    0x0052, // 29: jmp    x--, 18
+    0x06fc, // 26: jmp    !osre, 28              [6]
+    0x0098, // 27: jmp    y--, 24
+    0x01f9, // 28: jmp    !osre, 25              [1]
+    0xe000, // 29: set    pins, 0
+    0x0052, // 30: jmp    x--, 18
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program osd_tx_ntsc_program = {
     .instructions = osd_tx_ntsc_program_instructions,
-    .length = 30,
+    .length = 31,
     .origin = -1,
     .pio_version = osd_tx_ntsc_pio_version,
 #if PICO_PIO_VERSION > 0
