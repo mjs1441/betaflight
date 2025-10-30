@@ -1230,27 +1230,31 @@ void cacheStickInfo(info_stick_t *infoPtr, uint8_t x, uint8_t y, rc_alias_e vert
 {
     infoPtr->xLeft = charWidth * x;
     infoPtr->yTop = charHeight * y;
+#if 1
+    UNUSED(vert);
+    UNUSED(horiz);
+    float tr = micros()*(6.283f/1000000.0f / 3);
+    infoPtr->xStick = (uint16_t)(infoPtr->xLeft + stickWidth/2 * (1 + cosf(tr)));
+    infoPtr->yStick = (uint16_t)(infoPtr->yTop + stickHeight/2 * (1 + sinf(tr)));
+#else
     
     const float cursorX = constrainf(rcData[horiz], PWM_RANGE_MIN, PWM_RANGE_MAX);
-    infoPtr->xStick = (uint16_t)scaleRangef(cursorX, PWM_RANGE_MIN, PWM_RANGE_MAX, infoPtr->xLeft, infoPtr->xLeft + stickWidth);
     const float cursorY = constrainf(rcData[vert], PWM_RANGE_MIN, PWM_RANGE_MAX);
+
+
+    infoPtr->xStick = (uint16_t)scaleRangef(cursorX, PWM_RANGE_MIN, PWM_RANGE_MAX, infoPtr->xLeft, infoPtr->xLeft + stickWidth);
 
     // note y inverted, cf. osd_elements.c
     infoPtr->yStick = (uint16_t)scaleRangef(cursorY, PWM_RANGE_MIN, PWM_RANGE_MAX, infoPtr->yTop + stickHeight, infoPtr->yTop);
+#endif
 }
 
 
 void cacheStickLeftInfo(uint8_t x, uint8_t y)
 {
-#if 0
-    float tr = micros()*(6.283f/1000000.0f / 3);
-    uint8_t cursorX = OSD_STICK_OVERLAY_WIDTH/2 * (1 + cosf(tr));
-    uint8_t cursorY = OSD_STICK_OVERLAY_VERTICAL_POSITIONS/2 * (1 + sinf(tr));
-#else
     rc_alias_e vertical_channel = radioModes[osdConfig()->overlay_radio_mode-1].left_vertical;
     rc_alias_e horizontal_channel = radioModes[osdConfig()->overlay_radio_mode-1].left_horizontal;
     cacheStickInfo(&infoStickLeft, x, y, vertical_channel, horizontal_channel);
-#endif
     cachedStickLeft = 1; // Ready to render background.
 }
 
