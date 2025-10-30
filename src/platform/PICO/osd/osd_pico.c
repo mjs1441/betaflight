@@ -1169,7 +1169,7 @@ static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
     infoArtificialHorizon.outOfRange = pitchAngle != pitchAngleUnconstrained;
 
     static const int barScale = (AH_SIDEBAR_WIDTH_POS - 2) * charWidth; // The AH bar should fit nicely between the Sidebars.
-    const int displacementScale = (fb_ny - 32) / 2; // going to fit maxPitch to screen (vertically).
+    const int displacementScale = (fb_ny - 64) / 2; // going to fit maxPitch to screen (vertically), less a bit for overscan.
     const float d2r = 3.14159265f * 2 / 360 / 10; // Extra scale factor of 10 for 10th of degree -> radian.
     float tp = tanf(pitchAngle * d2r);
     float cr = cosf(rollAngle * d2r);
