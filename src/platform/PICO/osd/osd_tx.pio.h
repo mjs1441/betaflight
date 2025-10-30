@@ -101,7 +101,7 @@ static const uint16_t osd_tx_ntsc_program_instructions[] = {
     0x0048, // 16: jmp    x--, 8
     0xa026, // 17: mov    x, isr
     0x2020, // 18: wait   0 pin, 0
-    0xe459, // 19: set    y, 25                  [4]
+    0xe859, // 19: set    y, 25                  [8]
     0x1d94, // 20: jmp    y--, 20                [29]
     0x00d7, // 21: jmp    pin, 23
     0x0000, // 22: jmp    0

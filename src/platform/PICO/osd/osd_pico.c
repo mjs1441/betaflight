@@ -94,13 +94,13 @@ static int fb_ny;
 static int charLines = VIDEO_LINES_PAL; // Variable, default to 16 (PAL)
 static int numChars;
 
-// PIO program offset and state machine
+// PIO program offset and state machine.
 static int osd_tx_offset;
 static int osd_tx_sm;
 
-// GPIOs for write enable, white/black, sync-detect
-static int osd_en_gpio;
+// GPIOs for white/black, write enable, sync-detect.
 static int osd_w_gpio;
+static int osd_en_gpio;
 static int osd_sync_gpio;
 static int osdPioBase;
 
@@ -110,6 +110,11 @@ static uint8_t* osdBufferA = (uint8_t *)osdBuffer1W;
 static uint8_t* osdBufferB = (uint8_t *)osdBuffer2W;
 
 static const uint32_t zero;
+//static const uint32_t zero = 0xaaaaaaaa;
+//static const uint32_t zero = 0x22222222;
+//static const uint32_t zero = 0x88888888;
+//static const uint32_t zero = 0xf2f2f2f2;
+
 static int dma_chan_zero_to_bufA;
 static int dma_chan_bufB_to_fifo;
 
@@ -468,9 +473,10 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
 
     // Empirically found clocks to centre horizontally. Close enough to 75MHz not to affect sync pulse detection.
-    int pioclock = isPAL ? (int)75e6 * 1.057 : (int)75e6 * 1.038;
+    //  int pioclock = isPAL ? (int)75e6 * 1.057 : (int)75e6 * 1.038;
+    int pioclock = (int)75e6; // isPAL ? (int)75e6 * 1.057 : (int)75e6 * 1.038;
     float div = (float)SystemCoreClock / pioclock;
-    bprintf("pio clock div = %f", (double)div);
+    bprintf("OSD device clock div = %f", (double)div);
     sm_config_set_clkdiv(&config, div);
     pio_sm_init(osdPio, osd_tx_sm, osd_tx_offset, &config);
 
