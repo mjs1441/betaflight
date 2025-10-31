@@ -1168,6 +1168,7 @@ static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
 
     infoArtificialHorizon.outOfRange = pitchAngle != pitchAngleUnconstrained;
 
+    // Note that pitch is positive for the board / camera pointing up, and y coords increase going down the screen.
     static const int barScale = (AH_SIDEBAR_WIDTH_POS - 2) * charWidth; // The AH bar should fit nicely between the Sidebars.
     const int displacementScale = (fb_ny - 64) / 2; // going to fit maxPitch to screen (vertically), less a bit for overscan.
     const float d2r = 3.14159265f * 2 / 360 / 10; // Extra scale factor of 10 for 10th of degree -> radian.
@@ -1176,11 +1177,11 @@ static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
     float sr = sinf(rollAngle * d2r);
     float tscale = tp * displacementScale / tanf(maxPitch * d2r);
     int xc = x * charWidth + charHalfWidth - tscale * sr;
-    int yc = y * charHeight + charHalfHeight + tscale * cr;
+    int yc = y * charHeight + charHalfHeight - tscale * cr;
     infoArtificialHorizon.x1 = xc + barScale * cr;
-    infoArtificialHorizon.y1 = yc + barScale * sr;
+    infoArtificialHorizon.y1 = yc - barScale * sr;
     infoArtificialHorizon.x2 = xc - barScale * cr;
-    infoArtificialHorizon.y2 = yc - barScale * sr;
+    infoArtificialHorizon.y2 = yc + barScale * sr;
 
     if (tusr == -234) {
         bprintf("OSD ah pitch %d roll %d tp %f cr %f sr %f tscale %f xc %d yc %d x1y1 %d %d x2y2 %d %d",
@@ -1268,6 +1269,15 @@ void cacheStickRightInfo(uint8_t x, uint8_t y)
 
 bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
+//#define testNoPixelElements
+#ifdef testNoPixelElements
+    UNUSED(item);
+    UNUSED(elemPosX);
+    UNUSED(elemPosY);
+    UNUSED(cacheArtificialHorizonInfo);
+    UNUSED(cacheSidebarsInfo);
+    return false;
+#else
     // Cache information for rendering an osd item later on.
     switch (item) {
     case OSD_HORIZON_SIDEBARS:
@@ -1296,6 +1306,7 @@ bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
         // Not handled here
         return false;
     }
+#endif
 }
 
 static bool renderSidebarsUntil(uint32_t limit_micros)
