@@ -23,9 +23,9 @@
 
 MEMORY
 {
-    /* TODO: Assuming for now that target has >= 4MB boot flash */
-    FLASH (rx)        : ORIGIN = 0x10000000, LENGTH = 4032K
-    FLASH_CONFIG (r)  : ORIGIN = 0x103F0000, LENGTH = 64K
+    /* TODO: Assuming for now that target has >= 2MB boot flash */
+    FLASH (rx)        : ORIGIN = 0x10000000, LENGTH = 1984K
+    FLASH_CONFIG (r)  : ORIGIN = 0x101F0000, LENGTH = 64K
     RAM(rwx) : ORIGIN =  0x20000000, LENGTH = 512k
     SCRATCH_X(rwx) : ORIGIN = 0x20080000, LENGTH = 4k
     SCRATCH_Y(rwx) : ORIGIN = 0x20081000, LENGTH = 4k
@@ -174,6 +174,9 @@ SECTIONS
         . = ALIGN(4);
         *(.rodata*)
         . = ALIGN(4);
+        /* also code in section labelled ".fastcode" goes into RAM */
+        *(.fastcode*)
+        . = ALIGN(4);
 
         *(.data*)
         *(.sdata*)
@@ -193,7 +196,7 @@ SECTIONS
 
     .tdata : {
         . = ALIGN(4);
-		*(.tdata .tdata.* .gnu.linkonce.td.*)
+        *(.tdata .tdata.* .gnu.linkonce.td.*)
         /* All data end */
         __tdata_end = .;
     } > RAM AT> FLASH

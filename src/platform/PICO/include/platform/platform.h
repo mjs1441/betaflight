@@ -80,7 +80,8 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
 #define DMA_DATA_ZERO_INIT
 #define DMA_DATA
 #define STATIC_DMA_DATA_AUTO            static
-#define FAST_IRQ_HANDLER
+#define FAST_CODE                       __attribute__((section(".fastcode")))
+#define FAST_IRQ_HANDLER                FAST_CODE
 
 #define DEFAULT_CPU_OVERCLOCK           0
 
