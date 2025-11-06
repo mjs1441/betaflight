@@ -62,8 +62,6 @@ SECTIONS
         KEEP (*(.embedded_block))
         __embedded_block_end = .;
         KEEP (*(.reset))
-        *cli.o(.text*)
-        *main/*(.text*)
         . = ALIGN(4);
     } > FLASH
 
