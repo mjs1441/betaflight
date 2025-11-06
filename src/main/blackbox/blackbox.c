@@ -1883,7 +1883,7 @@ static bool blackboxWriteSysinfo(void)
 /**
  * Write the given event to the log immediately
  */
-void blackboxLogEvent(FlightLogEvent event, flightLogEventData_t *data)
+void blackboxLogEvent(FlightLogEvent event, const flightLogEventData_t *data)
 {
     // Only allow events to be logged after headers have been written
     if (!(blackboxState == BLACKBOX_STATE_RUNNING || blackboxState == BLACKBOX_STATE_PAUSED)) {
@@ -1949,7 +1949,7 @@ static void blackboxCheckAndLogFlightMode(void)
         eventData.lastFlags = blackboxLastFlightModeFlags;
         memcpy(&blackboxLastFlightModeFlags, &rcModeActivationMask, sizeof(blackboxLastFlightModeFlags));
         memcpy(&eventData.flags, &rcModeActivationMask, sizeof(eventData.flags));
-        blackboxLogEvent(FLIGHT_LOG_EVENT_FLIGHTMODE, (flightLogEventData_t *)&eventData);
+        blackboxLogEvent(FLIGHT_LOG_EVENT_FLIGHTMODE, (const flightLogEventData_t *)&eventData);
     }
 }
 

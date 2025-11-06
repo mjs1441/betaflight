@@ -70,7 +70,7 @@ typedef struct blackboxConfig_s {
 PG_DECLARE(blackboxConfig_t, blackboxConfig);
 
 union flightLogEventData_u;
-void blackboxLogEvent(FlightLogEvent event, union flightLogEventData_u *data);
+void blackboxLogEvent(FlightLogEvent event, const union flightLogEventData_u *data);
 
 void blackboxInit(void);
 void blackboxUpdate(timeUs_t currentTimeUs);
