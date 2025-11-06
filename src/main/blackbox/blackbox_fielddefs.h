@@ -167,6 +167,7 @@ typedef struct flightLogEvent_disarm_s {
 typedef struct flightLogEvent_flightMode_s { // New Event Data type
     uint32_t flags;
     uint32_t lastFlags;
+    uint32_t dummy;
 } flightLogEvent_flightMode_t;
 
 typedef struct flightLogEvent_inflightAdjustment_s {
