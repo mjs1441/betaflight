@@ -63,6 +63,10 @@ SECTIONS
         __embedded_block_end = .;
         KEEP (*(.reset))
         . = ALIGN(4);
+        */cli/*(*.text*)
+        */config/*(*.text*)
+        */pg/*(*.text*)
+        . = ALIGN(4);
     } > FLASH
 
     /* Note the boot2 section is optional, and should be discarded if there is
@@ -89,6 +93,10 @@ SECTIONS
     .rodata : {
         /* segments not marked as .flashdata are instead pulled into .data (in RAM) to avoid accidental flash accesses */
         *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.flashdata*)))
+        . = ALIGN(4);
+        */cli/*(*.rodata*)
+        */config/*(*.rodata*)
+        */pg/*(*.rodata*)
         . = ALIGN(4);
     } > FLASH
 
@@ -200,7 +208,7 @@ SECTIONS
 
     .tdata : {
         . = ALIGN(4);
-		*(.tdata .tdata.* .gnu.linkonce.td.*)
+        *(.tdata .tdata.* .gnu.linkonce.td.*)
         /* All data end */
         __tdata_end = .;
     } > RAM AT> FLASH
@@ -276,7 +284,7 @@ SECTIONS
         KEEP(*(.stack*))
     } > SCRATCH_Y
 
-    /* keep embedded end block as final entry into FLASH 
+    /* keep embedded end block as final entry into FLASH
      * - helps protect against partial/corrupt load into flash
      */
     .flash_end : {
