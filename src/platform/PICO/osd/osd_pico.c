@@ -1227,11 +1227,12 @@ static const radioControls_t radioModes[4] = {
 static const int stickWidth = charWidth * OSD_STICK_OVERLAY_WIDTH;
 static const int stickHeight = charHeight * OSD_STICK_OVERLAY_HEIGHT;
 
+#define TEST_STICK_INPUTS
 void cacheStickInfo(info_stick_t *infoPtr, uint8_t x, uint8_t y, rc_alias_e vert, rc_alias_e horiz)
 {
     infoPtr->xLeft = charWidth * x;
     infoPtr->yTop = charHeight * y;
-#if 1
+#ifdef TEST_STICK_INPUTS
     UNUSED(vert);
     UNUSED(horiz);
     float tr = micros()*(6.283f/1000000.0f / 3);
