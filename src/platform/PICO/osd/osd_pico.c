@@ -113,13 +113,13 @@ static uint8_t* osdBufferBackground = (uint8_t *)osdBufferBackgroundW;
 static uint8_t* osdBufferA = (uint8_t *)osdBuffer1W;
 static uint8_t* osdBufferB = (uint8_t *)osdBuffer2W;
 
-static const uint32_t zero;
+//static const uint32_t zero;
 //static const uint32_t zero = 0xaaaaaaaa;
 //static const uint32_t zero = 0x22222222;
 //static const uint32_t zero = 0x88888888;
 //static const uint32_t zero = 0xf2f2f2f2;
 
-static int dma_chan_zero_to_bufA;
+static int dma_chan_bg_to_bufA;
 static int dma_chan_bufB_to_fifo;
 
 // buffer update control (avoid tearing etc.)
@@ -198,14 +198,14 @@ bool osdPioBufferAvailable(void)
         return false;
     }
 
-    if (dma_channel_is_busy(dma_chan_zero_to_bufA)) {
+    if (dma_channel_is_busy(dma_chan_bg_to_bufA)) {
         dmb++;
         return false;
     }
 
     return true;
 #else
-    return !transferredSinceVsync && in_safe_zone && !dma_channel_is_busy(dma_chan_zero_to_bufA);
+    return !transferredSinceVsync && in_safe_zone && !dma_channel_is_busy(dma_chan_bg_to_bufA);
 #endif
 }
 
@@ -547,16 +547,16 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
 
     // TODO *** consistent dma_claim vs dmaAllocate in PICO, probably follow SPI example
 
-    dma_chan_zero_to_bufA = dma_claim_unused_channel(false);
-    if (-1 == dma_chan_zero_to_bufA) {
-        bprintf("**** failed to claim dma channel (zero to bufA) for osd pico");
+    dma_chan_bg_to_bufA = dma_claim_unused_channel(false);
+    if (-1 == dma_chan_bg_to_bufA) {
+        bprintf("**** failed to claim dma channel (bg to bufA) for osd pico");
         return;
     }
 
     dma_chan_bufB_to_fifo = dma_claim_unused_channel(false);
     if (-1 == dma_chan_bufB_to_fifo) {
         bprintf("**** failed to claim dma channel (buf2 to fifo) for osd pico");
-        dma_channel_unclaim(dma_chan_zero_to_bufA);
+        dma_channel_unclaim(dma_chan_bg_to_bufA);
         return;
     }
 
@@ -569,25 +569,25 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
     dma_channel_configure(
         dma_chan_bufB_to_fifo,
         &c,
-        &osdPio->txf[osd_tx_sm],  // Write address (fixed PIO TX FIFO)
-        NULL,                     // Read address (reset each time)
+        &osdPio->txf[osd_tx_sm], // Write address (fixed PIO TX FIFO)
+        NULL,                    // Read address (reset each time)
         transferWords,           // Number of transfers
-        false                     // Don't start immediately
+        false                    // Don't start immediately
     );
 
-    c = dma_channel_get_default_config(dma_chan_zero_to_bufA);
+    c = dma_channel_get_default_config(dma_chan_bg_to_bufA);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
-    channel_config_set_read_increment(&c, false);
+    channel_config_set_read_increment(&c, true);
     channel_config_set_write_increment(&c, true);
     channel_config_set_chain_to(&c, dma_chan_bufB_to_fifo); // DMA to PIO fifo starts immediately on completion of clearing buf1
 
     dma_channel_configure(
-        dma_chan_zero_to_bufA,
+        dma_chan_bg_to_bufA,
         &c,
-        NULL,                     // Write address (reset each time)
-        &zero,                    // Read address (fixed)
+        NULL,                    // Write address (reset each time)
+        NULL,                    // Read address (reset each time)
         transferWords,           // Number of transfers
-        false                     // Don't start immediately
+        false                    // Don't start immediately
     );
 
     /*
@@ -728,11 +728,11 @@ static void vsync_callback(void)
 
     sza=getCycleCounter();
 
-    if (dma_channel_is_busy(dma_chan_zero_to_bufA)) {
+    if (dma_channel_is_busy(dma_chan_bg_to_bufA)) {
         // Unexpected, PIO shouldn't get back to vsync IRQ unless dma buf2->fifo has started
         // unless sync signals are rather mixed up (detected vsync pulse but no hsync pulses on any line)
         busybuf++;
-        dma_channel_abort(dma_chan_zero_to_bufA);
+        dma_channel_abort(dma_chan_bg_to_bufA);
     }
 
     // Ensure that DMA (buf2 to PIO FIFO) is not in progress, and that the PIO FIFO is empty.
@@ -746,9 +746,10 @@ static void vsync_callback(void)
 
     // Reset the incrementing addresses
     dma_channel_set_read_addr(dma_chan_bufB_to_fifo, osdBufferB, false);
-    dma_channel_set_write_addr(dma_chan_zero_to_bufA, osdBufferA, false);
+    dma_channel_set_read_addr(dma_chan_bg_to_bufA, osdBufferBackground, false);
+    dma_channel_set_write_addr(dma_chan_bg_to_bufA, osdBufferA, false);
     
-    // Start DMA for zero->osdBufferA (clears screen buffer)
+    // Start DMA for bg->osdBufferA (effectively clears screen buffer)
     // chains to DMA for osdBufferB -> screen
 
 // testing dma speed
@@ -761,7 +762,7 @@ static void vsync_callback(void)
 //         bprintf("* dc3-dc1 %d dc3-dc2 %d buf1 %p werc %p buf2 %p", dc3-dc1, dc3-dc2, osdBuffer1, &werc[0], osdBuffer2);
 //     }
 
-    dma_channel_start(dma_chan_zero_to_bufA);
+    dma_channel_start(dma_chan_bg_to_bufA);
 
     // probably best clear at end, just in case there are re-trigger issues if cleared earlier...
     pio_interrupt_clear(osdPio, 0);
