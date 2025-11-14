@@ -1206,8 +1206,10 @@ typedef struct {
 
 static info_stick_t infoStickLeft;
 static info_stick_t infoStickRight;
-static uint8_t cachedStickLeft;
-static uint8_t cachedStickRight;
+static bool cachedStickLeftBackground;
+static bool cachedStickRightBackground;
+static bool cachedStickLeft;
+static bool cachedStickRight;
 
 
 typedef struct radioControls_s {
@@ -1232,10 +1234,14 @@ static const int stickWidth = charWidth * OSD_STICK_OVERLAY_WIDTH;
 static const int stickHeight = charHeight * OSD_STICK_OVERLAY_HEIGHT;
 
 #define TEST_STICK_INPUTS
-void cacheStickInfo(info_stick_t *infoPtr, uint8_t x, uint8_t y, rc_alias_e vert, rc_alias_e horiz)
+static void cacheStickBackgroundInfo(info_stick_t *infoPtr, uint8_t x, uint8_t y)
 {
     infoPtr->xLeft = charWidth * x;
     infoPtr->yTop = charHeight * y;
+}
+
+static void cacheStickInfo(info_stick_t *infoPtr, rc_alias_e vert, rc_alias_e horiz)
+{
 #ifdef TEST_STICK_INPUTS
     UNUSED(vert);
     UNUSED(horiz);
@@ -1255,21 +1261,45 @@ void cacheStickInfo(info_stick_t *infoPtr, uint8_t x, uint8_t y, rc_alias_e vert
 #endif
 }
 
+static void cacheStickLeftBackgroundInfo(uint8_t x, uint8_t y)
+{
+    static uint8_t stickLeft_x = 255;
+    static uint8_t stickLeft_y = 255;
+    if (x != stickLeft_x || y != stickLeft_y) {
+        cacheStickBackgroundInfo(&infoStickLeft, x, y);
+        stickLeft_x = x;
+        stickLeft_y = y;
+        cachedStickLeftBackground = true;
+        checkol+=10000;
+    }
+}
 
-void cacheStickLeftInfo(uint8_t x, uint8_t y)
+static void cacheStickRightBackgroundInfo(uint8_t x, uint8_t y)
+{
+    static uint8_t stickRight_x = 255;
+    static uint8_t stickRight_y = 255;
+    if (x != stickRight_x || y != stickRight_y) {
+        cacheStickBackgroundInfo(&infoStickRight, x, y);
+        stickRight_x = x;
+        stickRight_y = y;
+        cachedStickRightBackground = true;
+    }
+}
+
+static void cacheStickLeftInfo(void)
 {
     rc_alias_e vertical_channel = radioModes[osdConfig()->overlay_radio_mode-1].left_vertical;
     rc_alias_e horizontal_channel = radioModes[osdConfig()->overlay_radio_mode-1].left_horizontal;
-    cacheStickInfo(&infoStickLeft, x, y, vertical_channel, horizontal_channel);
-    cachedStickLeft = 1; // Ready to render background.
+    cacheStickInfo(&infoStickLeft, vertical_channel, horizontal_channel);
+    cachedStickLeft = true;
 }
 
-void cacheStickRightInfo(uint8_t x, uint8_t y)
+static void cacheStickRightInfo(void)
 {
     rc_alias_e vertical_channel = radioModes[osdConfig()->overlay_radio_mode-1].right_vertical;
     rc_alias_e horizontal_channel = radioModes[osdConfig()->overlay_radio_mode-1].right_horizontal;
-    cacheStickInfo(&infoStickRight, x, y, vertical_channel, horizontal_channel);
-    cachedStickRight = 1; // Ready to render background.
+    cacheStickInfo(&infoStickRight, vertical_channel, horizontal_channel);
+    cachedStickRight = true;
 }
 
 bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
@@ -1281,12 +1311,11 @@ bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPo
 //         cachedSidebars = false;return false;
         return true;
     case OSD_STICK_OVERLAY_LEFT:
-        cacheStickLeftInfo(elemPosX, elemPosY);
-        checkol++;
+        cacheStickLeftBackgroundInfo(elemPosX, elemPosY);
         return true;
 
     case OSD_STICK_OVERLAY_RIGHT:
-        cacheStickRightInfo(elemPosX, elemPosY);
+        cacheStickRightBackgroundInfo(elemPosX, elemPosY);
         return true;
         
     default:
@@ -1318,14 +1347,14 @@ bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPo
 #endif
 
     case OSD_STICK_OVERLAY_LEFT:
-        cacheStickLeftInfo(elemPosX, elemPosY);
+        cacheStickLeftInfo();
         checkol++;
         return true;
 
     case OSD_STICK_OVERLAY_RIGHT:
-        cacheStickRightInfo(elemPosX, elemPosY);
+        cacheStickRightInfo();
         return true;
-        
+
     default:
         // Not handled here
         return false;
@@ -1527,10 +1556,10 @@ bool renderCharsUntil(uint32_t limit_micros)
 
 bool renderSticksBackgroundUntil(uint32_t limit_micros)
 {
-    // cachedStickLeft, cachedStickRight, "state" are the state.
+    // cachedStickLeftBackground, cachedStickRightBackground, "state" are the state.
     static int state;
 
-    while (micros() < limit_micros && cachedStickLeft == 1) {
+    while (micros() < limit_micros && cachedStickLeftBackground) {
         int xMid = infoStickLeft.xLeft + stickWidth / 2;
         int yMid = infoStickLeft.yTop + stickHeight / 2;
         if (state == 0) {
@@ -1539,11 +1568,11 @@ bool renderSticksBackgroundUntil(uint32_t limit_micros)
         } else {
             dvLine(xMid, infoStickLeft.yTop, stickHeight);
             state = 0;
-            cachedStickLeft = 2; // next render stick position.
+            cachedStickLeftBackground = false; // This won't get retriggered unless x, y coords change.
         }
     }
 
-    while (micros() < limit_micros && cachedStickRight == 1) {
+    while (micros() < limit_micros && cachedStickRightBackground) {
         int xMid = infoStickRight.xLeft + stickWidth / 2;
         int yMid = infoStickRight.yTop + stickHeight / 2;
         if (state == 0) {
@@ -1552,27 +1581,27 @@ bool renderSticksBackgroundUntil(uint32_t limit_micros)
         } else {
             dvLine(xMid, infoStickRight.yTop, stickHeight);
             state = 0;
-            cachedStickRight = 2; // next render stick position.
+            cachedStickRightBackground = false;
         }
     }
 
-    return (cachedStickLeft != 1 && cachedStickRight != 1);
+    return (!cachedStickLeftBackground && !cachedStickRightBackground);
 }
 
     
 bool renderSticksForegroundUntil(uint32_t limit_micros)
 {
-    while (micros() < limit_micros && cachedStickLeft == 2) {
+    while (micros() < limit_micros && cachedStickLeft) {
         plotBlob(infoStickLeft.xStick, infoStickLeft.yStick);
-        cachedStickLeft = 0;
+        cachedStickLeft = false;
     }
 
-    while (micros() < limit_micros && cachedStickRight == 2) {
+    while (micros() < limit_micros && cachedStickRight) {
         plotBlob(infoStickRight.xStick, infoStickRight.yStick);
-        cachedStickRight = 0;
+        cachedStickRight = false;
     }
 
-    return (cachedStickLeft == 0 && cachedStickRight == 0);
+    return (!cachedStickLeft && !cachedStickRight);
 }
 
     

@@ -319,6 +319,7 @@ void osdAnalyzeActiveElements(void)
      */
     schedulerIgnoreTaskExecTime();
 
+    bprintf("OSD osdAnalyzeActiveElements");
     osdAddActiveElements();
     osdDrawActiveElementsBackground(osdDisplayPort);
 }
