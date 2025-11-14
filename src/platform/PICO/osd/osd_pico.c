@@ -119,7 +119,7 @@ static const uint32_t zero;
 //static const uint32_t zero = 0x88888888;
 //static const uint32_t zero = 0xf2f2f2f2;
 
-static bool dma_bg_from_zero = true; // set true to enforce clear of background buffer followed by rendering of background items
+static volatile bool dma_bg_from_zero = true; // set true to enforce clear of background buffer followed by rendering of background items
 static int dma_chan_bg_to_bufA;
 static int dma_chan_bufB_to_fifo;
 
@@ -474,14 +474,19 @@ static void plotBorder(void)
     }
 #endif
 
+static dma_channel_config config_zero_to_bg;
+static dma_channel_config config_bg_to_bufA;
+static int dmaTransferWords;
+
 static void osd_init_device(bool isPAL, int displayLines, int transferWords)
 {
+    dmaTransferWords = transferWords;
 //    safe_zone_period = 18000;
     safe_zone_period = 16000;
 //     safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBufferA) during final 10000 or so
     in_safe_zone = true;
 
-    bprintf("OSD osd_init_device lines %d words %d", displayLines, transferWords);
+    bprintf("OSD osd_init_device lines %d words %d", displayLines, dmaTransferWords);
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT_MAX, PICO_OSD_BUF_LENGTH);
     bprintf("osdBuffer1: %p osdBuffer2: %p", osdBuffer1W, osdBuffer2W);
     bprintf("nx %d, ny %d", fb_nx, fb_ny);
@@ -573,24 +578,21 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
         &c,
         &osdPio->txf[osd_tx_sm], // Write address (fixed PIO TX FIFO)
         NULL,                    // Read address (reset each time)
-        transferWords,           // Number of transfers
+        dmaTransferWords,        // Number of transfers
         false                    // Don't start immediately
     );
 
-    c = dma_channel_get_default_config(dma_chan_bg_to_bufA);
-    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
-    channel_config_set_read_increment(&c, true);
-    channel_config_set_write_increment(&c, true);
-    channel_config_set_chain_to(&c, dma_chan_bufB_to_fifo); // DMA to PIO fifo starts immediately on completion of clearing buf1
+    config_zero_to_bg = dma_channel_get_default_config(dma_chan_bg_to_bufA);
+    channel_config_set_transfer_data_size(&config_zero_to_bg, DMA_SIZE_32);
+    channel_config_set_read_increment(&config_zero_to_bg, false); // no increment when copying from the Zero word.
+    channel_config_set_write_increment(&config_zero_to_bg, true);
+    channel_config_set_chain_to(&config_zero_to_bg, dma_chan_bufB_to_fifo); // DMA to PIO fifo starts immediately on completion of clearing buf1
 
-    dma_channel_configure(
-        dma_chan_bg_to_bufA,
-        &c,
-        NULL,                    // Write address (reset each time)
-        NULL,                    // Read address (reset each time)
-        transferWords,           // Number of transfers
-        false                    // Don't start immediately
-    );
+    config_bg_to_bufA = config_zero_to_bg;
+    channel_config_set_read_increment(&config_bg_to_bufA, true); // increment when copying from the background buffer.
+    bprintf("OSD config_bg_to_bufA %08x, config_zero_to_bg %08x", config_bg_to_bufA, config_zero_to_bg);
+
+    // defer dma_channel_configure for dma_chan_bg_to_fifo, will change if clearing the background buffer by copying from Zero.
 
     /*
       dma channel abort, workaround for erratum
@@ -748,8 +750,28 @@ static void vsync_callback(void)
 
     // Reset the incrementing addresses
     dma_channel_set_read_addr(dma_chan_bufB_to_fifo, osdBufferB, false);
-    dma_channel_set_read_addr(dma_chan_bg_to_bufA, osdBufferBackground, false);
-    dma_channel_set_write_addr(dma_chan_bg_to_bufA, osdBufferA, false);
+
+    if (dma_bg_from_zero) {
+        dma_channel_configure(
+            dma_chan_bg_to_bufA,
+            &config_zero_to_bg,     // Config (don't increment read address)
+            osdBufferBackground,    // Write address
+            &zero,                  // Read address
+            dmaTransferWords,       // Number of transfers
+            false                   // Don't start immediately
+        );
+        setBackgroundItemsPending();
+        dma_bg_from_zero = false;
+    } else {
+        dma_channel_configure(
+            dma_chan_bg_to_bufA,
+            &config_bg_to_bufA,     // Config (increment read address)
+            osdBufferA,             // Write address
+            osdBufferBackground,    // Read address
+            dmaTransferWords,       // Number of transfers
+            false                   // Don't start immediately
+        );
+    }
     
     // Start DMA for bg->osdBufferA (effectively clears screen buffer)
     // chains to DMA for osdBufferB -> screen
@@ -1093,19 +1115,20 @@ typedef enum {
     bgItemComplete
 } bgItemState_e;
 
-static bgItemState_e bgSidebarsState;
-static bgItemState_e bgStickLeftState;
-static bgItemState_e bgStickRightState;
+static volatile bgItemState_e bgSidebarsState;
+static volatile bgItemState_e bgStickLeftState;
+static volatile bgItemState_e bgStickRightState;
 
 static void setBackgroundItemsPending(void)
 {
     bgSidebarsState = bgItemPendingCache;
     bgStickLeftState = bgItemPendingCache;
     bgStickRightState = bgItemPendingCache;
-}    
+}
 
 void osdPioRedrawBackground(void)
 {
+    dma_bg_from_zero = true;
 }
 
 typedef struct {
