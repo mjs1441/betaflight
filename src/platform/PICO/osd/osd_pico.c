@@ -1085,7 +1085,15 @@ void plotTestCard(void)
     }
 }
 
-#define INVALID_COORD 255
+typedef enum {
+    bgItemPendingCache = 0,
+    bgItemPendingRender,
+    bgItemComplete
+} bgItemState_e;
+
+static bgItemState_e bgSidebarsState;
+static bgItemState_e bgStickLeftState;
+static bgItemState_e bgStickRightState;
 
 typedef struct {
     uint16_t x1;
@@ -1095,7 +1103,6 @@ typedef struct {
 } info_sidebars_t;
 
 static info_sidebars_t infoSidebars;
-static bool cachedSidebars;
 
 // cf. osd_element.c implementation osdBackgroundHorizonSidebars
 #define AH_SIDEBAR_WIDTH_POS 7
@@ -1106,18 +1113,14 @@ static void cacheSidebarsInfo(uint8_t x, uint8_t y)
     // given the centre in char coords.
     // Sidebars are static (background), unchanging until reboot (or config change),
     // so only calculate once.
-    static uint8_t saved_x = INVALID_COORD;
-    static uint8_t saved_y = INVALID_COORD;
 
-    if (x != saved_x || y != saved_y) {
+    if (bgSidebarsState == bgItemPendingCache) {
         infoSidebars.x1 = (x - AH_SIDEBAR_WIDTH_POS) * charWidth + charHalfWidth;
         infoSidebars.y1 = (y - AH_SIDEBAR_HEIGHT_POS) * charHeight; // not  + charHalfHeight because sub 0.5char*charHeight
         infoSidebars.yMid = y * charHeight + charHalfHeight;
         infoSidebars.x2 = (x + AH_SIDEBAR_WIDTH_POS) * charWidth + charHalfWidth;;
 //        infoSidebars.y2 = (y + AH_SIDEBAR_HEIGHT_POS) * charHeight;
-        saved_x = x;
-        saved_y = y;
-        cachedSidebars = true;
+        bgSidebarsState = bgItemPendingRender;
    }
 }
 
@@ -1187,8 +1190,6 @@ typedef struct {
 
 static info_stick_t infoStickLeft;
 static info_stick_t infoStickRight;
-static bool cachedStickLeftBackground;
-static bool cachedStickRightBackground;
 static bool cachedStickLeft;
 static bool cachedStickRight;
 
@@ -1243,26 +1244,18 @@ static void cacheStickInfo(info_stick_t *infoPtr, rc_alias_e vert, rc_alias_e ho
 
 static void cacheStickLeftBackgroundInfo(uint8_t x, uint8_t y)
 {
-    static uint8_t saved_x = INVALID_COORD;
-    static uint8_t saved_y = INVALID_COORD;
-    if (x != saved_x || y != saved_y) {
+    if (bgStickLeftState == bgItemPendingCache) {
         cacheStickBackgroundInfo(&infoStickLeft, x, y);
-        saved_x = x;
-        saved_y = y;
-        cachedStickLeftBackground = true;
+        bgStickLeftState = bgItemPendingRender;
         checkol+=10000;
     }
 }
 
 static void cacheStickRightBackgroundInfo(uint8_t x, uint8_t y)
 {
-    static uint8_t stickRight_x = 255;
-    static uint8_t stickRight_y = 255;
-    if (x != stickRight_x || y != stickRight_y) {
+    if (bgStickRightState == bgItemPendingCache) {
         cacheStickBackgroundInfo(&infoStickRight, x, y);
-        stickRight_x = x;
-        stickRight_y = y;
-        cachedStickRightBackground = true;
+        bgStickRightState = bgItemPendingRender;
     }
 }
 
@@ -1346,7 +1339,7 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
     static int count = -1;
     static const int maxCount = (2*AH_SIDEBAR_HEIGHT_POS + 1) * charHeight + 1;
 
-    if (!cachedSidebars) {
+    if (bgSidebarsState != bgItemPendingRender) {
         return true; // Nothing to do here.
     }
 
@@ -1387,8 +1380,8 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
     }
 
     if (count == maxCount) {
-        count = -1; // Restart with central indicators
-        cachedSidebars = false;
+        count = -1; // Restart would be with central indicators
+        bgSidebarsState = bgItemComplete;
         return true; // All done with Sidebars.
     }
 
@@ -1426,7 +1419,6 @@ static bool renderAHUntil(uint32_t limit_micros)
 
 bool renderCharsUntil(uint32_t limit_micros)
 {
-
     // Saved state.
     // Position: currentChar (and cached currentY, currentX, currentPtr).
     static int currentChar;
@@ -1535,36 +1527,35 @@ bool renderCharsUntil(uint32_t limit_micros)
 
 bool renderSticksBackgroundUntil(uint32_t limit_micros)
 {
-    // cachedStickLeftBackground, cachedStickRightBackground, "state" are the state.
-    static int state;
+    static int subState;
 
-    while (micros() < limit_micros && cachedStickLeftBackground) {
+    while (micros() < limit_micros && bgStickLeftState == bgItemPendingRender) {
         int xMid = infoStickLeft.xLeft + stickWidth / 2;
         int yMid = infoStickLeft.yTop + stickHeight / 2;
-        if (state == 0) {
+        if (subState == 0) {
             dhLine(infoStickLeft.xLeft, yMid, stickWidth);
-            state++;
+            subState++;
         } else {
             dvLine(xMid, infoStickLeft.yTop, stickHeight);
-            state = 0;
-            cachedStickLeftBackground = false; // This won't get retriggered unless x, y coords change.
+            subState = 0;
+            bgStickLeftState = bgItemComplete; // This won't get retriggered unless config/profile changes.
         }
     }
 
-    while (micros() < limit_micros && cachedStickRightBackground) {
+    while (micros() < limit_micros && bgStickRightState == bgItemPendingRender) {
         int xMid = infoStickRight.xLeft + stickWidth / 2;
         int yMid = infoStickRight.yTop + stickHeight / 2;
-        if (state == 0) {
+        if (subState == 0) {
             dhLine(infoStickRight.xLeft, yMid, stickWidth);
-            state++;
+            subState++;
         } else {
             dvLine(xMid, infoStickRight.yTop, stickHeight);
-            state = 0;
-            cachedStickRightBackground = false;
+            subState = 0;
+            bgStickRightState = bgItemComplete;
         }
     }
 
-    return (!cachedStickLeftBackground && !cachedStickRightBackground);
+    return (bgStickLeftState != bgItemPendingRender && bgStickRightState != bgItemPendingRender);
 }
 
     
