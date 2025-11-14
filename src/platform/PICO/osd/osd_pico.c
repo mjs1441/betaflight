@@ -106,8 +106,10 @@ static int osd_en_gpio;
 static int osd_sync_gpio;
 static int osdPioBase;
 
+__attribute__((aligned(4))) static uint32_t osdBufferBackgroundW[PICO_OSD_BUF_LENGTH/4];
 __attribute__((aligned(4))) static uint32_t osdBuffer1W[PICO_OSD_BUF_LENGTH/4];
 __attribute__((aligned(4))) static uint32_t osdBuffer2W[PICO_OSD_BUF_LENGTH/4];
+static uint8_t* osdBufferBackground = (uint8_t *)osdBufferBackgroundW;
 static uint8_t* osdBufferA = (uint8_t *)osdBuffer1W;
 static uint8_t* osdBufferB = (uint8_t *)osdBuffer2W;
 
@@ -209,8 +211,22 @@ bool osdPioBufferAvailable(void)
 
 void testUpdate(void);
 
+static bool plotToBackground;
+
+static void selectBackgroundBuffer(void)
+{
+    plotToBackground = true;
+}
+
+static void selectForegroundBuffer(void)
+{
+    plotToBackground = false;
+}
+
 void plot(int x, int y, int c)
 {
+    uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
+
     static int badcount = 10;
 
     // c =  0 -> transparent (no overlay)   W=any EN=0
@@ -223,11 +239,11 @@ void plot(int x, int y, int c)
         return;
     }
 
-    uint8_t * pByte = osdBufferA + PICO_OSD_BUF_WIDTH * y;
+    uint8_t * pByte = plotBuffer + PICO_OSD_BUF_WIDTH * y;
     pByte += (int)(x/4); // 4 pixels per byte
 #if 0
-    if (pByte<osdBufferA || pByte>=osdBufferA + PICO_OSD_BUF_LENGTH) {
-        bprintf("huh %p (%p) %d, %d, %d",pByte,osdBufferA, x,y,c);
+    if (pByte<plotBuffer || pByte>=plotBuffer + PICO_OSD_BUF_LENGTH) {
+        bprintf("huh %p (%p) %d, %d, %d",pByte,plotBuffer, x,y,c);
     }
 #endif
     static uint8_t masks[4] = {0b00000011, 0b00001100, 0b00110000, 0b11000000};
@@ -1068,44 +1084,7 @@ void plotTestCard(void)
     }
 }
 
-// osd_elements artificalhorizon attitude.values.*
-// also see sensors/gyro/gyro.ADCf, but note gyro ~ rad/sec, accel ~ rad/sec^2
-// flight/imu.c -> "euler angles" (sic) (pitch, roll, yaw)
-// ./telemetry/crsf.c:    sbufWriteU16BigEndian(dst, decidegrees2Radians10000(attitude.values.roll));
-
-void osdUpdateCallback(uint32_t t_us)
-{
-    bprintf("\n*** not in use *** \n");
-#if 0
-    ouccount++;
-    if (!osdPioBufferAvailable()) {
-        oucunsafe++;
-        testUpdate();
-    } else {
-        // put equivalent delay here if you want to measure proportions from counters
-    }
-    UNUSED(t_us);
-#elif defined unsafetestloop
-    UNUSED(t_us);
-    while (true) {
-        ouccount++;
-        oucunsafe2 += dma_channel_is_busy(dma_chan_zero_to_bufA);
-        oucunsafe3 += dma_channel_is_busy(dma_chan_bufB_to_fifo);
-//        zero++;
-    }
-#else
-    static char oucbuf[30];
-    ouccount++;
-    sze = getCycleCounter();
-    osdPrintFloat(oucbuf, 0x64, ((float)t_us)/10000, "", 3, false, 0x6c);
-    osdPioWrite(2,0,oucbuf);
-    if (osdPioBufferAvailable()) {
-        testUpdate();
-    } else {
-        oucunsafe++;
-    }
-#endif
-}
+#define INVALID_COORD 255
 
 typedef struct {
     uint16_t x1;
@@ -1115,7 +1094,6 @@ typedef struct {
 } info_sidebars_t;
 
 static info_sidebars_t infoSidebars;
-static bool calculatedSidebars;
 static bool cachedSidebars;
 
 // cf. osd_element.c implementation osdBackgroundHorizonSidebars
@@ -1125,19 +1103,21 @@ static void cacheSidebarsInfo(uint8_t x, uint8_t y)
 {
     // Cache the top left cornder and right edge in buffer coords
     // given the centre in char coords.
-    // Sidebars are static (background), unchanging until reboot,
+    // Sidebars are static (background), unchanging until reboot (or config change),
     // so only calculate once.
+    static uint8_t saved_x = INVALID_COORD;
+    static uint8_t saved_y = INVALID_COORD;
 
-    if (!calculatedSidebars) {
+    if (x != saved_x || y != saved_y) {
         infoSidebars.x1 = (x - AH_SIDEBAR_WIDTH_POS) * charWidth + charHalfWidth;
         infoSidebars.y1 = (y - AH_SIDEBAR_HEIGHT_POS) * charHeight; // not  + charHalfHeight because sub 0.5char*charHeight
         infoSidebars.yMid = y * charHeight + charHalfHeight;
         infoSidebars.x2 = (x + AH_SIDEBAR_WIDTH_POS) * charWidth + charHalfWidth;;
 //        infoSidebars.y2 = (y + AH_SIDEBAR_HEIGHT_POS) * charHeight;
-        calculatedSidebars = true;
-    }
-
-    cachedSidebars = true;
+        saved_x = x;
+        saved_y = y;
+        cachedSidebars = true;
+   }
 }
 
 typedef struct {
@@ -1211,7 +1191,6 @@ static bool cachedStickRightBackground;
 static bool cachedStickLeft;
 static bool cachedStickRight;
 
-
 typedef struct radioControls_s {
     uint8_t left_vertical;
     uint8_t left_horizontal;
@@ -1263,12 +1242,12 @@ static void cacheStickInfo(info_stick_t *infoPtr, rc_alias_e vert, rc_alias_e ho
 
 static void cacheStickLeftBackgroundInfo(uint8_t x, uint8_t y)
 {
-    static uint8_t stickLeft_x = 255;
-    static uint8_t stickLeft_y = 255;
-    if (x != stickLeft_x || y != stickLeft_y) {
+    static uint8_t saved_x = INVALID_COORD;
+    static uint8_t saved_y = INVALID_COORD;
+    if (x != saved_x || y != saved_y) {
         cacheStickBackgroundInfo(&infoStickLeft, x, y);
-        stickLeft_x = x;
-        stickLeft_y = y;
+        saved_x = x;
+        saved_y = y;
         cachedStickLeftBackground = true;
         checkol+=10000;
     }
@@ -1308,7 +1287,6 @@ bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPo
     case OSD_HORIZON_SIDEBARS:
         cacheSidebarsInfo(elemPosX, elemPosY);
         checksb++;
-//         cachedSidebars = false;return false;
         return true;
     case OSD_STICK_OVERLAY_LEFT:
         cacheStickLeftBackgroundInfo(elemPosX, elemPosY);
@@ -1620,9 +1598,15 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
 
     uint32_t c1 = getCycleCounter();
 
+    // Proceed with rendering background elements if/as required, if not timed out.
+    selectBackgroundBuffer();
     bool complete =
         renderSticksBackgroundUntil(limit_micros) &&
-        renderSidebarsUntil(limit_micros) &&
+        renderSidebarsUntil(limit_micros);
+    selectForegroundBuffer();
+
+    // Continue with foreground elements, if not timed out.
+    complete = complete &&
         renderAHUntil(limit_micros) &&
         renderCharsUntil(limit_micros) &&
         renderSticksForegroundUntil(limit_micros);

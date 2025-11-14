@@ -1389,15 +1389,6 @@ bool osdUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
     UNUSED(currentDeltaTimeUs);
     static timeUs_t osdUpdateDueUs = 0;
 
-#if 0 // fdef TEST_PIO_OSD
-    return true;
-#if 0
-    void osdUpdateCallback(uint32_t currentTimeUs);
-    osdUpdateCallback((uint32_t)currentTimeUs);
-    return false; // hopefully never schedule osdUpdate
-#endif
-#endif
-
     if (osdState == OSD_STATE_IDLE) {
         // If the OSD is due a refresh, mark that as being the case
         if (cmpTimeUs(currentTimeUs, osdUpdateDueUs) > 0) {
