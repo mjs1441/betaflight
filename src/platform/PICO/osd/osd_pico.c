@@ -138,6 +138,9 @@ static volatile int nisz;
 static volatile int dmb;
 static volatile uint32_t maxAHI;
 
+static volatile int checksb;
+static volatile int checkol;
+
 
 // 30 * 16 = 480
 uint8_t osdCharBuffer[OSD_SD_COLS * OSD_SD_ROWS];
@@ -802,6 +805,7 @@ static void vsync_callback(void)
 //        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
         bprintf("%d vsync_callback busy %d %d nisz %d dmb %d (previous tainted n to c %d)",
                 c, business, busybuf, nisz, dmb, n_to_c);
+        bprintf(" sb %d ol %d", checksb, checkol);
         nisz = 0; dmb = 0;
         // NB ave wraps quickly (~1000 vsyncs)
 //        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
@@ -1268,7 +1272,30 @@ void cacheStickRightInfo(uint8_t x, uint8_t y)
     cachedStickRight = 1; // Ready to render background.
 }
 
-bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+{
+    switch (item) {
+    case OSD_HORIZON_SIDEBARS:
+        cacheSidebarsInfo(elemPosX, elemPosY);
+        checksb++;
+//         cachedSidebars = false;return false;
+        return true;
+    case OSD_STICK_OVERLAY_LEFT:
+        cacheStickLeftInfo(elemPosX, elemPosY);
+        checkol++;
+        return true;
+
+    case OSD_STICK_OVERLAY_RIGHT:
+        cacheStickRightInfo(elemPosX, elemPosY);
+        return true;
+        
+    default:
+        // Not handled here
+        return false;
+    }
+}
+
+bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
 //#define testNoPixelElements
 #ifdef testNoPixelElements
@@ -1276,15 +1303,10 @@ bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
     UNUSED(elemPosX);
     UNUSED(elemPosY);
     UNUSED(cacheArtificialHorizonInfo);
-    UNUSED(cacheSidebarsInfo);
     return false;
 #else
-    // Cache information for rendering an osd item later on.
     switch (item) {
-    case OSD_HORIZON_SIDEBARS:
-        cacheSidebarsInfo(elemPosX, elemPosY);
-//         cachedSidebars = false;return false;
-        return true;
+    // Cache information for rendering an osd item later on.
     case OSD_ARTIFICIAL_HORIZON:
 //#define testnoahhere
 #ifdef testnoahhere
@@ -1297,6 +1319,7 @@ bool osdPioDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 
     case OSD_STICK_OVERLAY_LEFT:
         cacheStickLeftInfo(elemPosX, elemPosY);
+        checkol++;
         return true;
 
     case OSD_STICK_OVERLAY_RIGHT:
@@ -1384,7 +1407,7 @@ static bool renderAHUntil(uint32_t limit_micros)
     }
 
     if (done) {
-        // All done.
+        // All done. Prepare for next time.
         first = true;
         cachedAH = false;
         return true; // Done with AH for this round.
@@ -1556,7 +1579,7 @@ bool renderSticksForegroundUntil(uint32_t limit_micros)
 // Update screen buffer (paint characters etc to buffer), up until a time limit.
 // Store state so that we can resume.
 // Return false when complete (no more to do).
-bool osdPioDrawScreenUntil(uint32_t limit_micros)
+bool osdPioRenderScreenUntil(uint32_t limit_micros)
 {
 #if 0
     UNUSED(limit_micros);
@@ -1590,7 +1613,7 @@ bool osdPioDrawScreenUntil(uint32_t limit_micros)
         return false; // Nothing more to draw.
     }
 
-    return true;
+    return true; // More still to draw.
 }
 
 void testUpdate(void)

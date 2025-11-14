@@ -162,15 +162,15 @@ bool fbOsdReInitIfRequired(bool forceStallCheck)
 // so it might end up being exceeded by the length of the longest individual operation.
 //#define DRAWSCREEN_TIME_LIMIT_US 20
 
-// diagnose long operations
+// set this low to diagnose long operations
 #define DRAWSCREEN_TIME_LIMIT_US 5
 
-// Return true if screen still being transferred
+// Return true if not complete.
 bool fbOsdDrawScreen(void)
 {
-    // Spend no more than DRAWSCREEN_TIME_LIMIT_US on each iteration, will keep
+    // Try to spend no more than DRAWSCREEN_TIME_LIMIT_US on each iteration, will keep
     // on calling in here until we return false for "all done".
-    return osdPioDrawScreenUntil(micros() + DRAWSCREEN_TIME_LIMIT_US);
+    return osdPioRenderScreenUntil(micros() + DRAWSCREEN_TIME_LIMIT_US);
 }
 
 bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)
@@ -240,9 +240,9 @@ void fbOsdSetBackgroundType(displayPortBackground_e backgroundType)
     UNUSED(backgroundType);
 }
 
-bool fbOsdDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+bool fbOsdDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY, bool isBackground)
 {
-    return osdPioDrawItem(item, elemPosX, elemPosY);
+    return isBackground ? osdPioDrawBackgroundItem(item, elemPosX, elemPosY) : osdPioDrawForegroundItem(item, elemPosX, elemPosY);
 }
 
 #endif // USE_FB_OSD

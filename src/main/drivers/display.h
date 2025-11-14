@@ -144,7 +144,7 @@ typedef struct displayPortVTable_s {
     void (*setBackgroundType)(displayPort_t *displayPort, displayPortBackground_e backgroundType);
 
     // Allow display drivers to render OSD elements, e.g. pixel-based FBOSD (framebuffer) can cache information for AH and paint later.
-    bool (*drawOsdItem)(displayPort_t *displayPort, uint8_t elemPosX, uint8_t elemPosY, uint8_t /* osd_items_e */ item);
+    bool (*drawOsdItem)(displayPort_t *displayPort, uint8_t elemPosX, uint8_t elemPosY, uint8_t /* osd_items_e */ item, bool isBackground);
 } displayPortVTable_t;
 
 void displayGrab(displayPort_t *instance);
@@ -156,7 +156,7 @@ bool displayDrawScreen(displayPort_t *instance);
 int displayScreenSize(const displayPort_t *instance);
 void displaySetXY(displayPort_t *instance, uint8_t x, uint8_t y);
 int displaySys(displayPort_t *instance, uint8_t x, uint8_t y, displayPortSystemElement_e systemElement);
-bool displayExtended(displayPort_t *instance, uint8_t x, uint8_t y, uint8_t /* osd_items_e */ item);
+bool displayExtended(displayPort_t *instance, uint8_t x, uint8_t y, uint8_t /* osd_items_e */ item, bool isBackground);
 int displayWrite(displayPort_t *instance, uint8_t x, uint8_t y, uint8_t attr, const char *text);
 int displayWriteChar(displayPort_t *instance, uint8_t x, uint8_t y, uint8_t attr, uint8_t c);
 bool displayIsTransferInProgress(const displayPort_t *instance);

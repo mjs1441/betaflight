@@ -68,7 +68,7 @@ static int clearScreen(displayPort_t *displayPort, displayClearOption_e options)
     return 0;
 }
 
-// Return true if screen still being transferred
+// Return true if drawScreen still in progress
 static bool drawScreen(displayPort_t *displayPort)
 {
     UNUSED(displayPort);
@@ -180,10 +180,10 @@ static void setBackgroundType(displayPort_t *displayPort, displayPortBackground_
     fbOsdSetBackgroundType(backgroundType);
 }
 
-static bool drawOsdItem(displayPort_t *displayPort, uint8_t elemPosX, uint8_t elemPosY, uint8_t /* osd_items_e */ item)
+static bool drawOsdItem(displayPort_t *displayPort, uint8_t elemPosX, uint8_t elemPosY, uint8_t /* osd_items_e */ item, bool isBackground)
 {
     UNUSED(displayPort);
-    return fbOsdDrawItem((osd_items_e)item, elemPosX, elemPosY);
+    return fbOsdDrawItem((osd_items_e)item, elemPosX, elemPosY, isBackground);
 }
 
 static const displayPortVTable_t fbOsdVTable = {
