@@ -113,12 +113,13 @@ static uint8_t* osdBufferBackground = (uint8_t *)osdBufferBackgroundW;
 static uint8_t* osdBufferA = (uint8_t *)osdBuffer1W;
 static uint8_t* osdBufferB = (uint8_t *)osdBuffer2W;
 
-//static const uint32_t zero;
+static const uint32_t zero;
 //static const uint32_t zero = 0xaaaaaaaa;
 //static const uint32_t zero = 0x22222222;
 //static const uint32_t zero = 0x88888888;
 //static const uint32_t zero = 0xf2f2f2f2;
 
+static bool dma_bg_from_zero = true; // set true to enforce clear of background buffer followed by rendering of background items
 static int dma_chan_bg_to_bufA;
 static int dma_chan_bufB_to_fifo;
 
@@ -149,6 +150,7 @@ uint8_t osdCharBuffer[OSD_SD_COLS * OSD_SD_ROWS];
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
+static void setBackgroundItemsPending(void);
 
 static void init_gpios(void)
 {
@@ -1094,6 +1096,17 @@ typedef enum {
 static bgItemState_e bgSidebarsState;
 static bgItemState_e bgStickLeftState;
 static bgItemState_e bgStickRightState;
+
+static void setBackgroundItemsPending(void)
+{
+    bgSidebarsState = bgItemPendingCache;
+    bgStickLeftState = bgItemPendingCache;
+    bgStickRightState = bgItemPendingCache;
+}    
+
+void osdPioRedrawBackground(void)
+{
+}
 
 typedef struct {
     uint16_t x1;

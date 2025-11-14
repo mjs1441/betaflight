@@ -248,3 +248,10 @@ void displayInit(displayPort_t *instance, const displayPortVTable_t *vTable, dis
     displayClearScreen(instance, DISPLAY_CLEAR_WAIT);
     displayCommitTransaction(instance);
 }
+
+void displayRedrawBackground(displayPort_t *instance)
+{
+    if (instance->vTable->redrawBackground) {
+        instance->vTable->redrawBackground(instance);
+    }
+}

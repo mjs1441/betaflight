@@ -2440,7 +2440,7 @@ void osdDrawActiveElementsBackground(displayPort_t *osdDisplayPort)
         displayLayerSelect(osdDisplayPort, DISPLAYPORT_LAYER_FOREGROUND);
     } else {
         // FB_OSD might need notification to redraw a background buffer.
-//        displayRedrawBackground(osdDisplayPort);
+        displayRedrawBackground(osdDisplayPort);
     }
 }
 

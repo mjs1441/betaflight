@@ -186,6 +186,12 @@ static bool drawOsdItem(displayPort_t *displayPort, uint8_t elemPosX, uint8_t el
     return fbOsdDrawItem((osd_items_e)item, elemPosX, elemPosY, isBackground);
 }
 
+static void redrawBackground(displayPort_t *displayPort)
+{
+    UNUSED(displayPort);
+    fbOsdRedrawBackground();
+}
+
 static const displayPortVTable_t fbOsdVTable = {
     .grab = grab,
     .release = release,
@@ -206,6 +212,7 @@ static const displayPortVTable_t fbOsdVTable = {
     .checkReady = checkReady,
     .setBackgroundType = setBackgroundType,
     .drawOsdItem = drawOsdItem,
+    .redrawBackground = redrawBackground,
 };
 
 bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displayPort)

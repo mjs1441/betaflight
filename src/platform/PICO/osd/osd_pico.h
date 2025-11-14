@@ -42,6 +42,7 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros);
 int osdPioRowsCount(void);
 bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY);
 bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY);
+void osdPioRedrawBackground(void);
 
 // testing, probably don't need
 // bool osdPioInitDevice( const struct vcdProfile_s *vcdProfile);

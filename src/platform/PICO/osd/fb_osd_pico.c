@@ -245,4 +245,9 @@ bool fbOsdDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY, bool is
     return isBackground ? osdPioDrawBackgroundItem(item, elemPosX, elemPosY) : osdPioDrawForegroundItem(item, elemPosX, elemPosY);
 }
 
+void fbOsdRedrawBackground(void)
+{
+    osdPioRedrawBackground();
+}
+
 #endif // USE_FB_OSD
