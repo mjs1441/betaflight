@@ -319,6 +319,7 @@ void osdAnalyzeActiveElements(void)
      */
     schedulerIgnoreTaskExecTime();
 
+    bprintf("OSD osdAnalyzeActiveElements");
     osdAddActiveElements();
     osdDrawActiveElementsBackground(osdDisplayPort);
 }
@@ -507,8 +508,8 @@ static void osdCompleteInitialization(void)
     }
     displayWrite(osdDisplayPort, midCol + 12 - version_str_len, midRow, DISPLAYPORT_SEVERITY_NORMAL, version_str_buf);
 
-    #ifdef USE_CMS
-    displayWrite(osdDisplayPort, midCol - 8, midRow + 2,  DISPLAYPORT_SEVERITY_NORMAL, CMS_STARTUP_HELP_TEXT1);
+#ifdef USE_CMS
+    displayWrite(osdDisplayPort, midCol - 8, midRow + 2, DISPLAYPORT_SEVERITY_NORMAL, CMS_STARTUP_HELP_TEXT1);
     displayWrite(osdDisplayPort, midCol - 4, midRow + 3, DISPLAYPORT_SEVERITY_NORMAL, CMS_STARTUP_HELP_TEXT2);
     displayWrite(osdDisplayPort, midCol - 4, midRow + 4, DISPLAYPORT_SEVERITY_NORMAL, CMS_STARTUP_HELP_TEXT3);
 #endif
@@ -1357,6 +1358,27 @@ typedef enum {
     OSD_STATE_COUNT
 } osdState_e;
 
+#ifdef TEST_PIO_OSD
+const char *osl[] = {
+    "INIT",
+    "IDLE",
+    "CHECK",
+    "PROCESS_STATS1",
+    "REFRESH_STATS",
+    "PROCESS_STATS2",
+    "PROCESS_STATS3",
+    "UPDATE_ALARMS",
+    "REFRESH_PREARM",
+    "UPDATE_CANVAS",
+    "DRAW_ELEMENT",
+    "DISPLAY_ELEMENT",
+    "UPDATE_HEARTBEAT",
+    "COMMIT",
+    "TRANSFER",
+    "COUNT"
+};
+#endif
+
 osdState_e osdState = OSD_STATE_INIT;
 
 #define OSD_UPDATE_INTERVAL_US (1000000 / osdConfig()->framerate_hz)
@@ -1394,6 +1416,19 @@ void osdUpdate(timeUs_t currentTimeUs)
     static uint32_t osdElementDurationFractionUs[OSD_ITEM_COUNT] = { 0 };
     static bool moreElementsToDraw;
 
+#ifdef TEST_PIO_OSD
+    // xx in testing, never busy at this point, because we passed updatecheck and were scheduled v. soon after
+    // no, wasn't proper test (hadn't saved)
+    void osdUpdateCallback(uint32_t currentTimeUs);
+//    osdUpdateCallback((uint32_t)currentTimeUs);
+///////////    return;
+
+    static osdState_e lastState = -100;
+    if (osdState != lastState) {
+//        bprintf("OSD state %s -> %s", osl[lastState], osl[osdState]);
+        lastState = osdState;
+    }
+#endif
     timeUs_t executeTimeUs;
     osdState_e osdCurrentState = osdState;
 
