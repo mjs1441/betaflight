@@ -108,6 +108,7 @@
 #include "io/asyncfatfs/asyncfatfs.h"
 #include "io/beeper.h"
 #include "io/dashboard.h"
+#include "io/displayport_fb_osd.h"
 #include "io/displayport_frsky_osd.h"
 #include "io/displayport_max7456.h"
 #include "io/displayport_msp.h"
@@ -879,11 +880,13 @@ void init(void)
             device = OSD_DISPLAYPORT_DEVICE_MSP;
         } else {
             device = osdConfig()->displayPortDevice;
+            bprintf("INIT OSD from config, displayPortDevice = %d", device);
         }
 
         switch(device) {
 
         case OSD_DISPLAYPORT_DEVICE_AUTO:
+            bprintf("INIT OSD displayport device was auto");
             FALLTHROUGH;
 
 #if defined(USE_FRSKYOSD)
@@ -914,6 +917,16 @@ void init(void)
             osdDisplayPort = displayPortMspInit();
             if (osdDisplayPort || device == OSD_DISPLAYPORT_DEVICE_MSP) {
                 osdDisplayPortDevice = OSD_DISPLAYPORT_DEVICE_MSP;
+                break;
+            }
+            FALLTHROUGH;
+#endif
+
+#if defined(USE_FB_OSD)
+        case OSD_DISPLAYPORT_DEVICE_FBOSD:
+            bprintf("INIT OSD test FBOSD");
+            if (fbOsdDisplayPortInit(vcdProfile(), &osdDisplayPort) || device == OSD_DISPLAYPORT_DEVICE_FBOSD) {
+                osdDisplayPortDevice = OSD_DISPLAYPORT_DEVICE_FBOSD;
                 break;
             }
             FALLTHROUGH;

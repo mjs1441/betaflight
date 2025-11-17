@@ -89,6 +89,15 @@ int displaySys(displayPort_t *instance, uint8_t x, uint8_t y, displayPortSystemE
     return 0;
 }
 
+bool displayExtended(displayPort_t *instance, uint8_t x, uint8_t y, uint8_t /* osd_items_e */ item, bool isBackground)
+{
+    if (instance->vTable->drawOsdItem) {
+        return instance->vTable->drawOsdItem(instance, x, y, item, isBackground);
+    }
+
+    return false;
+}
+
 int displayWrite(displayPort_t *instance, uint8_t x, uint8_t y, uint8_t attr, const char *text)
 {
     instance->posX = x + strlen(text);
@@ -238,4 +247,11 @@ void displayInit(displayPort_t *instance, const displayPortVTable_t *vTable, dis
     displayBeginTransaction(instance, DISPLAY_TRANSACTION_OPT_NONE);
     displayClearScreen(instance, DISPLAY_CLEAR_WAIT);
     displayCommitTransaction(instance);
+}
+
+void displayRedrawBackground(displayPort_t *instance)
+{
+    if (instance->vTable->redrawBackground) {
+        instance->vTable->redrawBackground(instance);
+    }
 }

@@ -539,6 +539,9 @@ MCU_COMMON_SRC = \
             PICO/dshot_pico.c \
             PICO/exti_pico.c \
             PICO/io_pico.c \
+            PICO/osd/font_betaflight.c \
+            PICO/osd/fb_osd_pico.c \
+            PICO/osd/osd_pico.c \
             PICO/persistent.c \
             PICO/pwm_pico.c \
             PICO/pwm_beeper_pico.c \
@@ -579,3 +582,9 @@ PICO_LIB_OBJS = $(addsuffix .o, $(basename $(PICO_LIB_SRC)))
 PICO_LIB_OBJS += $(addsuffix .o, $(basename $(PICO_TRACE_SRC)))
 PICO_LIB_TARGETS := $(foreach pobj, $(PICO_LIB_OBJS), %/$(pobj))
 $(PICO_LIB_TARGETS): CC_DEFAULT_OPTIMISATION := $(PICO_LIB_OPTIMISATION)
+
+# Work in progess: modify linker script pico_rp2350_RunFromRAM.ld to assign symbols from
+# certain files into flash instead of RAM (save memory without impacting performance), but
+# that is unsuccessful if build uses lto (link time optimisation has the effect of
+# breaking files up into temporary files)
+OPTIMISATION_BASE     := $(filter-out -flto=auto, $(OPTIMISATION_BASE))

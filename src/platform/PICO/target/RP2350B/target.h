@@ -103,6 +103,7 @@
 #define PIO_DSHOT_INDEX    0
 #define PIO_UART_INDEX     1
 #define PIO_LEDSTRIP_INDEX 2
+#define PIO_OSD_INDEX 2
 
 // Various untested or unsupported elements are undefined below
 
