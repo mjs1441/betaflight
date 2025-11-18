@@ -144,6 +144,11 @@ static volatile uint32_t maxAHI;
 static volatile int checksb;
 static volatile int checkol;
 
+//static volatile uint32_t renderMA;
+static volatile int badX = -1;
+static volatile int badY;
+static volatile int badC;
+
 
 // 30 * 16 = 480
 uint8_t osdCharBuffer[OSD_SD_COLS * OSD_SD_ROWS];
@@ -225,19 +230,18 @@ static void selectForegroundBuffer(void)
     plotToBackground = false;
 }
 
+
 void plot(int x, int y, int c)
 {
     uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
-
-    static int badcount = 10;
 
     // c =  0 -> transparent (no overlay)   W=any EN=0
     // c =  1 -> black                      W=0   EN=1
     // c =  2 -> white                      W=1   EN=1
     if (x<0 || y<0 || x>=fb_nx || y>=fb_ny) {
-        if (badcount-- > 0) {
-            bprintf("*** out of range plot %d, %d, %d",x,y,c);
-        }
+        badX = x;
+        badY = y;
+        badC = c;
         return;
     }
 
@@ -842,11 +846,13 @@ static void vsync_callback(void)
     }
 
     static uint32_t n_to_c;
+
     if (c % 250 == 0) {
 //        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
         bprintf("%d vsync_callback busy %d %d nisz %d dmb %d (previous tainted n to c %d)",
                 c, business, busybuf, nisz, dmb, n_to_c);
-        bprintf(" sb %d ol %d", checksb, checkol);
+///        bprintf(" sb %d ol %d", checksb, checkol);
+///        bprintf("average render call interval: %d us, %.1f hz", renderMA, 1000000.0/renderMA);
         nisz = 0; dmb = 0;
         // NB ave wraps quickly (~1000 vsyncs)
 //        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
@@ -855,7 +861,12 @@ static void vsync_callback(void)
 //                (double)tus/250, (double)tusr/250, (double)tus/tusr);
 //        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
 //                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
-        bprintf("max (per rd) us per call (max over %d rds) %d", tusr, maxcycles/150);
+        bprintf("max us per render call (last vsync had %d rds) %d", tusr, maxcycles/150);
+        if (badX >= 0) {
+            bprintf("*** detected out of range plot, last was %d, %d, %d", badX, badY, badC);
+            badX = -1;
+        }
+
 //        bprintf("max ah cache cycles %d", maxAHI);
         maxcycles = 0;
         tus = 0; tusr = 0;
@@ -869,7 +880,7 @@ static void vsync_callback(void)
                 (double)(((float)oucunsafe3)*20000.0f/ouccount)
                );
 #else
-        bprintf("ouccount %d of which unsafe %d ~ %d of 20000 ~ %.3f cf %d (%d)", ouccount, oucunsafe, (int)((float)oucunsafe * 20000.0f / (float)ouccount), ((double)oucunsafe)/ouccount, 20000 - safe_zone_period, (int)((float)oucunsafe * 20000.0f / (float)ouccount) - (20000 - safe_zone_period));        
+        bprintf("ouccount %d of which unsafe %d ~ %d of 20000 ~ %.3f cf %d (%d)", ouccount, oucunsafe, (int)((float)oucunsafe * 20000.0f / (float)ouccount), ((double)oucunsafe)/ouccount, 20000 - s$afe_zone_period, (int)((float)oucunsafe * 20000.0f / (float)ouccount) - (20000 - safe_zone_period));
 #endif
 #endif
         n_to_c = getCycleCounter() - szn;
@@ -1250,7 +1261,7 @@ static const radioControls_t radioModes[4] = {
 static const int stickWidth = charWidth * OSD_STICK_OVERLAY_WIDTH;
 static const int stickHeight = charHeight * OSD_STICK_OVERLAY_HEIGHT;
 
-#define TEST_STICK_INPUTS
+//#define TEST_STICK_INPUTS
 static void cacheStickBackgroundInfo(info_stick_t *infoPtr, uint8_t x, uint8_t y)
 {
     infoPtr->xLeft = charWidth * x;
@@ -1617,18 +1628,29 @@ bool renderSticksForegroundUntil(uint32_t limit_micros)
 bool osdPioRenderScreenUntil(uint32_t limit_micros)
 {
 #if 0
+    // testing. Use limit_micros as proxy for current time.
+    static bool complete;
+    static uint32_t lastTime;
+    uint32_t diff = limit_micros - lastTime;
+    if (!complete) { // if not returning after a while since last completion
+        renderMA = (renderMA + diff) / 2;
+    }
+    lastTime = limit_micros;
+#else
+    bool complete;
+#endif
+
+#if 0
     UNUSED(limit_micros);
     plotTestCard();
     return false;
 #endif
 
-    static uint32_t maxcyclesthisround;
-
     uint32_t c1 = getCycleCounter();
 
     // Proceed with rendering background elements if/as required, if not timed out.
     selectBackgroundBuffer();
-    bool complete =
+    complete =
         renderSticksBackgroundUntil(limit_micros) &&
         renderSidebarsUntil(limit_micros);
     selectForegroundBuffer();
@@ -1640,15 +1662,13 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
         renderSticksForegroundUntil(limit_micros);
 
     uint32_t cd = getCycleCounter() - c1;
-    if (cd > maxcyclesthisround) {
-        maxcyclesthisround = cd;
+    if (cd > maxcycles) {
+        maxcycles = cd;
     }
 
     if (complete) {
         // accumulate for averaging: maxcycles += maxcyclesthisround;
-        maxcycles = maxcyclesthisround;
         tusr++;
-        maxcyclesthisround = 0;
 
         transferredSinceVsync = true;
         return false; // Nothing more to draw.
