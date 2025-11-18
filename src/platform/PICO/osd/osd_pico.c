@@ -861,7 +861,7 @@ static void vsync_callback(void)
 //                (double)tus/250, (double)tusr/250, (double)tus/tusr);
 //        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
 //                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
-        bprintf("max us per render call (last vsync had %d rds) %d", tusr, maxcycles/150);
+        bprintf("max us per render call (last set of vsyncs had %d complete rds) %d", tusr, maxcycles/150);
         if (badX >= 0) {
             bprintf("*** detected out of range plot, last was %d, %d, %d", badX, badY, badC);
             badX = -1;
