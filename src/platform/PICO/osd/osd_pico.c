@@ -384,6 +384,32 @@ static bool iterDLineNext(void)
     return false;
 }
 
+static bool iterQLineNext(void)
+{
+    if (iterLineData.count >= iterLineData.maxCount) {
+        return true; // all done.
+    }
+
+    if (iterLineData.shallow) {
+        plot(iterLineData.ic, iterLineData.fc, 2);
+        plot(iterLineData.ic, iterLineData.fc + 1, 2);
+        plot(iterLineData.ic, iterLineData.fc + 2, 1);
+        plot(iterLineData.ic, iterLineData.fc - 1, 1);
+        iterLineData.ic++;
+        iterLineData.fc += iterLineData.delta;
+    } else {
+        plot(iterLineData.fc, iterLineData.ic, 2);
+        plot(iterLineData.fc + 1, iterLineData.ic, 2);
+        plot(iterLineData.fc + 2, iterLineData.ic, 1);
+        plot(iterLineData.fc - 1, iterLineData.ic, 1);
+        iterLineData.ic++;
+        iterLineData.fc += iterLineData.delta;
+    }
+
+    iterLineData.count++;
+    return false;
+}
+
 static bool iterDashedDLineNext(void)
 {
     if (iterLineData.count >= iterLineData.maxCount) {
@@ -398,6 +424,33 @@ static bool iterDashedDLineNext(void)
         else {
             plot(iterLineData.fc, iterLineData.ic, 2);
             plot(iterLineData.fc + 1, iterLineData.ic, 1);
+        }
+    }
+
+    iterLineData.ic++;
+    iterLineData.fc += iterLineData.delta;
+    iterLineData.count++;
+    return false;
+}
+
+static bool iterDashedQLineNext(void)
+{
+    if (iterLineData.count >= iterLineData.maxCount) {
+        return true; // all done.
+    }
+
+    if ((iterLineData.count % 16) < 9) {
+        if (iterLineData.shallow) {
+            plot(iterLineData.ic, iterLineData.fc, 2);
+            plot(iterLineData.ic, iterLineData.fc + 1, 2);
+            plot(iterLineData.ic, iterLineData.fc + 2, 1);
+            plot(iterLineData.ic, iterLineData.fc - 1, 1);
+        }
+        else {
+            plot(iterLineData.fc, iterLineData.ic, 2);
+            plot(iterLineData.fc + 1, iterLineData.ic, 2);
+            plot(iterLineData.fc + 2, iterLineData.ic, 1);
+            plot(iterLineData.fc - 1, iterLineData.ic, 1);
         }
     }
 
@@ -1451,7 +1504,11 @@ static bool renderAHUntil(uint32_t limit_micros)
     bool done = false;
     bool oor = infoArtificialHorizon.outOfRange;
     while (micros() < limit_micros && !done) {
-        done = oor ? iterDashedDLineNext() :  iterDLineNext();
+//        done = oor ? iterDashedDLineNext() :  iterDLineNext();
+        done = oor ? iterDashedQLineNext() :  iterQLineNext();
+        UNUSED(iterDashedDLineNext);
+        UNUSED(iterDLineNext);
+        // line with arrow rather than dashed line?
     }
 
     if (done) {
