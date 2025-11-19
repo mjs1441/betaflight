@@ -145,7 +145,7 @@ static volatile int checksb;
 static volatile int checkol;
 
 //static volatile uint32_t renderMA;
-static volatile int badX = -1;
+static volatile int badX = -12345;
 static volatile int badY;
 static volatile int badC;
 
@@ -257,6 +257,35 @@ void plot(int x, int y, int c)
     uint8_t mask = masks[x%4];
     uint8_t col = cols[c];
     *pByte = ((*pByte) &(~mask)) | (mask&col);
+}
+
+static bool isWhite(int x, int y)
+{
+    uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
+    uint8_t * pByte = plotBuffer + PICO_OSD_BUF_WIDTH * y;
+    pByte += (int)(x/4); // 4 pixels per byte
+    static uint8_t masks[4] = {0b00000011, 0b00001100, 0b00110000, 0b11000000};
+    uint8_t col = *(pByte) & masks[x%4];
+    return col & 0b01010101;
+}
+
+static bool postProcessUntil(uint32_t limit_micros)
+{
+    UNUSED(limit_micros);
+//    uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
+    for (int y=0; y<fb_ny; ++y) {
+//        uint8_t * pByte = plotBuffer + PICO_OSD_BUF_WIDTH * y;
+        for (int x=0; x<fb_nx; ++x) {
+            // if not white but adjacent (say orthongonally) to white, ensure black
+            if (!isWhite(x,y)) {
+                if (isWhite(x-1,y) || isWhite(x+1,y) || isWhite(x,y-1) || isWhite(x,y+1)) {
+                    plot(x,y,1);
+                }
+            }
+        }
+    }
+
+    return true;
 }
 
 void hLine(int x, int y, int count, int col)
@@ -915,9 +944,9 @@ static void vsync_callback(void)
 //        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
 //                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
         bprintf("max us per render call (last set of vsyncs had %d complete rds) %d", tusr, maxcycles/150);
-        if (badX >= 0) {
+        if (badX != -12345) {
             bprintf("*** detected out of range plot, last was %d, %d, %d", badX, badY, badC);
-            badX = -1;
+            badX = -12345;
         }
 
 //        bprintf("max ah cache cycles %d", maxAHI);
@@ -1717,6 +1746,10 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
         renderAHUntil(limit_micros) &&
         renderCharsUntil(limit_micros) &&
         renderSticksForegroundUntil(limit_micros);
+
+     selectBackgroundBuffer();
+     complete = complete && postProcessUntil(limit_micros);
+     selectForegroundBuffer();
 
     uint32_t cd = getCycleCounter() - c1;
     if (cd > maxcycles) {
