@@ -95,6 +95,7 @@ static const int charHalfHeight = charHeight / 2;
 static int fb_ny;
 static int charLines = VIDEO_LINES_PAL; // Variable, default to 16 (PAL)
 static int numChars;
+static int fb_words;
 
 // PIO program offset and state machine.
 static int osd_tx_offset;
@@ -269,11 +270,14 @@ static bool isWhite(int x, int y)
     return col & 0b01010101;
 }
 
-static bool postProcessUntil(uint32_t limit_micros)
+#if 0
+static bool postProcessUntil0(uint32_t limit_micros)
 {
     UNUSED(limit_micros);
 //    uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
-    for (int y=0; y<fb_ny; ++y) {
+//    for (int y=0; y<fb_ny; ++y) {
+// Testing with/without
+    for (int y=85; y<200; ++y) {
 //        uint8_t * pByte = plotBuffer + PICO_OSD_BUF_WIDTH * y;
         for (int x=0; x<fb_nx; ++x) {
             // if not white but adjacent (say orthongonally) to white, ensure black
@@ -285,6 +289,42 @@ static bool postProcessUntil(uint32_t limit_micros)
         }
     }
 
+    return true;
+}
+#endif
+
+static bool postProcessUntil(uint32_t limit_micros)
+{
+    UNUSED(limit_micros);
+    UNUSED(isWhite);
+    uint32_t *plotBufferW = (uint32_t *)(plotToBackground ? osdBufferBackground : osdBufferA);
+//    for (int y=0; y<fb_ny; ++y) {
+// Testing with/without
+    static uint32_t *pWord;
+//////////    const uint32_t lineDeltaWords = PICO_OSD_LINE_words
+    static int y;
+    static int wordIndex;
+
+    if (!pWord) {
+        pWord = plotBufferW;
+    }
+
+    while (pWord < plotBufferW + fb_words) {
+// ignore cross-word extra pixels for starters
+        uint32_t whites = *pWord & 0x55555555; // pick out all of the OSD_W (low bits) of each bit pair (OSD_EN, OSD_W).
+        *pWord |= (whites >> 1) | (whites << 3); // set OSD_EN according to adjacent OSD_W.
+
+        wordIndex++;
+        if (wordIndex == PICO_OSD_LINE_WORDS) {
+            wordIndex = 0;
+            y++;
+        }
+
+        pWord++;
+    }
+//    bprintf("y=%d, wi=%d, pw=%p vs pbw %p and fbw %d",
+//            y, wordIndex, pWord, plotBufferW, fb_words);
+    pWord = 0;
     return true;
 }
 
@@ -562,17 +602,16 @@ static void plotBorder(void)
 
 static dma_channel_config config_zero_to_bg;
 static dma_channel_config config_bg_to_bufA;
-static int dmaTransferWords;
 
 static void osd_init_device(bool isPAL, int displayLines, int transferWords)
 {
-    dmaTransferWords = transferWords;
+    fb_words = transferWords;
 //    safe_zone_period = 18000;
     safe_zone_period = 16000;
 //     safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBufferA) during final 10000 or so
     in_safe_zone = true;
 
-    bprintf("OSD osd_init_device lines %d words %d", displayLines, dmaTransferWords);
+    bprintf("OSD osd_init_device lines %d words %d", displayLines, fb_words);
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT_MAX, PICO_OSD_BUF_LENGTH);
     bprintf("osdBuffer1: %p osdBuffer2: %p", osdBuffer1W, osdBuffer2W);
     bprintf("nx %d, ny %d", fb_nx, fb_ny);
@@ -664,7 +703,7 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
         &c,
         &osdPio->txf[osd_tx_sm], // Write address (fixed PIO TX FIFO)
         NULL,                    // Read address (reset each time)
-        dmaTransferWords,        // Number of transfers
+        fb_words,        // Number of transfers
         false                    // Don't start immediately
     );
 
@@ -787,16 +826,23 @@ volatile int oucunsafe3;
 #endif
 //static volatile int vdelay;
 
+static const bool updateEveryOtherVSync = true;
+
 static void vsync_callback(void)
 {
     static int fieldOddEven;
     fieldOddEven = fieldOddEven ^ 0x1;  // odd or even field (we can't tell which is which), alternate 0, 1
-    uint8_t * tptr = osdBufferA;
-    osdBufferA = osdBufferB;
-    osdBufferB = tptr;
+    bool updateThisVSync = fieldOddEven || !updateEveryOtherVSync;
 
-    transferredSinceVsync = 0;
-    // 50 per second (PAL)
+    if (updateThisVSync) {
+        // 25 per second (PAL) if updateEveryOtherVSync, otherwise
+        // 50 per second (PAL)
+        uint8_t * tptr = osdBufferA;
+        osdBufferA = osdBufferB;
+        osdBufferB = tptr;
+        transferredSinceVsync = 0;
+    }
+
     static int c=0;
     // Need to clear the IRQ flag state from the PIO.
     // This just writes a 1 to a register, doesn't mess with SM execution    
@@ -839,22 +885,22 @@ static void vsync_callback(void)
 
     if (dma_bg_from_zero) {
         dma_channel_configure(
-            dma_chan_bg_to_bufA,
+            dma_chan_bg_to_bufA,    // Take over this dma channel for purpose of clearing the background buffer
             &config_zero_to_bg,     // Config (don't increment read address)
             osdBufferBackground,    // Write address
             &zero,                  // Read address
-            dmaTransferWords,       // Number of transfers
+            fb_words,       // Number of transfers
             false                   // Don't start immediately
         );
         setBackgroundItemsPending();
-        dma_bg_from_zero = false;
-    } else {
+        dma_bg_from_zero = false;   // Reset the background clear request flag
+    } else if (updateThisVSync) {
         dma_channel_configure(
             dma_chan_bg_to_bufA,
             &config_bg_to_bufA,     // Config (increment read address)
             osdBufferA,             // Write address
             osdBufferBackground,    // Read address
-            dmaTransferWords,       // Number of transfers
+            fb_words,       // Number of transfers
             false                   // Don't start immediately
         );
     }
@@ -872,7 +918,11 @@ static void vsync_callback(void)
 //         bprintf("* dc3-dc1 %d dc3-dc2 %d buf1 %p werc %p buf2 %p", dc3-dc1, dc3-dc2, osdBuffer1, &werc[0], osdBuffer2);
 //     }
 
-    dma_channel_start(dma_chan_bg_to_bufA);
+    if (updateThisVSync) {
+        dma_channel_start(dma_chan_bg_to_bufA);
+    } else {
+        dma_channel_start(dma_chan_bufB_to_fifo);
+    }
 
     // probably best clear at end, just in case there are re-trigger issues if cleared earlier...
     pio_interrupt_clear(osdPio, 0);
@@ -1508,6 +1558,17 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
         count++;
     }
 
+#if 1
+    // TESTING for comparison
+    for (int i=30; i<230; ++i) {
+        plot(i,i,2);
+        if (i>100 && i<150) {
+            plot(i-1,i,1);
+            plot(i+1,i,1);
+        }
+    }
+#endif
+
     if (count == maxCount) {
         count = -1; // Restart would be with central indicators
         bgSidebarsState = bgItemComplete;
@@ -1747,9 +1808,13 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
         renderCharsUntil(limit_micros) &&
         renderSticksForegroundUntil(limit_micros);
 
-     selectBackgroundBuffer();
-     complete = complete && postProcessUntil(limit_micros);
-     selectForegroundBuffer();
+#if 0
+    UNUSED(postProcessUntil);
+#else
+    selectBackgroundBuffer();
+    complete = complete && postProcessUntil(limit_micros);
+    selectForegroundBuffer();
+#endif
 
     uint32_t cd = getCycleCounter() - c1;
     if (cd > maxcycles) {
