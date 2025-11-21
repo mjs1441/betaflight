@@ -120,7 +120,7 @@ static const uint32_t zero;
 //static const uint32_t zero = 0x88888888;
 //static const uint32_t zero = 0xf2f2f2f2;
 
-static volatile bool dma_bg_from_zero = true; // set true to enforce clear of background buffer followed by rendering of background items
+static volatile bool dmaClearBackgroundBuffer = true; // set true to enforce clear of background buffer followed by rendering of background items
 static int dma_chan_bg_to_bufA;
 static int dma_chan_bufB_to_fifo;
 
@@ -737,7 +737,7 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
     channel_config_set_write_increment(&config_zero_to_bg, true);
     channel_config_set_chain_to(&config_zero_to_bg, dma_chan_bufB_to_fifo); // DMA to PIO fifo starts immediately on completion of clearing buf1
 
-    config_bg_to_bufA = config_zero_to_bg;
+    config_bg_to_bufA = config_zero_to_bg; // Copy bg to bufA, also chains to bufB->fifo.
     channel_config_set_read_increment(&config_bg_to_bufA, true); // increment when copying from the background buffer.
     bprintf("OSD config_bg_to_bufA %08x, config_zero_to_bg %08x", config_bg_to_bufA, config_zero_to_bg);
 
@@ -856,15 +856,22 @@ static void vsync_callback(void)
 {
     static int fieldOddEven;
     fieldOddEven = fieldOddEven ^ 0x1;  // odd or even field (we can't tell which is which), alternate 0, 1
-    bool updateThisVSync = fieldOddEven || !updateEveryOtherVSync;
-
-    if (updateThisVSync) {
+#if 0
+    bool flipThisVSync = fieldOddEven || !updateEveryOtherVSync;
         // 25 per second (PAL) if updateEveryOtherVSync, otherwise
         // 50 per second (PAL)
+#else
+    UNUSED(updateEveryOtherVSync);
+    bool flipThisVSync = transferredSinceVsync;
+#endif
+
+    if (flipThisVSync) {
+        // We have completed rendering into bufferA, rename so that's now bufferB and will be dma-d to screen.
+        // Then (below) get bufferA ready for more rendering (dma background buffer into the new bufferA).
         uint8_t * tptr = osdBufferA;
         osdBufferA = osdBufferB;
         osdBufferB = tptr;
-        transferredSinceVsync = 0;
+        transferredSinceVsync = false;
     }
 
     static int c=0;
@@ -907,24 +914,23 @@ static void vsync_callback(void)
     // Reset the incrementing addresses
     dma_channel_set_read_addr(dma_chan_bufB_to_fifo, osdBufferB, false);
 
-    if (dma_bg_from_zero) {
+    if (dmaClearBackgroundBuffer) {
         dma_channel_configure(
             dma_chan_bg_to_bufA,    // Take over this dma channel for purpose of clearing the background buffer
             &config_zero_to_bg,     // Config (don't increment read address)
             osdBufferBackground,    // Write address
             &zero,                  // Read address
-            fb_words,       // Number of transfers
+            fb_words,               // Number of transfers
             false                   // Don't start immediately
         );
         setBackgroundItemsPending();
-        dma_bg_from_zero = false;   // Reset the background clear request flag
-    } else if (updateThisVSync) {
+    } else if (flipThisVSync) {
         dma_channel_configure(
             dma_chan_bg_to_bufA,
             &config_bg_to_bufA,     // Config (increment read address)
             osdBufferA,             // Write address
             osdBufferBackground,    // Read address
-            fb_words,       // Number of transfers
+            fb_words,               // Number of transfers
             false                   // Don't start immediately
         );
     }
@@ -942,11 +948,13 @@ static void vsync_callback(void)
 //         bprintf("* dc3-dc1 %d dc3-dc2 %d buf1 %p werc %p buf2 %p", dc3-dc1, dc3-dc2, osdBuffer1, &werc[0], osdBuffer2);
 //     }
 
-    if (updateThisVSync) {
+    if (dmaClearBackgroundBuffer || flipThisVSync) {
         dma_channel_start(dma_chan_bg_to_bufA);
     } else {
         dma_channel_start(dma_chan_bufB_to_fifo);
     }
+
+    dmaClearBackgroundBuffer = false;   // Reset the background clear request flag if it was set.
 
     // probably best clear at end, just in case there are re-trigger issues if cleared earlier...
     pio_interrupt_clear(osdPio, 0);
@@ -1295,7 +1303,8 @@ static void setBackgroundItemsPending(void)
 
 void osdPioRedrawBackground(void)
 {
-    dma_bg_from_zero = true;
+    bprintf("OSD osdPioRedrawBackground setting dmaClearBackgroundBuffer to true");
+    dmaClearBackgroundBuffer = true;
 }
 
 typedef struct {
@@ -1582,7 +1591,7 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
         count++;
     }
 
-#if 1
+#if 0
     // TESTING for comparison
     for (int i=30; i<230; ++i) {
         plot(i,i,2);
@@ -1833,7 +1842,7 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
         renderCharsUntil(limit_micros) &&
         renderSticksForegroundUntil(limit_micros);
 
-#if 0
+#if 1
     UNUSED(postProcessUntil);
 #else
     selectBackgroundBuffer();
