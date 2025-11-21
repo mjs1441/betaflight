@@ -300,25 +300,41 @@ static bool postProcessUntil(uint32_t limit_micros)
     uint32_t *plotBufferW = (uint32_t *)(plotToBackground ? osdBufferBackground : osdBufferA);
 //    for (int y=0; y<fb_ny; ++y) {
 // Testing with/without
-    static uint32_t *pWord;
 //////////    const uint32_t lineDeltaWords = PICO_OSD_LINE_words
     static int y;
-    static int wordIndex;
+    static int wordIndex; // index of word along a line, in 0..22
+    static uint32_t *pWord;
+    static uint32_t wordPrev;
+    static uint32_t wordThis;
+    static uint32_t wordNext;
 
     if (!pWord) {
         pWord = plotBufferW;
     }
 
     while (pWord < plotBufferW + fb_words) {
-// ignore cross-word extra pixels for starters
-        uint32_t whites = *pWord & 0x55555555; // pick out all of the OSD_W (low bits) of each bit pair (OSD_EN, OSD_W).
-        *pWord |= (whites >> 1) | (whites << 3); // set OSD_EN according to adjacent OSD_W.
+        if (wordIndex == 0) {
+            wordThis = 0;
+            wordNext = *pWord;
+        }
+
+        wordPrev = wordThis;
+        wordThis = wordNext;
 
         wordIndex++;
         if (wordIndex == PICO_OSD_LINE_WORDS) {
+            // we are on the last word of a line, don't peek at the next word, reset line counter.
+            wordNext = 0;
             wordIndex = 0;
             y++;
+        } else {
+            wordNext = *(pWord + 1);
         }
+
+        uint32_t whites = wordThis & 0x55555555; // pick out all of the OSD_W (low bits) of each bit pair (OSD_EN, OSD_W).
+        *pWord |= (whites >> 1) | (whites << 3); // set OSD_EN according to adjacent OSD_W.
+        *pWord |= (wordPrev & 0x40000000) >> 29;
+        *pWord |= (wordNext & 0x1) << 31;
 
         pWord++;
     }
@@ -1562,10 +1578,11 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
     // TESTING for comparison
     for (int i=30; i<230; ++i) {
         plot(i,i,2);
-        if (i>100 && i<150) {
+        if (i>50 && i<100) {
             plot(i-1,i,1);
             plot(i+1,i,1);
         }
+        plot(i,125,2);
     }
 #endif
 
