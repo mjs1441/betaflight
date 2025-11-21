@@ -310,6 +310,7 @@ static bool postProcessUntil(uint32_t limit_micros)
 
     if (!pWord) {
         pWord = plotBufferW;
+        y = 0;
     }
 
     while (pWord < plotBufferW + fb_words) {
@@ -331,12 +332,19 @@ static bool postProcessUntil(uint32_t limit_micros)
             wordNext = *(pWord + 1);
         }
 
-        uint32_t whites = wordThis & 0x55555555; // pick out all of the OSD_W (low bits) of each bit pair (OSD_EN, OSD_W).
-        *pWord |= (whites >> 1) | (whites << 3); // set OSD_EN according to adjacent OSD_W.
-        *pWord |= (wordPrev & 0x40000000) >> 29;
-        *pWord |= (wordNext & 0x1) << 31;
+        uint32_t whiteThis = wordThis & 0x55555555; // pick out all of the OSD_W (low bits) of each bit pair (OSD_EN, OSD_W).
+        uint32_t blackUpdates = (whiteThis >> 1) | (whiteThis << 3); // set OSD_EN according to adjacent OSD_W.
+        blackUpdates |= (wordPrev & 0x40000000) >> 29;
+        blackUpdates |= (wordNext & 0x1) << 31;
+        if (y != 0) {
+            blackUpdates |= (*(pWord - PICO_OSD_LINE_WORDS) & 0x55555555) << 1;
+        }
 
-        pWord++;
+        if (y < fb_ny) {
+            blackUpdates |= (*(pWord + PICO_OSD_LINE_WORDS) & 0x55555555) << 1;
+        }
+
+        *pWord++ = wordThis | blackUpdates;
     }
 //    bprintf("y=%d, wi=%d, pw=%p vs pbw %p and fbw %d",
 //            y, wordIndex, pWord, plotBufferW, fb_words);
