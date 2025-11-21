@@ -2434,6 +2434,7 @@ bool osdDrawSpec(displayPort_t *osdDisplayPort)
 
 void osdDrawActiveElementsBackground(displayPort_t *osdDisplayPort)
 {
+    // We get here from osdAnalyzeActiveElements, after changes to the OSD from the Configurator (see msp.c).
     if (backgroundLayerSupported) {
         displayLayerSelect(osdDisplayPort, DISPLAYPORT_LAYER_BACKGROUND);
         displayClearScreen(osdDisplayPort, DISPLAY_CLEAR_WAIT);
