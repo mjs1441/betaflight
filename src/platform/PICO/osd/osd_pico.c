@@ -1871,7 +1871,7 @@ void testUpdate(void)
     tus++;
 //#define clearscreen
 //#define testcard
-#define textpaint
+//#define textpaint
 //#define blockpaint
 //#define ahpaint
 //#define testsprintf

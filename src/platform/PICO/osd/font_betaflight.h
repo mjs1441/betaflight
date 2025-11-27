@@ -23,4 +23,5 @@
 
 #include <stdint.h>
 
-extern const uint8_t fontData[18*3*256];
+//extern const uint8_t fontData[18*3*256];
+extern uint8_t fontData[18*3*256];
