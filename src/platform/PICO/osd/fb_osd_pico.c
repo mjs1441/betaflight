@@ -173,12 +173,30 @@ bool fbOsdDrawScreen(void)
     return osdPioRenderScreenUntil(micros() + DRAWSCREEN_TIME_LIMIT_US);
 }
 
+#include "font_betaflight.h"
 bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)
 {
     // future: might store fonts in flash...
     UNUSED(char_address);
+#if 1
+    uint8_t bitConv[] = {0b01, 0b00, 0b11, 0b00};
+    // MCM format 00 = black, 01 = transparent, 10 = white, 11 = transparent
+    // -> FB format 01 = black, 11 = white, 00 = transparent
+    uint8_t *p = fontData + 54*char_address;
+    for (int i=0; i<54; ++i) {
+        uint8_t c = *font_data++;
+        uint8_t d = bitConv[c&0x3] << 6;
+        d |= bitConv[(c>>2)&0x3] << 4;
+        d |= bitConv[(c>>4)&0x3] << 2;
+        d |= bitConv[c>>6];
+        *p++ = d;
+    }
+
+    return true;
+#else
     UNUSED(font_data);
     return false;
+#endif
 }
 
     
