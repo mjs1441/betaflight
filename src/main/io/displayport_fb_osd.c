@@ -153,6 +153,13 @@ static bool writeFontCharacter(displayPort_t *displayPort, uint16_t addr, const 
     return fbOsdWriteFontCharacter(addr, (const uint8_t *)chr);
 }
 
+static void fontUpdateCompletion(displayPort_t *displayPort)
+{
+    UNUSED(displayPort);
+    fbOsdFontUpdateCompletion();
+}
+
+
 static bool checkReady(displayPort_t *displayPort, bool rescan)
 {
     UNUSED(displayPort);
@@ -209,6 +216,7 @@ static const displayPortVTable_t fbOsdVTable = {
     .layerSelect = layerSelect,
     .layerCopy = layerCopy,
     .writeFontCharacter = writeFontCharacter,
+    .fontUpdateCompletion = fontUpdateCompletion,
     .checkReady = checkReady,
     .setBackgroundType = setBackgroundType,
     .drawOsdItem = drawOsdItem,

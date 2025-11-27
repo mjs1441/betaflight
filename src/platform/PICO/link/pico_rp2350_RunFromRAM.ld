@@ -289,6 +289,10 @@ SECTIONS
     __config_start = ORIGIN(FLASH_CONFIG);
     __config_end = ORIGIN(FLASH_CONFIG) + LENGTH(FLASH_CONFIG);
 
+    /* Base address for font data. */
+    __fontdata_start = ORIGIN(FLASH_FONT);
+    __fontdata_end = ORIGIN(FLASH_FONT) + LENGTH(FLASH_FONT);
+
     .pg_registry :
     {
       PROVIDE_HIDDEN (__pg_registry_start = .);

@@ -22,7 +22,6 @@
 #include <stdint.h>
 
 // MAX7456 font: Betaflight
-//const uint8_t fontData[18*3*256] = {
 uint8_t fontData[18*3*256] = {
     0b00000000, 0b00000000, 0b00000000,
     0b00000000, 0b00000000, 0b00000000,
