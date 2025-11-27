@@ -27,9 +27,11 @@
 
 #ifdef USE_FB_OSD
 
+#include "config/config_streamer.h"
 #include "drivers/fb_osd_impl.h"
 #include "drivers/osd.h"
 #include "drivers/time.h"
+#include "font_betaflight.h"
 #include "osd_pico.h"
 
 // void    fbOsdHardwareReset(void);
@@ -40,6 +42,8 @@
 
 // *** TODO merge osd_pico.c into fb_osd_pico.c (probably - might tease out some lower level stuff, pio-related)
 // osd_pico -> osd_pio, DMA, IRQ or so
+
+static uint8_t fontDataMagic[] = {'p', 'f', 'n', 't'};
 
 static bool inNTSCrange(int n)
 {
@@ -52,6 +56,21 @@ static bool inPALrange(int n)
 {
     const int palHsyncs = 305;
     return n >= palHsyncs - 1 && n <= palHsyncs + 1;
+}
+
+static void fbOsdLoadFont(void)
+{
+    // Retrieve font data from flash if present. Otherwise defaults to baked-in font in font_betaflight.c.
+    uint8_t *ptr = (uint8_t *)&__fontdata_start;
+    if (0 != memcmp(ptr, fontDataMagic, 4)) {
+        bprintf("FONT did not detect font data in flash");
+        return;
+    }
+
+    ptr += 4;
+    bprintf("FONT loading font from flash into ram");
+    memcpy(fontData, ptr, FONTDATA_LENGTH);
+    bprintf("FONT loaded font from flash into ram");
 }
 
 fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struct vcdProfile_s *vcdProfile)
@@ -81,6 +100,7 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
     videoSystem_e videoSystem = vcdProfile->video_system;
 
     if (first) {
+        fbOsdLoadFont();
         osdPioDetectStart();
         first = false;
         bprintf("fbOsdInit vcdProfile %p video system %d", vcdProfile, videoSystem);
@@ -173,15 +193,11 @@ bool fbOsdDrawScreen(void)
     return osdPioRenderScreenUntil(micros() + DRAWSCREEN_TIME_LIMIT_US);
 }
 
-#include "font_betaflight.h"
 bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)
 {
-    // future: might store fonts in flash...
-    UNUSED(char_address);
-#if 1
-    uint8_t bitConv[] = {0b01, 0b00, 0b11, 0b00};
+    uint8_t bitConv[] = {0b10, 0b00, 0b11, 0b00};
     // MCM format 00 = black, 01 = transparent, 10 = white, 11 = transparent
-    // -> FB format 01 = black, 11 = white, 00 = transparent
+    // -> FB format 10 = black, 11 = white, 00 = transparent
     uint8_t *p = fontData + 54*char_address;
     for (int i=0; i<54; ++i) {
         uint8_t c = *font_data++;
@@ -193,12 +209,22 @@ bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)
     }
 
     return true;
-#else
-    UNUSED(font_data);
-    return false;
-#endif
 }
 
+void fbOsdFontUpdateCompletion(void)
+{
+    // The font has been updated in place (in RAM). Copy out of RAM back into flash.
+    // Borrow the streamer functions from config.
+    // __fontdata_start will be on a flash page size boundary (256 byte aligned)
+    bprintf("FONT fbOsdFontUpdateCompletion start");
+    config_streamer_t streamer = {
+        .address = (uintptr_t)&__fontdata_start,
+    };
+    config_streamer_write(&streamer, fontDataMagic, 4);
+    config_streamer_write(&streamer, (const uint8_t *)fontData, FONTDATA_LENGTH);
+    config_streamer_flush(&streamer);
+    bprintf("FONT fbOsdFontUpdateCompletion end");
+}
     
 uint8_t fbOsdGetRowsCount(void)
 {

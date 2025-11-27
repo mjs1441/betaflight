@@ -146,6 +146,7 @@ typedef struct displayPortVTable_s {
     // Allow display drivers to render OSD elements, e.g. pixel-based FBOSD (framebuffer) can cache information for AH and paint later.
     bool (*drawOsdItem)(displayPort_t *displayPort, uint8_t elemPosX, uint8_t elemPosY, uint8_t /* osd_items_e */ item, bool isBackground);
     void (*redrawBackground)(displayPort_t *displayPort);
+    void (*fontUpdateCompletion)(displayPort_t *displayPort);
 } displayPortVTable_t;
 
 void displayGrab(displayPort_t *instance);
@@ -166,6 +167,7 @@ void displayRedraw(displayPort_t *instance);
 bool displayIsSynced(const displayPort_t *instance);
 uint16_t displayTxBytesFree(const displayPort_t *instance);
 bool displayWriteFontCharacter(displayPort_t *instance, uint16_t addr, const struct osdCharacter_s *chr);
+void displayFontUpdateCompletion(displayPort_t *instance);
 bool displayCheckReady(displayPort_t *instance, bool rescan);
 void displayBeginTransaction(displayPort_t *instance, displayTransactionOption_e opts);
 void displayCommitTransaction(displayPort_t *instance);

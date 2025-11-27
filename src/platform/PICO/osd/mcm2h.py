@@ -7,7 +7,7 @@ else:
 
 mods = dict(
     (
-        # MCM   FB
+        # MCM   FB bit-reversed
         ("00", "01"), # Black
         ("01", "00"), # Transparent
         ("10", "11"), # White
@@ -40,7 +40,7 @@ for x in f:
     a=""
     for i in range(4):
         a += mods[x[2*i:2*(i+1)]]
-    print(a[::-1], end="") # reverse order of pixels in byte
+    print(a[::-1], end="") # reverse order of bits in byte
     print(",", end="")
     if (rc != 2):
         print(" ", end="")

@@ -80,6 +80,9 @@
 // Assume on-board flash (see linker files)
 #define CONFIG_IN_FLASH
 
+// Allow for font data in flash
+#define FONTDATA_IN_FLASH
+
 // Pico flash writes are all aligned and in batches of FLASH_PAGE_SIZE (256)
 #define FLASH_CONFIG_STREAMER_BUFFER_SIZE   FLASH_PAGE_SIZE
 #define FLASH_CONFIG_BUFFER_TYPE            uint8_t

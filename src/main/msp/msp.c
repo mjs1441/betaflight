@@ -217,6 +217,8 @@ typedef enum {
 static bool vtxTableNeedsInit = false;
 #endif
 
+static bool fontHasBeenUpdated = false;
+
 static int mspDescriptor = 0;
 
 mspDescriptor_t mspDescriptorAlloc(void)
@@ -358,6 +360,14 @@ MAYBE_UNUSED static void configRebootUpdateCheckU8(uint8_t *parm, uint8_t value)
     *parm = value;
 }
 
+static void fontUpdateCompletion(void)
+{
+    displayPort_t *osdDisplayPort = osdGetDisplayPort(NULL);
+    if (osdDisplayPort) {
+        displayFontUpdateCompletion(osdDisplayPort);
+    }
+}
+
 static void mspRebootFn(serialPort_t *serialPort)
 {
     UNUSED(serialPort);
@@ -366,6 +376,11 @@ static void mspRebootFn(serialPort_t *serialPort)
 
     switch (rebootMode) {
     case MSP_REBOOT_FIRMWARE:
+        if (fontHasBeenUpdated) {
+            fontUpdateCompletion();
+            fontHasBeenUpdated = false;
+        }
+
         systemReset();
 
         break;
@@ -4396,6 +4411,8 @@ static mspResult_e mspCommonProcessInCommand(mspDescriptor_t srcDesc, int16_t cm
             if (!displayWriteFontCharacter(osdDisplayPort, addr, &chr)) {
                 return MSP_RESULT_ERROR;
             }
+
+            fontHasBeenUpdated = true;
         }
         break;
 

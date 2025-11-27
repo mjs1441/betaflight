@@ -65,3 +65,4 @@ bool fbOsdLayerCopy(displayPortLayer_e destLayer, displayPortLayer_e sourceLayer
 void fbOsdSetBackgroundType(displayPortBackground_e backgroundType);
 bool fbOsdDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY, bool isBackground);
 void fbOsdRedrawBackground(void);
+void fbOsdFontUpdateCompletion(void);
