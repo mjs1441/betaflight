@@ -141,6 +141,9 @@ static volatile uint32_t maxcycles;
 static volatile int nisz;
 static volatile int dmb;
 static volatile uint32_t maxAHI;
+static volatile uint32_t renderTot;
+static volatile uint32_t drawBGTot;
+static volatile uint32_t drawFGTot;
 
 static volatile int checksb;
 static volatile int checkol;
@@ -862,6 +865,8 @@ static void vsync_callback(void)
         // 50 per second (PAL)
 #else
     UNUSED(updateEveryOtherVSync);
+    // If for some reason the complete draw and render sequence takes longer than fits into the vsync period,
+    // don't flip the buffers (display will be jerky but complete, no tearing / flicker)
     bool flipThisVSync = transferredSinceVsync;
 #endif
 
@@ -933,6 +938,11 @@ static void vsync_callback(void)
             fb_words,               // Number of transfers
             false                   // Don't start immediately
         );
+//#define TEST_BACKGROUND_EFFECT
+#ifdef TEST_BACKGROUND_EFFECT
+    setBackgroundItemsPending();
+#endif
+
     }
     
     // Start DMA for bg->osdBufferA (effectively clears screen buffer)
@@ -1026,12 +1036,18 @@ static void vsync_callback(void)
 //        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
 //                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
         bprintf("max us per render call (last set of vsyncs had %d complete rds) %d", tusr, maxcycles/150);
+        bprintf("ave us (duty cycle) per vsync render %d (%.1f), fg %d (%.1f), bg %d (%.1f), fg+bg %d (%.1f)",
+                renderTot/(250*150), ((double)renderTot)/(250*150*20000/100),
+                drawBGTot/(250*150), ((double)drawBGTot)/(250*150*20000/100),
+                drawFGTot/(250*150), ((double)drawFGTot)/(250*150*20000/100),
+                (drawFGTot + drawBGTot)/(250*150), ((double)(drawFGTot + drawBGTot))/(250*150*20000/100));
         if (badX != -12345) {
             bprintf("*** detected out of range plot, last was %d, %d, %d", badX, badY, badC);
             badX = -12345;
         }
 
 //        bprintf("max ah cache cycles %d", maxAHI);
+        renderTot = 0; drawFGTot = 0; drawBGTot = 0;
         maxcycles = 0;
         tus = 0; tusr = 0;
         vmax = 0;
@@ -1487,7 +1503,7 @@ static void cacheStickRightInfo(void)
     cachedStickRight = true;
 }
 
-bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+bool drawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
     switch (item) {
     case OSD_HORIZON_SIDEBARS:
@@ -1508,8 +1524,17 @@ bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPo
     }
 }
 
-bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
+    uint32_t c1 = getCycleCounter();
+    bool ret = drawBackgroundItem(item, elemPosX, elemPosY);
+//    drawBGTot += 100*150; UNUSED(c1);
+    drawBGTot += getCycleCounter() - c1;
+    return ret;
+}
+
+bool drawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+{    
 //#define testNoPixelElements
 #ifdef testNoPixelElements
     UNUSED(item);
@@ -1544,6 +1569,15 @@ bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPo
         return false;
     }
 #endif
+}
+
+bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
+{
+    uint32_t c1 = getCycleCounter();
+    bool ret = drawForegroundItem(item, elemPosX, elemPosY);
+    //drawFGTot += 200*150; UNUSED(c1);
+    drawFGTot += getCycleCounter() - c1;
+    return ret;
 }
 
 static bool renderSidebarsUntil(uint32_t limit_micros)
@@ -1851,6 +1885,7 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
 #endif
 
     uint32_t cd = getCycleCounter() - c1;
+    renderTot += cd;
     if (cd > maxcycles) {
         maxcycles = cd;
     }
