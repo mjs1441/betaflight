@@ -1050,7 +1050,7 @@ static void vsync_callback(void)
         for (taskId_e taskId = 0; taskId < TASK_COUNT; taskId++) {
             tmpNow += getTask(taskId)->totalExecutionTimeUs;
         }
-        uint32_t sinceAll = tmpNow - lastAllTot;
+        uint32_t sinceOther = tmpNow - lastAllTot - sinceOSD - sincePID;
         lastAllTot = tmpNow;
         cfCheckFuncInfo_t checkFuncInfo;
         getCheckFuncInfo(&checkFuncInfo);
@@ -1061,7 +1061,7 @@ static void vsync_callback(void)
                 cyclesSince/150,
                 sincePID, (double)((float)sincePID)*100*150/cyclesSince,
                 sinceOSD, (double)((float)sinceOSD)*100*150/cyclesSince,
-                sinceAll, (double)((float)sinceAll)*100*150/cyclesSince,
+                sinceOther, (double)((float)sinceOther)*100*150/cyclesSince,
                 sinceCheck, (double)((float)sinceCheck)*100*150/cyclesSince,
                 thisFunctionUs, (double)((float)thisFunctionUs)*100*150/cyclesSince
                );
