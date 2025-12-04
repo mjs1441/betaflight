@@ -855,8 +855,18 @@ volatile int oucunsafe3;
 
 static const bool updateEveryOtherVSync = true;
 
+#define TASKREPORT
+#ifdef TASKREPORT
+#include "scheduler/scheduler.h"
+#include "fc/tasks.h"
+#endif
+
 static void vsync_callback(void)
 {
+    sza=getCycleCounter();
+#ifdef TASKREPORT
+    static uint32_t thisFunctionUs;
+#endif
     static int fieldOddEven;
     fieldOddEven = fieldOddEven ^ 0x1;  // odd or even field (we can't tell which is which), alternate 0, 1
 #if 0
@@ -898,7 +908,6 @@ static void vsync_callback(void)
     static int business;
     static int busybuf;
 
-    sza=getCycleCounter();
 
     if (dma_channel_is_busy(dma_chan_bg_to_bufA)) {
         // Unexpected, PIO shouldn't get back to vsync IRQ unless dma buf2->fifo has started
@@ -1022,6 +1031,41 @@ static void vsync_callback(void)
     static uint32_t n_to_c;
 
     if (c % 250 == 0) {
+#ifdef TASKREPORT
+        uint32_t tmpNow = getCycleCounter();
+        static uint32_t lastCyclesHere;
+        uint32_t cyclesSince = tmpNow - lastCyclesHere;
+        lastCyclesHere = tmpNow;
+        static uint32_t lastPIDTot;
+        static uint32_t lastOSDTot;
+        static uint32_t lastAllTot;
+        static uint32_t lastCheckTot;
+        tmpNow = getTask(TASK_PID)->totalExecutionTimeUs;
+        uint32_t sincePID = tmpNow - lastPIDTot;
+        lastPIDTot = tmpNow;
+        tmpNow = getTask(TASK_OSD)->totalExecutionTimeUs;
+        uint32_t sinceOSD = tmpNow - lastOSDTot;
+        lastOSDTot = tmpNow;
+        tmpNow = 0;
+        for (taskId_e taskId = 0; taskId < TASK_COUNT; taskId++) {
+            tmpNow += getTask(taskId)->totalExecutionTimeUs;
+        }
+        uint32_t sinceAll = tmpNow - lastAllTot;
+        lastAllTot = tmpNow;
+        cfCheckFuncInfo_t checkFuncInfo;
+        getCheckFuncInfo(&checkFuncInfo);
+        tmpNow = checkFuncInfo.totalExecutionTimeUs;
+        uint32_t sinceCheck = tmpNow - lastCheckTot;
+        lastCheckTot = tmpNow;
+        bprintf("t %d, PID %d (%.1f%%), OSD %d (%.1f%%), other %d (%.1f%%), Check %d (%.1f%%), this %d (%.1f%%)",
+                cyclesSince/150,
+                sincePID, (double)((float)sincePID)*100*150/cyclesSince,
+                sinceOSD, (double)((float)sinceOSD)*100*150/cyclesSince,
+                sinceAll, (double)((float)sinceAll)*100*150/cyclesSince,
+                sinceCheck, (double)((float)sinceCheck)*100*150/cyclesSince,
+                thisFunctionUs, (double)((float)thisFunctionUs)*100*150/cyclesSince
+               );
+#endif
 //        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
         bprintf("%d vsync_callback busy %d %d nisz %d dmb %d (previous tainted n to c %d)",
                 c, business, busybuf, nisz, dmb, n_to_c);
@@ -1070,6 +1114,9 @@ static void vsync_callback(void)
     szo = szn;
     
     szc=getCycleCounter();
+#ifdef TASKREPORT
+    thisFunctionUs = (szc - sza)/150;
+#endif
 }
 
 /*
