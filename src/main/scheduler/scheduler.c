@@ -405,6 +405,8 @@ FAST_CODE timeDelta_t schedulerGetNextStateTime(void)
 
 FAST_CODE timeUs_t schedulerExecuteTask(task_t *selectedTask, timeUs_t currentTimeUs)
 {
+    uint32_t c1 = getCycleCounter();
+
     timeUs_t taskExecutionTimeUs = 0;
 
     if (selectedTask) {
@@ -422,7 +424,13 @@ FAST_CODE timeUs_t schedulerExecuteTask(task_t *selectedTask, timeUs_t currentTi
 #if defined(USE_LATE_TASK_STATISTICS)
         const timeUs_t estimatedExecutionUs = selectedTask->execTime;
 #endif
+        
+        //uint32_t c1 = getCycleCounter();
         selectedTask->attribute->taskFunc(currentTimeBeforeTaskCallUs);
+
+        //extern uint32_t setCycles;
+        //setCycles += getCycleCounter() - c1;
+
         taskExecutionTimeUs = micros() - currentTimeBeforeTaskCallUs;
         taskTotalExecutionTime += taskExecutionTimeUs;
         selectedTask->movingSumExecutionTime10thUs += (taskExecutionTimeUs * 10) - selectedTask->movingSumExecutionTime10thUs / TASK_STATS_MOVING_SUM_COUNT;
@@ -469,6 +477,8 @@ FAST_CODE timeUs_t schedulerExecuteTask(task_t *selectedTask, timeUs_t currentTi
 #endif
     }
 
+    extern uint32_t setCycles;
+    setCycles += getCycleCounter() - c1;
     return taskExecutionTimeUs;
 }
 
@@ -544,12 +554,15 @@ FAST_CODE void scheduler(void)
             if (schedLoopStartCycles > schedLoopStartMinCycles) {
                 schedLoopStartCycles -= schedLoopStartDeltaDownCycles;
             }
+            uint32_t c1 = getCycleCounter();
 #if !defined(UNIT_TEST)
             while (schedLoopRemainingCycles > 0) {
                 nowCycles = getCycleCounter();
                 schedLoopRemainingCycles = cmpTimeCycles(nextTargetCycles, nowCycles);
             }
 #endif
+            extern uint32_t delayCycles;
+            delayCycles += getCycleCounter() - c1;
             currentTimeUs = micros();
             taskExecutionTimeUs += schedulerExecuteTask(gyroTask, currentTimeUs);
 

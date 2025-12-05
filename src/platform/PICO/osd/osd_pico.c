@@ -859,6 +859,8 @@ static const bool updateEveryOtherVSync = true;
 #ifdef TASKREPORT
 #include "scheduler/scheduler.h"
 #include "fc/tasks.h"
+uint32_t setCycles = 0;
+uint32_t delayCycles = 0;
 #endif
 
 static void vsync_callback(void)
@@ -1057,14 +1059,20 @@ static void vsync_callback(void)
         tmpNow = checkFuncInfo.totalExecutionTimeUs;
         uint32_t sinceCheck = tmpNow - lastCheckTot;
         lastCheckTot = tmpNow;
-        bprintf("t %d, PID %d (%.1f%%), OSD %d (%.1f%%), other %d (%.1f%%), Check %d (%.1f%%), this %d (%.1f%%)",
+        bprintf("t %d, PID %d (%.1f%%), OSD %d (%.1f%%), other %d (%.1f%%), Check %d (%.1f%%), this %d (%.1f%%), set %d vs %d, est. sched %d (%.1f%%), delay %d",
                 cyclesSince/150,
                 sincePID, (double)((float)sincePID)*100*150/cyclesSince,
                 sinceOSD, (double)((float)sinceOSD)*100*150/cyclesSince,
                 sinceOther, (double)((float)sinceOther)*100*150/cyclesSince,
                 sinceCheck, (double)((float)sinceCheck)*100*150/cyclesSince,
-                thisFunctionUs, (double)((float)thisFunctionUs)*100*150/cyclesSince
+                thisFunctionUs, (double)((float)thisFunctionUs)*100*150/cyclesSince,
+                setCycles/150,
+                sinceOther + sinceOSD + sincePID,
+                (cyclesSince - setCycles - 150*sinceCheck)/150, (double)((float)(cyclesSince - setCycles - 150*sinceCheck)*100/cyclesSince),
+                delayCycles/150
                );
+        setCycles = 0;
+        delayCycles = 0;
 #endif
 //        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
         bprintf("%d vsync_callback busy %d %d nisz %d dmb %d (previous tainted n to c %d)",
