@@ -33,6 +33,7 @@
 #include <stdlib.h>
 
 #include "common/printf.h"
+#include "drivers/dma.h"
 #include "drivers/io.h"
 #include "drivers/io_impl.h"
 #include "drivers/osd.h"
@@ -717,6 +718,17 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
         bprintf("**** failed to claim dma channel (buf2 to fifo) for osd pico");
         dma_channel_unclaim(dma_chan_bg_to_bufA);
         return;
+    }
+
+    // There is no irq to handle on dma completion, so we don't call dmaSetHandler,
+    // but we do want to register ownership (shows up in cli on "dma").
+    if (!dmaAllocate(DMA_CHANNEL_TO_IDENTIFIER(dma_chan_bg_to_bufA), OWNER_OSD, 1) ||
+        !dmaAllocate(DMA_CHANNEL_TO_IDENTIFIER(dma_chan_bufB_to_fifo), OWNER_OSD, 2)) {
+        // Unexpected
+        bprintf("*** dmaAllocate failed in osd_init_device ***");
+        dma_channel_unclaim(dma_chan_bg_to_bufA);
+        dma_channel_unclaim(dma_chan_bufB_to_fifo);
+       return;
     }
 
     dma_channel_config c = dma_channel_get_default_config(dma_chan_bufB_to_fifo);
