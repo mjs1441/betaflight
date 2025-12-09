@@ -876,7 +876,7 @@ static const bool updateEveryOtherVSync = true;
 static void vsync_callback(void)
 {
     sza=getCycleCounter();
-#ifdef TASKREPORT
+#if defined PICO_TRACE && defined TASKREPORT
     static uint32_t thisFunctionUs;
 #endif
     static int fieldOddEven;
@@ -1043,7 +1043,7 @@ static void vsync_callback(void)
     static uint32_t n_to_c;
 
     if (c % 250 == 0) {
-#ifdef TASKREPORT
+#if defined PICO_TRACE && defined TASKREPORT
         uint32_t tmpNow = getCycleCounter();
         static uint32_t lastCyclesHere;
         uint32_t cyclesSince = tmpNow - lastCyclesHere;
@@ -1126,7 +1126,7 @@ static void vsync_callback(void)
     szo = szn;
     
     szc=getCycleCounter();
-#ifdef TASKREPORT
+#if defined PICO_TRACE && defined TASKREPORT
     thisFunctionUs = (szc - sza)/150;
 #endif
 }
