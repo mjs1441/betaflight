@@ -225,11 +225,9 @@ static const displayPortVTable_t fbOsdVTable = {
 
 bool fbOsdDisplayPortInit(const vcdProfile_t *vcdProfile, displayPort_t **displayPort)
 {
-    bprintf("OSD fbOsdDisplayPortInit");
     fbOsdVcdProfile = vcdProfile;
 
     fbOsdInitStatus_e initResult = fbOsdInit(NULL /* fbOsdConfig() */ , fbOsdVcdProfile);
-    bprintf("OSD fbOsdDisplayPortInit %d", initResult);
 
     if (initResult == FB_OSD_INIT_NOT_CONFIGURED) {
         // fb device IO pins are not defined. We either don't have

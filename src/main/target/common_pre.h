@@ -20,12 +20,6 @@
 
 #pragma once
 
-// *** TEMP
-#ifndef PICO_TRACE
-#define bprintf(fmt,...)
-#endif
-
-
 /*
 
     The purpose of this file is to enable the firmware "gates" for features and drivers

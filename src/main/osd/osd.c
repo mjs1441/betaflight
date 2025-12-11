@@ -319,7 +319,6 @@ void osdAnalyzeActiveElements(void)
      */
     schedulerIgnoreTaskExecTime();
 
-    bprintf("OSD osdAnalyzeActiveElements");
     osdAddActiveElements();
     osdDrawActiveElementsBackground(osdDisplayPort);
 }
@@ -1425,7 +1424,6 @@ void osdUpdate(timeUs_t currentTimeUs)
 
     static osdState_e lastState = -100;
     if (osdState != lastState) {
-//        bprintf("OSD state %s -> %s", osl[lastState], osl[osdState]);
         lastState = osdState;
     }
 #endif
