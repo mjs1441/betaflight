@@ -64,6 +64,7 @@ PG_REGISTER_WITH_RESET_FN(displayPortProfile_t, displayPortProfileFbOsd, PG_DISP
 
 void pgResetFn_displayPortProfileFbOsd(displayPortProfile_t *displayPortProfile)
 {
+    // TODO add entries in settings.c, so we can set from Configurator / CLI.
     displayPortProfile->colAdjust = 0;
     displayPortProfile->rowAdjust = 0;
     displayPortProfile->invert = false;
