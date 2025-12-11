@@ -134,7 +134,7 @@ void systemResetToBootloader(bootloaderRequestType_e requestType)
     }
 }
 
-// We can make use of time_us_64 if BF defines USE_64BIT_TIME
+// We can make use of time_us_64 if BF defines USE_64BIT_TIME in future, but that will require some changes
 STATIC_ASSERT(sizeof(timeMs_t) == sizeof(uint32_t), timeMs_t_is_32_bit_failed);
 STATIC_ASSERT(sizeof(timeUs_t) == sizeof(uint32_t), timeUs_t_is_32_bit_failed);
 
