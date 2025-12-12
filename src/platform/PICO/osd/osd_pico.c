@@ -831,9 +831,8 @@ void osdPioDetectStart(void)
     sm_config_set_clkdiv(&config, div);
 
     pio_sm_init(osdPio, osd_tx_sm, osd_tx_offset, &config);
-    // Prepare OSR with the initial hsync count for the decrementing loop.
+    // Prepare OSR with the initial hsync counter value for the decrementing loop.
     pio_sm_put(osdPio, osd_tx_sm, initLines);
-    // this now in PIO code: pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_pull(false, false));
 
     // Start counting...
     pio_sm_set_enabled(osdPio, osd_tx_sm, true);
@@ -847,9 +846,9 @@ int osdPioCountHSyncs(void)
     if (pc - osd_tx_offset == osd_count_sync_offset_ready) {
         // Program has reached "pull block". Extract from ISR, then restart by sending to TX fifo.
         pio_sm_clear_fifos(osdPio, osd_tx_sm);
-        pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_push(false, false));
-        hsyncs = initLines - pio_sm_get(osdPio, osd_tx_sm);
-        pio_sm_put(osdPio, osd_tx_sm, initLines);
+        pio_sm_exec_wait_blocking(osdPio, osd_tx_sm, pio_encode_push(false, false)); // ISR -> RX fifo.
+        hsyncs = initLines - pio_sm_get(osdPio, osd_tx_sm); // read down-counter from fifo, subtract from initial value.
+        pio_sm_put(osdPio, osd_tx_sm, initLines); // write initial value to fifo to restart the program.
     }
 
     return hsyncs;

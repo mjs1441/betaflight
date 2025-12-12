@@ -22,8 +22,14 @@
 ; .define hshiftA 24
 ; .define hshiftB 29
 ; .define hshiftC 24
+;
+; pixel word count per line = 368 / 16 (2bpp) = 23
+;
 
 .define clocksPerPixel 10
+.define wordsPerLine   23
+
+.define wordCount      wordsPerLine - 1
 
 .program osd_tx_pal
 
@@ -72,7 +78,7 @@ d4: jmp y--, d4 [hshiftB]    ; from after wait until out PINS should be hsync + 
     jmp start                ; (unusual) sync still low, suppose we are in a vsync pulse
 
 next_line:
-    set y, 22                ; (num words of pixel data in line) - 1
+    set y, wordCount         ; (num words of pixel data in line) - 1
 
 line_loop:
     pull noblock             ; NB no autopull
@@ -132,7 +138,7 @@ d4: jmp y--, d4 [hshiftB]    ; from after wait until out PINS should be hsync + 
     jmp start                ; (unusual) sync still low, suppose we are in a vsync pulse
 
 next_line:
-    set y, 22                ; (num words of pixel data in line) - 1
+    set y, wordCount         ; (num words of pixel data in line) - 1
 
 line_loop:
     pull noblock             ; NB no autopull
@@ -148,35 +154,15 @@ osrPath:
 ; that's a wrap
 
 
-;;;; prototype 2x SM, one just detects different sync types
-
-.program osd_sync
-; no FIFO, one IN pin for WAIT, one JMP pin
-start:
-    set x, 8
-    set y, 5
-    irq clear 1              ; clear IRQ flags
-    irq clear 2              ; other SM waiting on flag will have seen it after 1 clock
-restart:
-    wait 0 PIN, 0
-d1: jmp x--, d1       [28]   ; wait then test for PIN being high
-    jmp PIN, restart         ; shorter than HSync pulse at ~ 9*29/75 ~ 3.5us
-d2: jmp y--, d2       [28]
-    jmp PIN, hsync           ; shorter than VSync pulse at ~ 15*29/75 ~ 5.8us
-    irq 1                    ; set flag for VSync
-    jmp start
-hsync:
-    irq 2                    ; set flag for HSync
-    ; wrap
-
 .program osd_count_sync
 ; default FIFOs, one IN on JMP pin for wait, jmp
 ; no autopush (IN doesn't push ISR to fifo)
 ; use tx FIFO for flow control (restart)
-;;;; prep osr has initLines (1000 say)
+; prepare osr with initLines (1000 say, larger than any possible hsync count)
+; running at 75MHz
 start:
     IN NULL, 32              ; clear ISR
-PUBLIC ready:
+PUBLIC ready:                ; program will pause here until CPU reads the data and then sends to FIFO
     PULL block               ; (re)start when CPU sends initLines to the tx fifo
 recover:
     out y, 32                ; shift in initLines from osr
@@ -186,7 +172,7 @@ waitInitialVSync:
     wait 0 PIN, 0
     set x, 14
 d0: jmp x--, d0       [28]
-    jmp PIN, waitInitialVSync
+    jmp PIN, waitInitialVSync ; shorter than VSync pulse at ~ 15*29/75 ~ 5.8us
     wait 1 PIN, 0
 waitsync:
     wait 0 PIN, 0
@@ -201,46 +187,68 @@ vsync:
     jmp ready
 hsync:
     jmp y--, waitsync
-    jmp recover              ; counted beyond initLines - unusual, try find another VSync
+    jmp recover              ; counted beyond initLines: unusual, try to find another VSync
 
 
-.program osd_tx2
-
-.define hshiftA 28
-.define hshiftB 29
-.define hshiftC 24
-
-; First display on "even" field 1 at (second half of) this line (official = 23), on "odd" field 2 at this + 313 (official = 336)
-; e.g. skip hsync on lines 6,7,...,22 (17 such, so counter = 16)
-.define firstDisplayLine 23
-.define skipHsyncs firstDisplayLine - 7
-
-    irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
-    wait 0 irq 1             ; wait for a VSync pulse
-    set x, skipHsyncs
-loop_hsync_skip:
-    wait 1 irq 2             ; wait for an HSync pulse (and clear it)
-    jmp x--, loop_hsync_skip
-
-    mov x, isr               ; x = (num lines in field - 1). isr prepared with 287 (PAL)
-
-; TODO safer: detect either-or hs, vs, if vs back to start
-wait_next_hsync:
-    wait 1 irq 2             ; wait for an HSync pulse (and clear it)
-
-    ; delay until visible area
-    set y, hshiftA [hshiftC] ; TODO adjust this
-d1: jmp y--, d1 [hshiftB]    ; from after wait, less adjustment, until out PINS should be hsync + back porch ~ 10.4us = 780 clocks
-
-    ; write line of pixels
-    set y, 22                ; (num words of pixel data in line) - 1
-line_loop:
-    pull noblock             ; NB no autopull
-d2: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
-    jmp !osre d2        [clocksPerPixel - 2]
-    jmp y--, line_loop  [clocksPerPixel - 4] ; <------- *** TODO fix me ***
-
-    set PINS, 0
-    jmp x--, wait_next_hsync
-
-
+; ;;;; prototype 2x SM, one just detects different sync types
+; 
+; .program osd_sync
+; ; no FIFO, one IN pin for WAIT, one JMP pin
+; start:
+;     set x, 8
+;     set y, 5
+;     irq clear 1              ; clear IRQ flags
+;     irq clear 2              ; other SM waiting on flag will have seen it after 1 clock
+; restart:
+;     wait 0 PIN, 0
+; d1: jmp x--, d1       [28]   ; wait then test for PIN being high
+;     jmp PIN, restart         ; shorter than HSync pulse at ~ 9*29/75 ~ 3.5us
+; d2: jmp y--, d2       [28]
+;     jmp PIN, hsync           ; shorter than VSync pulse at ~ 15*29/75 ~ 5.8us
+;     irq 1                    ; set flag for VSync
+;     jmp start
+; hsync:
+;     irq 2                    ; set flag for HSync
+;     ; wrap
+; 
+; .program osd_tx2
+; 
+; .define hshiftA 28
+; .define hshiftB 29
+; .define hshiftC 24
+; 
+; ; First display on "even" field 1 at (second half of) this line (official = 23), on "odd" field 2 at this + 313 (official = 336)
+; ; e.g. skip hsync on lines 6,7,...,22 (17 such, so counter = 16)
+; .define firstDisplayLine 23
+; .define skipHsyncs firstDisplayLine - 7
+; 
+;     irq 0                    ; set IRQ, don't wait (signal for DMA to restart)
+;     wait 0 irq 1             ; wait for a VSync pulse
+;     set x, skipHsyncs
+; loop_hsync_skip:
+;     wait 1 irq 2             ; wait for an HSync pulse (and clear it)
+;     jmp x--, loop_hsync_skip
+; 
+;     mov x, isr               ; x = (num lines in field - 1). isr prepared with 287 (PAL)
+; 
+; ; TODO safer: detect either-or hs, vs, if vs back to start
+; wait_next_hsync:
+;     wait 1 irq 2             ; wait for an HSync pulse (and clear it)
+; 
+;     ; delay until visible area
+;     set y, hshiftA [hshiftC] ; TODO adjust this
+; d1: jmp y--, d1 [hshiftB]    ; from after wait, less adjustment, until out PINS should be hsync + back porch ~ 10.4us = 780 clocks
+; 
+;     ; write line of pixels
+;     set y, wordCount         ; (num words of pixel data in line) - 1
+; line_loop:
+;     pull noblock             ; NB no autopull
+; d2: out PINS, 2              ; shift 2 bits from OSR to PINS offset 0, offset 1 (OSD_W and OSD_EN)
+;     jmp !osre d2        [clocksPerPixel - 2]
+;     jmp y--, line_loop  [clocksPerPixel - 4] ; <------- *** TODO fix me ***
+; 
+;     set PINS, 0
+;     jmp x--, wait_next_hsync
+; 
+; 
+; 
