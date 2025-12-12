@@ -21,8 +21,6 @@
 
 #include "platform.h"
 
-//#ifdef USE_OSD_SD
-//#ifdef TEST_PIO_OSD
 #ifdef USE_FB_OSD
 
 #if !(defined OSD_W_PIN && defined OSD_EN_PIN && defined OSD_SYNC_PIN)
@@ -220,8 +218,6 @@ bool osdPioBufferAvailable(void)
     return !transferredSinceVsync && in_safe_zone && !dma_channel_is_busy(dma_chan_bg_to_bufA);
 #endif
 }
-
-void testUpdate(void);
 
 static bool plotToBackground;
 
@@ -1003,27 +999,6 @@ static void vsync_callback(void)
     // the rest is just debug and testing.
 
     ++c;
-
-#if 0
-    static int32_t maxcc;
-    static int32_t cca;
-    static int ccc;
-//    int nav = 250;
-    int nav = 99999250;
-    uint32_t m1 = getCycleCounter();
-    // testUpdate();
-    int32_t dd = getCycleCounter() - m1;
-    if (dd>maxcc) maxcc = dd;
-    cca += dd;
-    if (++ccc == nav) {
-        ccc=0;
-        bprintf("(%d %d busy %d busybuf %d) ave us per update: %.1f, max %.1f",
-                cca, maxcc, business, busybuf,
-                ((double)cca)/nav/150, ((double)maxcc)/150);
-        cca = 0;
-        maxcc = 0;
-    }
-#endif
     
     static uint32_t vmax = 0;
     static uint32_t szo;
@@ -1900,22 +1875,12 @@ bool renderSticksForegroundUntil(uint32_t limit_micros)
 // Return false when complete (no more to do).
 bool osdPioRenderScreenUntil(uint32_t limit_micros)
 {
-#if 0
-    // testing. Use limit_micros as proxy for current time.
-    static bool complete;
-    static uint32_t lastTime;
-    uint32_t diff = limit_micros - lastTime;
-    if (!complete) { // if not returning after a while since last completion
-        renderMA = (renderMA + diff) / 2;
-    }
-    lastTime = limit_micros;
-#else
     bool complete;
-#endif
 
 #if 0
     UNUSED(limit_micros);
     plotTestCard();
+    transferredSinceVsync = true;
     return false;
 #endif
 
@@ -1959,329 +1924,6 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
     return true; // More still to draw.
 }
 
-void testUpdate(void)
-{
-    tus++;
-//#define clearscreen
-//#define testcard
-//#define textpaint
-//#define blockpaint
-//#define ahpaint
-//#define testsprintf
-    // none:       0.0
-    // blockpaint 39.4
-    // ahpaint   216.7
-    // clearscreen (bzero) 1104 (loop bytes) 1104 (loop words) 1104 (memset) 1104
-    // clearscreen (__aeabi_memset) 99.6
-    // testcard 3302.2 [includes memset clear]
-    // textpaint blank: 25.7 ~4lines: 160
-    static int parity;
-    parity = 1-parity;
-
-#ifdef testsprintf
-    static char tsbuf[32];
-#if 0
-    int snprintf(char *str, size_t size, const char *format, ...);
-    int sprintf(char *str, const char *format, ...);
-//    for (int i=0; i<100; ++i) {
-    for (float i=0.123f; i<100.0f; ++i) {
-//        snprintf(tsbuf, 30, "look %d here %d so",i, i); // 622.5
-//        sprintf(tsbuf, "look %d here %d so",i, i); // 621.8
-        sprintf(tsbuf, "A%.1fB",(double)i); // ...
-        sprintf(tsbuf, "A%.2fB",(double)i); // 929.6
-    }
-#else
-//    for (int i=0; i<100; ++i) {
-    for (float i=0.123f; i<100.0f; ++i) {
-//        tfp_sprintf(tsbuf, "look %d here %d so",i, i); // 429.8
-        int osdPrintFloat(char *buffer, char leadingSymbol, float value, char *formatString, unsigned decimalPlaces, bool round, char trailingSymbol);
-        osdPrintFloat(tsbuf, 'A', i, "", 1, false, 'B'); // ...
-        osdPrintFloat(tsbuf, 'A', i, "", 2, false, 'B'); // 1166.8
-    }
-#endif
-    
-#endif
-#ifdef clearscreen
-//    for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
-//        osdBufferA[i] = 0;
-//    }
-    {
-        void *__aeabi_memset(void *s, size_t n, int c); // maybe , size_t n);    
-//        __aeabi_memset(osdBufferA, PICO_OSD_BUF_LENGTH, 0xff);
-        __aeabi_memset(osdBufferA, PICO_OSD_BUF_LENGTH, 0);
-
-//        uint32_t *p = (uint32_t *)osdBufferA;
-//        uint32_t *p = osdBuffer1W;
-//        for (int i=0; i<PICO_OSD_BUF_LENGTH/4; ++i) {
-//            *p++ = 0;
-//        }
-//        memset(osdBuffer1, 0, PICO_OSD_BUF_LENGTH/4);
-    }
-//    bzero(osdBuffer1, PICO_OSD_BUF_LENGTH);
-#endif
-    
-#ifdef testcard
-//    memset(osdBuffer1, 0b10101010, PICO_OSD_BUF_LENGTH); // black background
-#ifndef clearscreen
-    memset(osdBufferA, 0, PICO_OSD_BUF_LENGTH); // transparent background
-#endif
-
-    plotTestCard();
-
-#elif 0
-    if (0 == (millis() % 5000) ) { parity = 1 - parity; }
-
-//    if (parity) {
-    if (1) {
-//    memset(osdBuffer1, 0b10101010, PICO_OSD_BUF_LENGTH/2);
-//    memset(osdBuffer1 + PICO_OSD_BUF_LENGTH/2, 0xff, PICO_OSD_BUF_LENGTH/2);
-    memset(osdBufferA, 0xff, PICO_OSD_BUF_LENGTH/2);
-    memset(osdBufferA + PICO_OSD_BUF_LENGTH/2, 0b10101010, PICO_OSD_BUF_LENGTH/2);
-
-    // initially with set x,22 in pio
-    // not with i=1... nor with j=1...
-    // not with i<20,j<20 but with i<25,j<25
-    // i<24, j<24 looks double bad, but maybe correct on one field, bad on the other (squares about 1/4 from the right)
-    // from v offsets, I think the bad first square is late by 3/4 line
-#if 1
-//    int iii=25; int jjj = 25;
-    int iii=45; int jjj = 45;
-//    int iii=20; int jjj = 20;
-//    int iii=5; int jjj = 5;
-    for (int i=0; i<iii; ++i) {
-        for (int j=0; j<jjj; ++j) {
-
-            // how long is 24 pixels horizontally? we are running at 9 cpp so 24*9/150us = 1.44us
-            // maybe monitor thinks it's front porch?
-
-            // wait a minute, we're not allowed to write in first half of first line of even frame nor 2nd half of last line of odd frame
-            // so let's enforce that
-            // either with colour black (level black) or with not enable
-            // try both
-            
-// *** 
-// Individually, these two lines are fine, and we see black square in top left or top right
-// but together, we get wobbly out of sync, black squares appear about 1/4 way across the row (and not stable)
-            // [ was probably just total time... ]
-            plot(i,j,1);
-            plot(fb_nx-1-i,j,1);
-// ***
-
-
-//            plot(i,fb_ny-1,2);
-//            plot(fb_nx-1-i,fb_ny-1,2);
-        }
-    }
-
-    // enforce (overkill full lines, both fields)
-#if 1
-    for (int i=0; i<fb_nx; ++i) {
-        for (int j=0; j<4; ++j) {
-//        plot(i,0,0);
-//        plot(i,1,0);
-//        plot(i,2,0);
-//        plot(i,fb_ny-1,0);
-//            plot(i,j,(i/32)%3);
-//            plot(i,fb_ny-1-j,(i/32)%3);
-            plot(i,j,(i/32)%3);
-//            plot(i,j+4,(i/32)%3);
-            plot(i,fb_ny-1-j,0);
-        }
-    }
-#endif    
-#endif
-    
-    } else {
-        memset(osdBufferA, 0, PICO_OSD_BUF_LENGTH);
-    }
-#if 0
-  int s = millis()/4234;
-    for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
-        osdBufferA[i] = (0b1010101) * ((s >> 10)&3);
-        if (i%577 == 234)
-            s = s*13+29;
-    }
-    memset(osdBufferA, 0b10101010 /*0xff*/, PICO_OSD_BUF_LENGTH/2);
-    memset(osdBufferA + PICO_OSD_BUF_LENGTH/2, 0xff /* 0b10101010*/, PICO_OSD_BUF_LENGTH/2);
-#endif
-
-
-#endif // testcard
-    
-#ifdef textpaint
-    extern const uint8_t fontData[18*3*256];
-
-    const int hoffs = 0; //4; // 0..7
-    const int pxpc = 12;
-    const int bxpc = pxpc / 4; // 4 pixels per byte
-    const int pypc = 18;
-    const int bpc  = bxpc * pypc;
-    const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte3
-
-//    for (int i=0; i<10; ++i) {
-    for (int i=0; i<numChars; ++i) {
-        uint8_t c = osdCharBuffer[i];
-        if (!c) {
-            continue;
-        }
-
-        // paint chars to buffer here
-        // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
-        int x = i % charsPerLine;
-        int y = i / charsPerLine; // or loop x,y
-        uint8_t * bufp = osdBufferA + hoffs + fbbpl * y * pypc + x * bxpc; // pointer to topleft of char dest on osdBufferA
-        // TODO bufp without multiply, loop x,y etc.
-
-        const uint8_t * fontp = &fontData[c*bpc]; // 3 bytes per 12 pixel char line, 18 lines
-        // rp2350 don't have to worry about cache, all 1-clock sram
-
-//        bprintf("painting char '%c' (0x%02x) at %d, %d from %p (cf %p) to %p (cf %p)",
-//                c, c, x, y, fontp, fontData, bufp, osdBufferA);
-        for (int j=0; j<18; ++j) {
-            for (int b=0; b<3; ++b) {
-                *bufp++ = *fontp++;
-            }
-            bufp += fbbpl - 3; // new line, back 3 bytes
-        }
-    }
-
-
-#endif
-
-    //bzero(osdBufferA, PICO_OSD_BUF_LENGTH);
-    //plotBorder();
-#ifdef blockpaint
-    {
-        static const int nxx = fb_nx - 64;
-        static const float xp = ((float)(nxx))/4000000;
-        uint32_t ctime = micros();
-        int x = 27 + ((int)(ctime*xp)) % nxx;
-        int y = 32;
-        for (int i=0; i<10; ++i) {
-            for (int j=0; j<10; ++j) {
-                plot(x+i, y+j, (j==0 || i==0) ? 1 : 2);
-            }
-        }
-    }
-#endif
-
-#ifdef ahpaint
-    //bzero(osdBufferA, PICO_OSD_BUF_LENGTH);
-    //plotBorder();
-
-    /*
-      osd_ah_max_pit = 20
-osd_ah_max_rol = 40
-osd_ah_invert = OFF
-    */
-
-    // cf. osd_elements.c osdElementArtificialHorizon
-    // Get pitch and roll limits [and values] in tenths of degrees
-    const int maxPitch = osdConfig()->ahMaxPitch * 10;
-    const int maxRoll = osdConfig()->ahMaxRoll * 10;
-    const int ahSign = osdConfig()->ahInvert ? -1 : 1;
-    const int rollAngle = constrain(attitude.values.roll * ahSign, -maxRoll, maxRoll);
-    int pitchAngle = constrain(attitude.values.pitch * ahSign, -maxPitch, maxPitch);
-
-    static bool didPitchCalc;
-    static float pitchMult;
-    static float rollMult;
-    static const float pitchMaxOffset = fb_ny*0.2f; // fb_ny*0.1f;
-    static const float rollMaxOffset = fb_ny*0.2f;
-    static const int hcx = fb_nx / 2;
-    static const int hcy = fb_ny * 0.68f;
-    static const int hhwid = 8 * (int)(fb_nx * 0.2f / 8);
-    static const float oohhwid = 1.0f / hhwid;
-
-    if (!didPitchCalc) {
-        pitchMult = pitchMaxOffset / maxPitch;
-        rollMult = rollMaxOffset / maxRoll;
-    }
-
-    int im = fb_ny*0.75f;
-    int imm = im/10;
-    int yy = fb_ny*0.9f;
-    for (int i=0; i<im; ++i) {
-        int dd = hhwid*1.15f;
-        if (i==0 || i==im-1) {
-            for (int j=-4; j<=4; ++j) {
-                plot(hcx-dd+j, yy, 2);
-                plot(hcx+dd+j, yy, 2);
-            }
-        } else if (i%imm == 0) {
-            for (int j=-2; j<=2; ++j) {
-                plot(hcx-dd+j, yy, 2);
-                plot(hcx+dd+j, yy, 2);
-            }
-        }
-        if (i%8 == 2) {
-            plot(hcx-dd, yy, 2);
-            plot(1 + hcx-dd, yy, 1);
-            plot(hcx+dd, yy, 2);
-            plot(1 + hcx+dd, yy, 1);
-        }
-        yy--;
-    }
-    
-    int ypitchoffset = 0;
-    int yrollmax;; // ypitchoffset -+ yrollmax across hwid
-
-    // Convert pitchAngle to y compensation value
-    // (maxPitch / 25) divisor matches previous settings of fixed divisor of 8 and fixed max AHI pitch angle of 20.0 degrees
-
-    if (maxPitch > 0) { // <-- where did that come from?
-        ypitchoffset = pitchAngle * pitchMult; // small angles, pitchAngle roughly proportional to pitch delta (in pixels)
-    }
-
-    yrollmax = rollAngle * rollMult;
-
-    int xi = hcx - hhwid;
-    float yf = hcy + ypitchoffset - yrollmax;
-    float yDelta = yrollmax * oohhwid;
-    // int hmod = hhwid/4;
-    
-    for (int i=0; i< 2*hhwid+1; ++i) {
-        plot(xi, yf, 2);
-        plot(xi, yf+1, 1);
-        if (i == 0 || i == 2*hhwid) { //  || (i%hmod == 0)) {
-            plot(xi, yf-1, 2);
-            plot(xi, yf+1, 2);
-            plot(xi, yf-2, 2);
-            plot(xi, yf+2, 2);
-        }
-        yf += yDelta;
-        xi++;
-    }
-   
-
-#endif // ahpaint
-
-#if 0
-    static const int usPerRun = 50000;
-    static const int nxx = fb_nx - 64;
-    static const float xp = ((float)(nxx))/4000000;
-    static uint32_t ttime;
-    if (!ttime) {
-        ttime = micros();
-    }
-    uint32_t ctime = micros();
-    int32_t dtime = (int32_t)(ctime - ttime);
-    if (dtime > usPerRun) {
-        bzero(osdBufferA, PICO_OSD_BUF_LENGTH);
-        plotBorder();
-        int x = 27 + ((int)(ctime*xp)) % nxx;
-        (void)xp;
-        int y = 32;
-        for (int i=0; i<10; ++i) {
-            for (int j=0; j<10; ++j) {
-                plot(x+i, y+j, (j==0 || i==0) ? 1 : 2);
-            }
-        }
-        ttime = ctime;            
-    }
-#endif
-}
-
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c)
 {
     if (x < charsPerLine && y < charLines) {
@@ -2300,16 +1942,4 @@ void osdPioWrite(uint8_t x, uint8_t y, const char *text)
     }
 }
 
-#else // USE_OSD_SD
-
-// no OSD SD
-
-// if required
-void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c)
-{
-    UNUSED(x);
-    UNUSED(y);
-    UNUSED(c);
-}
-
-#endif // USE_OSD_SD
+#endif // USE_FB_OSD
