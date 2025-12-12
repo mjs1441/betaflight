@@ -161,7 +161,6 @@
 #undef USE_MSP_UART
 #undef USE_MSP_DISPLAYPORT
 
-#undef USE_DSHOT_BITBANG
 #undef USE_ESC_SENSOR
 
 #undef USE_VTX
