@@ -247,7 +247,7 @@ void fbOsdWriteChar(uint8_t x, uint8_t y, uint8_t attr, uint8_t c)
 
 void fbOsdClearScreen(void)
 {
-    memset(osdCharBuffer, 0x20, OSD_CHAR_BUFFER_LENGTH);
+    osdPioClearCharBuffer();
 }
 
 void fbOsdRefreshAll(void)

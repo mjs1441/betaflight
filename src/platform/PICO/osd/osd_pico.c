@@ -79,6 +79,9 @@ STATIC_ASSERT(PICO_OSD_BUF_HEIGHT_PAL == 288, pico_pal_lines_failed);
 #define PICO_OSD_DISPLAY_WORDS_NTSC (PICO_OSD_LINE_WORDS * PICO_OSD_BUF_HEIGHT_NTSC)
 #define PICO_OSD_DISPLAY_WORDS_PAL  (PICO_OSD_LINE_WORDS * PICO_OSD_BUF_HEIGHT_PAL)
 
+// 30 * 16 = 480
+#define OSD_CHAR_BUFFER_LENGTH (OSD_SD_COLS * OSD_SD_ROWS)
+
 static const PIO osdPio = PIO_INSTANCE(PIO_OSD_INDEX);
 static const uint osdPioIrq = PIO_IRQ_NUM(osdPio, 0);
 
@@ -129,7 +132,7 @@ static volatile uint32_t safe_zone_period;
 static volatile bool transferredSinceVsync;
 
 // trace / debugging
-static volatile uint32_t sza;
+static volatile uint32_t startVsyncCycles;
 static volatile uint32_t szb;
 static volatile uint32_t szc;
 static volatile uint32_t szd;
@@ -143,6 +146,8 @@ static volatile uint32_t maxAHI;
 static volatile uint32_t renderTot;
 static volatile uint32_t drawBGTot;
 static volatile uint32_t drawFGTot;
+static uint32_t renderStartCycles;
+static uint32_t renderEndCycles;
 
 static volatile int checksb;
 static volatile int checkol;
@@ -153,8 +158,7 @@ static volatile int badY;
 static volatile int badC;
 
 
-// 30 * 16 = 480
-uint8_t osdCharBuffer[OSD_SD_COLS * OSD_SD_ROWS];
+uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
@@ -183,6 +187,11 @@ static void init_gpios(void)
     }
 }
 
+void osdPioClearCharBuffer(void)
+{
+    memset(osdCharBuffer, 0x20, OSD_CHAR_BUFFER_LENGTH);
+}
+
 int64_t safe_zone_callback(alarm_id_t id, void * user_data)
 {
     static int cc;
@@ -191,15 +200,15 @@ int64_t safe_zone_callback(alarm_id_t id, void * user_data)
     in_safe_zone = false;
     szd = getCycleCounter();
     if (++cc == 99999991) {
-        bprintf("\nsz %d %d %d %d  %d\n",sza,szb,szc,szd,sze);
+        bprintf("\nsz %d %d %d %d  %d\n",startVsyncCycles,szb,szc,szd,sze);
     }
     return 0; // don't automatically reschedule
 }
 
 bool osdPioBufferAvailable(void)
 {
-#if 1
     if (transferredSinceVsync) {
+        // We have completed a draw / render pass since the last vsync, don't start a new one.
         return false;
     }
 
@@ -209,14 +218,13 @@ bool osdPioBufferAvailable(void)
     }
 
     if (dma_channel_is_busy(dma_chan_bg_to_bufA)) {
+        // Busy preparing osdBufferA for rendering (copying in background buffer),
+        // don't allow rendering into osdBufferA until that is complete.
         dmb++;
         return false;
     }
 
     return true;
-#else
-    return !transferredSinceVsync && in_safe_zone && !dma_channel_is_busy(dma_chan_bg_to_bufA);
-#endif
 }
 
 static bool plotToBackground;
@@ -234,11 +242,12 @@ static void selectForegroundBuffer(void)
 
 void plot(int x, int y, int c)
 {
-    uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
-
     // c =  0 -> transparent (no overlay)   W=any EN=0
     // c =  1 -> black                      W=0   EN=1
     // c =  2 -> white                      W=1   EN=1
+
+    uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
+
     if (x<0 || y<0 || x>=fb_nx || y>=fb_ny) {
         badX = x;
         badY = y;
@@ -260,6 +269,7 @@ void plot(int x, int y, int c)
     *pByte = ((*pByte) &(~mask)) | (mask&col);
 }
 
+#if 0
 static bool isWhite(int x, int y)
 {
     uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
@@ -270,7 +280,6 @@ static bool isWhite(int x, int y)
     return col & 0b01010101;
 }
 
-#if 0
 static bool postProcessUntil0(uint32_t limit_micros)
 {
     UNUSED(limit_micros);
@@ -295,12 +304,9 @@ static bool postProcessUntil0(uint32_t limit_micros)
 
 static bool postProcessUntil(uint32_t limit_micros)
 {
+    // Plot Black points around every White point (don't overwrite a White point).
     UNUSED(limit_micros);
-    UNUSED(isWhite);
     uint32_t *plotBufferW = (uint32_t *)(plotToBackground ? osdBufferBackground : osdBufferA);
-//    for (int y=0; y<fb_ny; ++y) {
-// Testing with/without
-//////////    const uint32_t lineDeltaWords = PICO_OSD_LINE_words
     static int y;
     static int wordIndex; // index of word along a line, in 0..22
     static uint32_t *pWord;
@@ -346,8 +352,7 @@ static bool postProcessUntil(uint32_t limit_micros)
 
         *pWord++ = wordThis | blackUpdates;
     }
-//    bprintf("y=%d, wi=%d, pw=%p vs pbw %p and fbw %d",
-//            y, wordIndex, pWord, plotBufferW, fb_words);
+
     pWord = 0;
     return true;
 }
@@ -553,76 +558,7 @@ static bool iterDashedQLineNext(void)
     return false;
 }
 
-
 static void vsync_callback(void);
-
-#if 0
-static void plotBorder(void)
-{    
-    for (int i=0; i<fb_nx; ++i) {
-        if (i < fb_nx/6) {plot(i, i, 2); plot(i, fb_ny-i-1, 2);}
-        if (i > 5*fb_nx/6) {plot(i, (fb_nx-i-1), 2); plot(i, fb_ny-(fb_nx-i-1)-1, 2);}
-        plot(i,0,1); plot(i,fb_ny-1,1);
-        plot(i,1,2); plot(i,fb_ny-2,2);
-    }
-    for (int i=0; i<fb_ny; ++i) {
-        plot(0,i,1); plot(fb_nx-1,i,1);
-        plot(1,i,2); plot(fb_nx-2,i,2);
-    }
-}
-#endif
-    
-#if 0
-    for (int i=0; i<fb_nx; ++i) {
-        for (int j=0; j<fb_ny; ++j) {
-            plot(i,j, ((j%100)<10 ? (j%2)+1 : 0)); // (int)((13*j + i/37))%4);
-        }
-    }
-
-    
-#endif
-    
-#if 0
-    // plotBorder();
-    UNUSED(plotBorder);
-
-#elif 0
-    UNUSED(plotBorder);
-    // this pattern particularly hard for small old screen
-    for (int i=0; i<360; ++i) {
-        plot(i, 256-1, 1);
-        plot(i, 256-2, 1);
-        plot(i, 256-3, 1);
-        plot(i, 256-3, 1);
-        plot(i, 256-4, 2);
-        plot(i, 256-5, 2);
-        plot(i, 0, 1);
-        plot(i, 1, 1);
-        plot(i, 2, 1);
-        plot(i, 3, 2);
-        plot(i, 3, 2);
-        plot(i, 4, 2);
-    }
-
-    for (int i=0; i<256; ++i) { 
-        plot(0, i, 1);
-        plot(1, i, 1);
-        plot(2, i, 2);
-        plot(3, i, 2);
-        plot(359, i, 2);
-        plot(358, i, 2);
-        plot(357, i, 1);
-        plot(356, i, 1);
-        plot(360, i, 2);
-        plot(361, i, 2);
-        plot(362, i, 2);
-        plot(363, i, 2);
-        plot(364, i, 2);
-        plot(365, i, 2);
-        plot(366, i, 2);
-        plot(367, i, 2);
-    }
-#endif
 
 static dma_channel_config config_zero_to_bg;
 static dma_channel_config config_bg_to_bufA;
@@ -850,18 +786,6 @@ int osdPioCountHSyncs(void)
     return hsyncs;
 }
 
-volatile int ouccount;
-volatile int oucunsafe;
-
-//#define unsafetestloop
-#ifdef unsafetestloop
-volatile int oucunsafe2;
-volatile int oucunsafe3;
-#endif
-//static volatile int vdelay;
-
-static const bool updateEveryOtherVSync = true;
-
 #define TASKREPORT
 #ifdef TASKREPORT
 #include "scheduler/scheduler.h"
@@ -870,22 +794,16 @@ static const bool updateEveryOtherVSync = true;
 
 static void vsync_callback(void)
 {
-    sza=getCycleCounter();
+    startVsyncCycles=getCycleCounter();
 #if defined PICO_TRACE && defined TASKREPORT
     static uint32_t thisFunctionUs;
 #endif
-    static int fieldOddEven;
-    fieldOddEven = fieldOddEven ^ 0x1;  // odd or even field (we can't tell which is which), alternate 0, 1
-#if 0
-    bool flipThisVSync = fieldOddEven || !updateEveryOtherVSync;
-        // 25 per second (PAL) if updateEveryOtherVSync, otherwise
-        // 50 per second (PAL)
-#else
-    UNUSED(updateEveryOtherVSync);
+    // static int fieldOddEven;
+    // fieldOddEven = fieldOddEven ^ 0x1;  // odd or even field (we can't tell which is which), alternate 0, 1
+
     // If for some reason the complete draw and render sequence takes longer than fits into the vsync period,
     // don't flip the buffers (display will be jerky but complete, no tearing / flicker)
     bool flipThisVSync = transferredSinceVsync;
-#endif
 
     if (flipThisVSync) {
         // We have completed rendering into bufferA, rename so that's now bufferB and will be dma-d to screen.
@@ -1043,6 +961,7 @@ static void vsync_callback(void)
         tmpNow = checkFuncInfo.totalExecutionTimeUs;
         uint32_t sinceCheck = tmpNow - lastCheckTot;
         lastCheckTot = tmpNow;
+#if 0
         bprintf("t %d, PID %d (%.1f%%), OSD %d (%.1f%%), other %d (%.1f%%), Check %d (%.1f%%), this %d (%.1f%%)",
                 cyclesSince/150,
                 sincePID, (double)((float)sincePID)*100*150/cyclesSince,
@@ -1051,10 +970,18 @@ static void vsync_callback(void)
                 sinceCheck, (double)((float)sinceCheck)*100*150/cyclesSince,
                 thisFunctionUs, (double)((float)thisFunctionUs)*100*150/cyclesSince
                );
+#else
+        UNUSED(sinceCheck);
+        UNUSED(sinceOther);
+        UNUSED(cyclesSince);
+        UNUSED(thisFunctionUs);
+#endif
 #endif
 //        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
+#if 0
         bprintf("%d vsync_callback busy %d %d nisz %d dmb %d (previous tainted n to c %d)",
                 c, business, busybuf, nisz, dmb, n_to_c);
+#endif
 ///        bprintf(" sb %d ol %d", checksb, checkol);
 ///        bprintf("average render call interval: %d us, %.1f hz", renderMA, 1000000.0/renderMA);
         nisz = 0; dmb = 0;
@@ -1065,34 +992,32 @@ static void vsync_callback(void)
 //                (double)tus/250, (double)tusr/250, (double)tus/tusr);
 //        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
 //                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
+#if 0
         bprintf("max us per render call (last set of vsyncs had %d complete rds) %d", tusr, maxcycles/150);
-        bprintf("ave us (duty cycle) per vsync render %d (%.1f), fg %d (%.1f), bg %d (%.1f), fg+bg %d (%.1f)",
+#endif
+        bprintf("%d completed %d, ave us (duty cycle) per vsync render %d (%.1f), ave start, end us %.1f, %.1f",
+                c, tusr,
                 renderTot/(250*150), ((double)renderTot)/(250*150*20000/100),
+                ((double)renderStartCycles)/(250*150), ((double)renderEndCycles)/(250*150)
+               );
+        
+#if 0
+                bprintf(", fg %d (%.1f), bg %d (%.1f), fg+bg %d (%.1f)",
                 drawBGTot/(250*150), ((double)drawBGTot)/(250*150*20000/100),
                 drawFGTot/(250*150), ((double)drawFGTot)/(250*150*20000/100),
                 (drawFGTot + drawBGTot)/(250*150), ((double)(drawFGTot + drawBGTot))/(250*150*20000/100));
+#endif
         if (badX != -12345) {
             bprintf("*** detected out of range plot, last was %d, %d, %d", badX, badY, badC);
             badX = -12345;
         }
 
+        renderStartCycles = 0; renderEndCycles = 0;
 //        bprintf("max ah cache cycles %d", maxAHI);
         renderTot = 0; drawFGTot = 0; drawBGTot = 0;
         maxcycles = 0;
         tus = 0; tusr = 0;
         vmax = 0;
-#if 0
-#ifdef unsafetestloop
-        bprintf("ouccount %d of which unsafe %d %d %d (%.3f %.3f %.3f of 20000)", ouccount,
-                oucunsafe, oucunsafe2, oucunsafe3,
-                (double)(((float)oucunsafe)*20000.0f/ouccount),
-                (double)(((float)oucunsafe2)*20000.0f/ouccount),
-                (double)(((float)oucunsafe3)*20000.0f/ouccount)
-               );
-#else
-        bprintf("ouccount %d of which unsafe %d ~ %d of 20000 ~ %.3f cf %d (%d)", ouccount, oucunsafe, (int)((float)oucunsafe * 20000.0f / (float)ouccount), ((double)oucunsafe)/ouccount, 20000 - s$afe_zone_period, (int)((float)oucunsafe * 20000.0f / (float)ouccount) - (20000 - safe_zone_period));
-#endif
-#endif
         n_to_c = getCycleCounter() - szn;
         UNUSED(n_to_c);
     }
@@ -1101,7 +1026,7 @@ static void vsync_callback(void)
     
     szc=getCycleCounter();
 #if defined PICO_TRACE && defined TASKREPORT
-    thisFunctionUs = (szc - sza)/150;
+    thisFunctionUs = (szc - startVsyncCycles)/150;
 #endif
 }
 
@@ -1856,12 +1781,12 @@ bool renderSticksBackgroundUntil(uint32_t limit_micros)
     
 bool renderSticksForegroundUntil(uint32_t limit_micros)
 {
-    while (micros() < limit_micros && cachedStickLeft) {
+    if (cachedStickLeft && micros() < limit_micros) {
         plotBlob(infoStickLeft.xStick, infoStickLeft.yStick);
         cachedStickLeft = false;
     }
 
-    while (micros() < limit_micros && cachedStickRight) {
+    if (cachedStickRight && micros() < limit_micros) {
         plotBlob(infoStickRight.xStick, infoStickRight.yStick);
         cachedStickRight = false;
     }
@@ -1875,8 +1800,14 @@ bool renderSticksForegroundUntil(uint32_t limit_micros)
 // Return false when complete (no more to do).
 bool osdPioRenderScreenUntil(uint32_t limit_micros)
 {
-    bool complete;
+    static bool firstOfVsync = true;
+    if (firstOfVsync) {
+        firstOfVsync = false;
+        renderStartCycles += getCycleCounter() - startVsyncCycles;
+    }
 
+    bool complete;
+    
 #if 0
     UNUSED(limit_micros);
     plotTestCard();
@@ -1917,6 +1848,8 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
         // accumulate for averaging: maxcycles += maxcyclesthisround;
         tusr++;
 
+        renderEndCycles += getCycleCounter() - startVsyncCycles;
+        firstOfVsync = true;
         transferredSinceVsync = true;
         return false; // Nothing more to draw.
     }

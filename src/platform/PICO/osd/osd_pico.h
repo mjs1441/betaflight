@@ -26,9 +26,7 @@
 #include "osd/osd.h"
 #include "pg/vcd.h"
 
-// TODO ***  export function clearscreen instead of osdCharBuffer
-#define OSD_CHAR_BUFFER_LENGTH 480
-extern uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
+void osdPioClearCharBuffer(void);
 
 int osdPioCountHSyncs(void);
 void osdPioDetectStart(void);
