@@ -23,6 +23,8 @@
 
 #ifdef USE_FB_OSD
 
+#define OSD_DEBUG_EXTRA
+
 #if !(defined OSD_W_PIN && defined OSD_EN_PIN && defined OSD_SYNC_PIN)
 #error This PICO OSD requires OSD_W_PIN, OSD_EN_PIN and OSD_SYNC_PIN to be defined
 #endif
@@ -896,6 +898,7 @@ static void vsync_callback(void)
     if (dmaClearBackgroundBuffer || flipThisVSync) {
         dma_channel_start(dma_chan_bg_to_bufA);
     } else {
+        // If not updating this time, just repeat the dma copy from bufB to fifo.
         dma_channel_start(dma_chan_bufB_to_fifo);
     }
 
@@ -904,10 +907,9 @@ static void vsync_callback(void)
     // probably best clear at end, just in case there are re-trigger issues if cleared earlier...
     pio_interrupt_clear(osdPio, 0);
 
-    // static alarm_id_t add_alarm_in_us (uint64_t us, alarm_callback_t callback, void * user_data, bool fire_if_past)
-    // typedef int64_t(* alarm_callback_t)(alarm_id_t id, void *user_data)
     szb = getCycleCounter();
 
+    // Protect against starting a render operation just before a vsync callback.
     static alarm_id_t aid = -1 ;
     if (aid != -1) {
         cancel_alarm(aid);
@@ -1033,34 +1035,6 @@ static void vsync_callback(void)
 #endif
 }
 
-/*
-  #define OSD_W_PIN            PA32
-  #define OSD_EN_PIN           PA33
-  // #define OSD_SYNC_PIN
-  
-#define OSD_W_PIN            PA16
-#define OSD_EN_PIN           PA17
-#define OSD_SYNC_PIN         PA18
-
-*/
-
-bool timer_callback(repeating_timer_t *rt)
-{
-#ifdef PICO_TRACE
-    uint8_t *buffer = (uint8_t *)rt->user_data;
-    bprintf("buffer = %p, osdBufferA = %p", buffer, osdBufferA);
-#else
-    UNUSED(rt);
-#endif
-        
-//    pio_sm_set_enabled(osdPio, osd_tx_sm, true);
-    //return false;
-    return true;
-}
-
-
-static repeating_timer_t rtdata;
-
 static void enable(void)
 {
     pio_sm_set_enabled(osdPio, osd_tx_sm, true);
@@ -1087,127 +1061,7 @@ void osdPioDisableDevice(void) {
     disable();
 }
 
-void osd_test(void)
-{
-    osd_init_device(true, PICO_OSD_BUF_HEIGHT_PAL, PICO_OSD_DISPLAY_WORDS_PAL);
-
-    (void)rtdata;
-/*
-//     int32_t delay_ms = 20;
-//    int32_t delay_ms = 1520;
-    int32_t delay_ms = 51520;
-    
-  bprintf("adding timer");
-    if (!add_repeating_timer_ms(delay_ms, timer_callback, &osdBuffer1[0], &rtdata)) {
-        bprintf("*** failed to add timer ***");
-    }
-*/
-    
-#if 1
-    bprintf("OSD PIO Enable");
-    enable();
-#else
-    // debug PIO, histogram etc.
-    
-    int disp = 0;
-    int pc;
-    int pca[50];
-    int hist[32];
-    for (int i=0; i<32; ++i) hist[i] = 0;
-    bprintf("SM offset is %d", osd_tx_offset);
-    while (true) {
-        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("A pc = %d less offset = %d", pc, pc - osd_tx_offset);
-        delay(893);
-//        delay(13893);
-        delay(13);
-        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("B pc = %d less offset = %d", pc, pc - osd_tx_offset);
-
-        bprintf("      ENABLE");
-        enable();
-
-
-#if 1
-        (void)hist;
-        (void)pca;
-        (void)disp;
-        return;
-#elif 1
-        (void)hist;
-        (void)pca;
-
-        if (disp == 0) {
-            // moving blocks
-            for (int i=0; i<15; ++i) {
-                delay(250);
-                for (int x=0; x<368; ++x) {
-                    int xx = (3*(x+i))>>7;
-                    for (int y=0; y<256; ++y) {
-                        int yy = (3*y)>>7;
-                        plot(x,y,((int)(xx+yy+i))%4);
-                    }
-                }
-            }
-        } else if (disp == 1) {
-            for (int i=0; i<760; ++i) {
-                for (int x=0; x<368; ++x) {
-                    int rx = 32 + ((int)((i*3)/5)) % 304;
-                    for (int y=0; y<256; ++y) {
-                        int ry = 32 + ((int)(((i+123)*5)/7)) % 192;
-                        int d = (x-rx)*(x-rx) + (y-ry)*(y-ry);
-                        plot(x,y, d<1000 ? d<780 ? d<300 ? 0 : 2 : 1 : 0);
-                    }
-                }
-            }
-        }
-
-        disp = (disp + 1)%2;
-        
-#else
-        while (1) {
-            uint32_t x = getCycleCounter();
-            if ((x%13) == 1 || (x % 17) == 7) {
-                for (int i=0; i<10000000; ++i) {
-                    hist[osdPio->sm[osd_tx_sm].addr]++;
-                }
-                bprintf("-----");
-                for (int i=0; i<32-osd_tx_offset; ++i) {
-                    bprintf("%d: %d", i, hist[i+osd_tx_offset]);
-                }
-                bprintf("-----");
-            }
-        }
-        
-        for (int i=0; i<50; ++i) {
-            pca[i] = pio_sm_get_pc(osdPio, osd_tx_sm);
-        }
-        for (int i=0; i<50; ++i) {
-            bprintf("pc = %d", pca[i] - osd_tx_offset);
-        }
-        bprintf(".");
-        delay(7);
-        while (pio_sm_get_pc(osdPio, osd_tx_sm) < osd_tx_offset + 17) {
-            ;
-        }
-        for (int i=0; i<50; ++i) {
-            pca[i] = pio_sm_get_pc(osdPio, osd_tx_sm);
-        }
-        for (int i=0; i<50; ++i) {
-            bprintf("pc = %d", pca[i] - osd_tx_offset);
-        }
-        
-#endif
-            
-        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("C pc = %d less offset = %d", pc, pc - osd_tx_offset);
-        delay(1997);
-        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("D pc = %d less offset = %d", pc, pc - osd_tx_offset);
-
-        bprintf("      DISABLE");
-        disable();
-        pc = pio_sm_get_pc(osdPio, osd_tx_sm); bprintf("E pc = %d less offset = %d", pc, pc - osd_tx_offset);
-    }
-#endif
-}
-
+#ifdef OSD_DEBUG_EXTRA
 void plotTestCard(void)
 {
     for (int i=0; i<fb_nx; ++i) {
@@ -1260,6 +1114,7 @@ void plotTestCard(void)
         plot(fb_nx/2  +i, fb_ny -1 -i, 2);
     }
 }
+#endif
 
 typedef enum {
     bgItemPendingCache = 0,
@@ -1329,8 +1184,7 @@ static bool cachedAH;
 #define AH_SYMBOL_COUNT 9
 static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
 {
-    // takes about 5us (every 20ms)
-//    uint32_t c1 = getCycleCounter();
+    // Takes about 5us (every 20ms)
     // Adjust to central y value of character-based AH element.
     y += (AH_SYMBOL_COUNT - 1) / 2;
 
@@ -1345,10 +1199,11 @@ static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
 
     infoArtificialHorizon.outOfRange = pitchAngle != pitchAngleUnconstrained;
 
-    // Note that pitch is positive for the board / camera pointing up, and y coords increase going down the screen.
+    // Note that pitch is positive for the board / camera pointing down, and y coords increase going down the screen.
     static const int barScale = (AH_SIDEBAR_WIDTH_POS - 2) * charWidth; // The AH bar should fit nicely between the Sidebars.
     const int displacementScale = (fb_ny - 64) / 2; // going to fit maxPitch to screen (vertically), less a bit for overscan.
     const float d2r = 3.14159265f * 2 / 360 / 10; // Extra scale factor of 10 for 10th of degree -> radian.
+    // float trig functions are pretty quick on RP2350
     float tp = tanf(pitchAngle * d2r);
     float cr = cosf(rollAngle * d2r);
     float sr = sinf(rollAngle * d2r);
@@ -1360,14 +1215,7 @@ static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
     infoArtificialHorizon.x2 = xc - barScale * cr;
     infoArtificialHorizon.y2 = yc + barScale * sr;
 
-    if (tusr == -234) {
-        bprintf("OSD ah pitch %d roll %d tp %f cr %f sr %f tscale %f xc %d yc %d x1y1 %d %d x2y2 %d %d",
-                pitchAngle, rollAngle, (double)tp, (double)cr, (double)sr, (double)tscale, xc, yc,
-                infoArtificialHorizon.x1, infoArtificialHorizon.y1, infoArtificialHorizon.x2, infoArtificialHorizon.y2);
-    }
     cachedAH = true;
-//    uint32_t cd = getCycleCounter() - c1;
-//    maxAHI = cd > maxAHI ? cd : maxAHI;
 }
 
 typedef struct {
@@ -1649,7 +1497,7 @@ bool renderCharsUntil(uint32_t limit_micros)
     static int currentX;
     static uint8_t *currentPtr;
 
-    // ** BEWARE ** charsPerLine doesn't correspond with pixels or bytes per line,
+    // ** NOTE ** charsPerLine doesn't correspond with pixels or bytes per line,
     // because we have some spare: 368 pixels not 360 for alignment reasons
 
     // REM *** if we use hoffs or equivalent, do same in plot and other drawing routines
@@ -1675,8 +1523,6 @@ bool renderCharsUntil(uint32_t limit_micros)
             // Buffer is always cleared after vsync before we start updating it. So, we can
             // ignore empty characters.
             // *** TODO check char 0 and char 32 (spc) are always transparent
-//            if (currentY >= 14 && currentY <= 15) c = 0x17; // <-- bad with PiB output and PAL
-//            if (currentY >= 14 && currentY <= 15) c = 0x9d; // not a problem
             if (c!=0 && c!=0x20) {
                 // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
                 const uint8_t * fontp = &fontData[c * bpc]; // 3 bytes per 12 pixel char line, 18 lines
@@ -1711,42 +1557,6 @@ bool renderCharsUntil(uint32_t limit_micros)
 
     return false;
 }
-
-#if 0
-        int bs = 252; int bx = 18; // bad
-//        int bs = 262; int bx = 8; // ok
-//        int bs = 252; int bx = 8; // ok
-        for (int badline = bs; badline < bs + bx; badline+=1) {
-            uint32_t *ptr = (uint32_t *)(osdBufferA + (fbbpl * badline));
-            for (int x=0; x<92/4 /*92*/; ++x) {
-//                *ptr++ = 0xf5555f55; // 0xff; // 55;
-//                *ptr++ = 0x55555f55; // 0xff; // 55;
-                *ptr++ = 0x55555555; // 0xff; // 55;
-            }
-        }
-#elif 0
-//        int bs = 252; int bx = 18; // bad - but maybe just timing
-//        int bs = 262; int bx = 8; // ok
-//        int bs = 252; int bx = 8; // ok
-        int bs = 260; int bx = 3; // ok - fixes frame on row 14
-        for (int badline = bs; badline < bs + bx; badline+=1) {
-            uint8_t *ptr = (osdBufferA + (fbbpl * badline));
-//            for (int x=0; x<92 /*92*/; ++x) {
-//            for (int x=24; x<64; ++x) {
-//            for (int x=24; x<28; ++x) { // <-- doesn't clear problem
-            for (int x=44; x<48; ++x) { // clears the problem
-//            for (int x=20; x<60 /*92*/; ++x) {
-//                *ptr++ = 0xf5555f55; // 0xff; // 55;
-//                *ptr++ = 0x55555f55; // 0xff; // 55;
-//                *ptr++ = 0xff; // 
-//                *ptr++ = 0x55;
-//                *ptr++ = (x < 32 || x > 70) ? 0x55 : 0xff;
-//                *ptr++ = (x < 32 || x > 70) ? 0xff : 0x55;
-                ptr[x] = 0xff;
-//                ptr++;
-            }
-        }
-#endif
 
 bool renderSticksBackgroundUntil(uint32_t limit_micros)
 {
