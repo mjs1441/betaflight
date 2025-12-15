@@ -162,6 +162,7 @@ static volatile int badC;
 static uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
 uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
+uint8_t osdCharLineInUse[OSD_SD_ROWS];
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
@@ -193,6 +194,7 @@ static void init_gpios(void)
 void osdPioClearCharBuffer(void)
 {
     memset(osdCharBuffer, 0x20, OSD_CHAR_BUFFER_LENGTH);
+    memset(osdCharLineInUse, 0, OSD_SD_ROWS);
 }
 
 int64_t safe_zone_callback(alarm_id_t id, void * user_data)
@@ -588,9 +590,7 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
         osdBufferA[i] = 0;
     }
 
-    for (int i=0; i<numChars; ++i) {
-        osdCharBuffer[i] = 0;
-    }
+    osdPioClearCharBuffer();
 
     init_gpios();
 
@@ -1500,14 +1500,16 @@ bool renderCharsUntil(uint32_t limit_micros)
     // ** NOTE ** charsPerLine doesn't correspond with pixels or bytes per line,
     // because we have some spare: 368 pixels not 360 for alignment reasons
 
+    // TODO rename these...
     // REM *** if we use hoffs or equivalent, do same in plot and other drawing routines
     const int hoffs = 0; //0..2 (using 90 of 92 bytes)
     const int pxpc = PICO_OSD_CHAR_WIDTH;
     const int bxpc = pxpc / 4; // 4 pixels per byte -> 3 bytes to go across by 1 char
     const int pypc = PICO_OSD_CHAR_HEIGHT;
     const int bpc  = bxpc * pypc;
-    const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte3
-    const int fbbpNextLine = pypc * fbbpl - charsPerLine * bxpc; // byte increment from  (top left of) last char of line to first of next line.
+    const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte
+    const int bpCharLine = pypc * fbbpl;
+    const int fbbpNextLine = bpCharLine - charsPerLine * bxpc; // byte increment from  (top left of) last char of line to first of next line.
 
     if (0 == currentChar) {
         currentY = 0;
@@ -1517,36 +1519,44 @@ bool renderCharsUntil(uint32_t limit_micros)
 
     tus++;
     while (currentY < charLines) {
-        // currentPtr is pointer to topleft of char dest on osdBufferA
-        while (cmpTimeUs(limit_micros, micros()) > 0 && currentX < charsPerLine) {
-            uint8_t c = osdCharBuffer[currentChar++];
-            // Buffer is always cleared after vsync before we start updating it. So, we can
-            // ignore empty characters.
-            // *** TODO check char 0 and char 32 (spc) are always transparent
-            if (c!=0 && c!=0x20) {
-                // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
-                const uint8_t * fontp = &fontData[c * bpc]; // 3 bytes per 12 pixel char line, 18 lines
-                uint8_t * bufPtr = currentPtr;
-                for (int j=0; j<pypc; ++j) {
-                    // write out loop of bxpc (bytes per char = 3)
-                    *bufPtr++ = *fontp++;
-                    *bufPtr++ = *fontp++;
-                    *bufPtr++ = *fontp++;
-                    bufPtr += fbbpl - 3; // new line, back 3 bytes
+        if (osdCharLineInUse[currentY]) {
+            // currentPtr is pointer to topleft of char dest on osdBufferA
+            while (cmpTimeUs(limit_micros, micros()) > 0 && currentX < charsPerLine) {
+                uint8_t c = osdCharBuffer[currentChar++];
+                // Buffer is always cleared after vsync before we start updating it. So, we can
+                // ignore empty characters.
+                // *** TODO check char 0 and char 32 (spc) are always transparent (max7456 code clears to 0x20)
+                if (c!=0x20 && c!=0) {
+                    // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
+                    const uint8_t * fontp = &fontData[c * bpc]; // 3 bytes per 12 pixel char line, 18 lines
+                    uint8_t * bufPtr = currentPtr;
+                    for (int j=0; j<pypc; ++j) {
+                        // write out loop of bxpc (bytes per char = 3)
+                        *bufPtr++ = *fontp++;
+                        *bufPtr++ = *fontp++;
+                        *bufPtr++ = *fontp++;
+                        bufPtr += fbbpl - 3; // new line, back 3 bytes
+                    }
                 }
+
+                currentPtr += bxpc;
+                currentX++;
             }
 
-            currentPtr += bxpc;
-            currentX++;
-        }
+            if (currentX < charsPerLine) {
+                // timed out
+                break;
+            }
 
-        if (currentX < charsPerLine) {
-            break;
+            // Completed a char line, pointer is at top left of last character of line.
+            currentX = 0;
+            currentY++;
+            currentPtr += fbbpNextLine;
+        } else {
+            currentY++;
+            currentChar += charsPerLine;
+            currentPtr += bpCharLine;
         }
-
-        currentX = 0;
-        currentY++;
-        currentPtr += fbbpNextLine;
     }
 
     if (currentChar == numChars) { // equivalently currentY == charLines
@@ -1679,12 +1689,14 @@ void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c)
 {
     if (x < charsPerLine && y < charLines) {
         osdCharBuffer[y*charsPerLine + x] = c;
+        osdCharLineInUse[y] = 1;
     }
 }
 
 void osdPioWrite(uint8_t x, uint8_t y, const char *text)
 {
     if (y < charLines) {
+        osdCharLineInUse[y] = 1;
         uint8_t *p = osdCharBuffer + y * charsPerLine;
         int i=0;
         while (text[i] && x < charsPerLine) {
