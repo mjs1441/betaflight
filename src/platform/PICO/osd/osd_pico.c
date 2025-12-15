@@ -157,6 +157,7 @@ static volatile int badX = -12345;
 static volatile int badY;
 static volatile int badC;
 
+static uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
 uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
 
@@ -995,11 +996,13 @@ static void vsync_callback(void)
 #if 0
         bprintf("max us per render call (last set of vsyncs had %d complete rds) %d", tusr, maxcycles/150);
 #endif
-        bprintf("%d completed %d, ave us (duty cycle) per vsync render %d (%.1f), ave start, end us %.1f, %.1f",
+        bprintf("%d completed %d, ave us (duty cycle) per vsync render %d (%.1f), ave start, end us %.1f, %.1f [%d %d %d %d %d %d]",
                 c, tusr,
                 renderTot/(250*150), ((double)renderTot)/(250*150*20000/100),
-                ((double)renderStartCycles)/(250*150), ((double)renderEndCycles)/(250*150)
+                ((double)renderStartCycles)/(250*150), ((double)renderEndCycles)/(250*150),
+                dd1,dd3-dd2,dd5-dd4,dd6,dd7,dd8
                );
+        dd1 = dd2 = dd3 = dd4 = dd5 = dd6 = dd7 = dd8 = 0;
         
 #if 0
                 bprintf(", fg %d (%.1f), bg %d (%.1f), fg+bg %d (%.1f)",
@@ -1749,7 +1752,7 @@ bool renderSticksBackgroundUntil(uint32_t limit_micros)
 {
     static int subState;
 
-    while (micros() < limit_micros && bgStickLeftState == bgItemPendingRender) {
+    while (bgStickLeftState == bgItemPendingRender && micros() < limit_micros) {
         int xMid = infoStickLeft.xLeft + stickWidth / 2;
         int yMid = infoStickLeft.yTop + stickHeight / 2;
         if (subState == 0) {
@@ -1762,7 +1765,7 @@ bool renderSticksBackgroundUntil(uint32_t limit_micros)
         }
     }
 
-    while (micros() < limit_micros && bgStickRightState == bgItemPendingRender) {
+    while (bgStickRightState == bgItemPendingRender && micros() < limit_micros) {
         int xMid = infoStickRight.xLeft + stickWidth / 2;
         int yMid = infoStickRight.yTop + stickHeight / 2;
         if (subState == 0) {
@@ -1781,14 +1784,20 @@ bool renderSticksBackgroundUntil(uint32_t limit_micros)
     
 bool renderSticksForegroundUntil(uint32_t limit_micros)
 {
+    dd1++;
     if (cachedStickLeft && micros() < limit_micros) {
+        dd6++;
+        dd2 = getCycleCounter();
         plotBlob(infoStickLeft.xStick, infoStickLeft.yStick);
         cachedStickLeft = false;
+        dd3 = getCycleCounter();
     }
 
     if (cachedStickRight && micros() < limit_micros) {
+        dd4 = getCycleCounter();
         plotBlob(infoStickRight.xStick, infoStickRight.yStick);
         cachedStickRight = false;
+        dd5 = getCycleCounter();
     }
 
     return (!cachedStickLeft && !cachedStickRight);
@@ -1800,14 +1809,13 @@ bool renderSticksForegroundUntil(uint32_t limit_micros)
 // Return false when complete (no more to do).
 bool osdPioRenderScreenUntil(uint32_t limit_micros)
 {
+    dd7++;
     static bool firstOfVsync = true;
     if (firstOfVsync) {
         firstOfVsync = false;
         renderStartCycles += getCycleCounter() - startVsyncCycles;
     }
 
-    bool complete;
-    
 #if 0
     UNUSED(limit_micros);
     plotTestCard();
@@ -1819,7 +1827,7 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
 
     // Proceed with rendering background elements if/as required, if not timed out.
     selectBackgroundBuffer();
-    complete =
+    bool complete =
         renderSticksBackgroundUntil(limit_micros) &&
         renderSidebarsUntil(limit_micros);
     selectForegroundBuffer();
