@@ -161,7 +161,9 @@ static volatile int badC;
 
 static uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
-uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
+static __attribute__((aligned(4))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
+static uint32_t * const charBufferW = (uint32_t *)osdCharBuffer;
+
 uint8_t osdCharLineInUse[OSD_SD_ROWS];
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
@@ -191,10 +193,31 @@ static void init_gpios(void)
     }
 }
 
+// Not static, not const, don't let the compiler know it's a constant
+// so it can't replace the loop with a call to memset (which is a byte loop
+// at time of writing).
+// NB only effective when lto is disabled.
+uint32_t clearBufferPattern = 0x20202020;
+
 void osdPioClearCharBuffer(void)
 {
+    dd6++;
+    uint32_t c1 = getCycleCounter();
+#if 1
+    // Enforce a word copy.
+    // (We could go even faster with DMA, but that would add complication and use up a DMA channel.)
+    STATIC_ASSERT(0 == OSD_CHAR_BUFFER_LENGTH % 4, pico_osdcharbuffer_length);
+    for (int i=0; i<OSD_CHAR_BUFFER_LENGTH/4; ++i) {
+        charBufferW[i] = clearBufferPattern;
+    }
+
+    memset(osdCharLineInUse, 0, OSD_SD_ROWS);
+#else
+    UNUSED(charBufferW);
     memset(osdCharBuffer, 0x20, OSD_CHAR_BUFFER_LENGTH);
     memset(osdCharLineInUse, 0, OSD_SD_ROWS);
+#endif
+    dd8 = getCycleCounter() - c1;
 }
 
 int64_t safe_zone_callback(alarm_id_t id, void * user_data)
@@ -1434,18 +1457,6 @@ static bool renderSidebarsUntil(uint32_t limit_micros)
         count++;
     }
 
-#if 0
-    // TESTING for comparison
-    for (int i=30; i<230; ++i) {
-        plot(i,i,2);
-        if (i>50 && i<100) {
-            plot(i-1,i,1);
-            plot(i+1,i,1);
-        }
-        plot(i,125,2);
-    }
-#endif
-
     if (count == maxCount) {
         count = -1; // Restart would be with central indicators
         bgSidebarsState = bgItemComplete;
@@ -1606,7 +1617,6 @@ bool renderSticksForegroundUntil(uint32_t limit_micros)
 {
     dd1++;
     if (cachedStickLeft && micros() < limit_micros) {
-        dd6++;
         dd2 = getCycleCounter();
         plotBlob(infoStickLeft.xStick, infoStickLeft.yStick);
         cachedStickLeft = false;
