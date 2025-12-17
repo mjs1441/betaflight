@@ -148,8 +148,13 @@ static volatile uint32_t maxAHI;
 static volatile uint32_t renderTot;
 static volatile uint32_t drawBGTot;
 static volatile uint32_t drawFGTot;
-static uint32_t renderStartCycles;
-static uint32_t renderEndCycles;
+static volatile uint32_t renderStartCycles;
+static volatile uint32_t renderEndCycles;
+static volatile uint32_t renderStartCyclesMax;
+static volatile uint32_t renderEndCyclesMax;
+static volatile uint32_t renderWasCheck;
+static volatile uint32_t renderWasCheckD;
+static volatile uint32_t renderWasTransfer;
 
 static volatile int checksb;
 static volatile int checkol;
@@ -970,7 +975,7 @@ static void vsync_callback(void)
     ++c;
 
 //#define NN 250
-#define NN 472
+#define NN 100
     
     static uint32_t vmax = 0;
     static uint32_t szo;
@@ -987,6 +992,7 @@ static void vsync_callback(void)
     }
 
     static uint32_t n_to_c;
+    static int printq;
 
     if (c % NN == 0) {
 #if defined PICO_TRACE && defined TASKREPORT
@@ -1049,14 +1055,24 @@ static void vsync_callback(void)
 #if 0
         bprintf("max us per render call (last set of vsyncs had %d complete rds) %d", tusr, maxcycles/150);
 #endif
-        bprintf("%d completed %d, ave us (duty cycle) per vsync render %d (%.1f), ave start, end us %.1f, %.1f [%d %d %d %d %d %d]",
-                c, tusr,
-                renderTot/(NN*150), ((double)renderTot)/(NN*150*20000/100),
-                ((double)renderStartCycles)/(NN*150), ((double)renderEndCycles)/(NN*150),
-                dd1,dd3-dd2,dd5-dd4,dd6,dd7,dd8
-               );
+        printq = (printq + 1) % 2;
+        if (printq) {
+//        if (printq<2) {
+            bprintf("%d completed %d, ave us (duty cycle) per vsync render %d (%.1f), "
+                    "start ave %.1f max %.1f, end ave %.1f max %.1f "
+                    "check at -%.1f, lateness %d, transfer at %.1f "
+                    "[%d %d %d %d %d %d]",
+                    c, tusr,
+                    renderTot/(NN*150), ((double)renderTot)/(NN*(150*20000/100)),
+                    ((double)renderStartCycles)/(NN*150), ((double)renderStartCyclesMax)/(150),
+                    ((double)renderEndCycles)/(NN*150), ((double)renderEndCyclesMax)/(150),
+                    ((double)renderWasCheck)/(150), renderWasCheckD, ((double)renderWasTransfer)/(150),                
+                    dd1,dd3-dd2,dd5-dd4,dd6,dd7,dd8
+                   );
+        }
+
         dd1 = dd2 = dd3 = dd4 = dd5 = dd6 = dd7 = dd8 = 0;
-        
+            
 #if 0
                 bprintf(", fg %d (%.1f), bg %d (%.1f), fg+bg %d (%.1f)",
                 drawBGTot/(NN*150), ((double)drawBGTot)/(NN*150*20000/100),
@@ -1069,6 +1085,7 @@ static void vsync_callback(void)
         }
 
         renderStartCycles = 0; renderEndCycles = 0;
+        renderStartCyclesMax = 0; renderEndCyclesMax = 0;
 //        bprintf("max ah cache cycles %d", maxAHI);
         renderTot = 0; drawFGTot = 0; drawBGTot = 0;
         maxcycles = 0;
@@ -1661,7 +1678,11 @@ bool renderSticksForegroundUntil(uint32_t limit_micros)
     return (!cachedStickLeft && !cachedStickRight);
 }
 
-    
+static inline uint32_t maxi(uint32_t a, uint32_t b)
+{
+    return a>b ? a : b;
+}
+
 // Update screen buffer (paint characters etc to buffer), up until a time limit.
 // Store state so that we can resume.
 // Return false when complete (no more to do).
@@ -1672,6 +1693,7 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
     if (firstOfVsync) {
         firstOfVsync = false;
         renderStartCycles += getCycleCounter() - startVsyncCycles;
+        renderStartCyclesMax = maxi(renderStartCyclesMax, getCycleCounter() - startVsyncCycles);
     }
 
 #if 0
@@ -1715,6 +1737,19 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
         tusr++;
 
         renderEndCycles += getCycleCounter() - startVsyncCycles;
+//        renderEndCyclesMax = maxi(renderEndCyclesMax, getCycleCounter() - startVsyncCycles);
+// TODO ***
+        uint32_t rdd = getCycleCounter() - startVsyncCycles;
+        if (rdd > renderEndCyclesMax) {
+            renderEndCyclesMax = rdd;
+            extern uint32_t toCheck;
+            extern uint32_t toCheckD;
+            extern uint32_t toTransfer;
+            renderWasCheck = startVsyncCycles - toCheck; // expect -ve in bad case
+            renderWasCheckD = toCheckD;
+            renderWasTransfer = toTransfer - startVsyncCycles;
+        }
+
         firstOfVsync = true;
         transferredSinceVsync = true;
         return false; // Nothing more to draw.
