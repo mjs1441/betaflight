@@ -31,19 +31,17 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
-#include "common/printf.h"
+#include "common/maths.h"
 #include "drivers/dma.h"
 #include "drivers/io.h"
 #include "drivers/io_impl.h"
 #include "drivers/osd.h"
 #include "drivers/system.h"
 #include "drivers/time.h"
-#include "fc/rc_controls.h"
-#include "flight/imu.h"
 #include "osd/osd.h"
 #include "pg/vcd.h"
-#include "rx/rx.h"
 
 // pico sdk
 #include "hardware/irq.h"
@@ -52,54 +50,20 @@
 
 // local
 #include "osd_pico.h"
+#include "osd_pico_internal.h"
 #include "osd_tx.pio.h"
-#include "font_betaflight.h"
-
-// each char 12 x 18 pixels
-#define PICO_OSD_CHAR_WIDTH  12
-#define PICO_OSD_CHAR_HEIGHT 18
-
-// chars OSD_SD_ROWS x OSD_SD_COLS (30 x 16)
-// 360 / 8 = 45 x 288
-// 2 bits per pixel
-
-// 23 -> 23*4*4 = 368 pixels -> 30.67 chars
-// 288 for PAL field
-// PIO hard coded to 23 words of pixel data per line (=> 368 pixels)
-#define PICO_OSD_LINE_WORDS 23
-#define PICO_OSD_BUF_WIDTH (PICO_OSD_LINE_WORDS*4)
-
-#define PICO_OSD_BUF_HEIGHT_NTSC (PICO_OSD_CHAR_HEIGHT * VIDEO_LINES_NTSC)
-#define PICO_OSD_BUF_HEIGHT_PAL (PICO_OSD_CHAR_HEIGHT * VIDEO_LINES_PAL)
-#define PICO_OSD_BUF_HEIGHT_MAX PICO_OSD_BUF_HEIGHT_PAL
-#define PICO_OSD_BUF_LENGTH (PICO_OSD_BUF_WIDTH * PICO_OSD_BUF_HEIGHT_MAX)
-
-// 18*13 = 234, 18*16 = 288
-STATIC_ASSERT(PICO_OSD_BUF_HEIGHT_NTSC == 234, pico_ntsc_lines_failed);
-STATIC_ASSERT(PICO_OSD_BUF_HEIGHT_PAL == 288, pico_pal_lines_failed);
-
-#define PICO_OSD_DISPLAY_WORDS_NTSC (PICO_OSD_LINE_WORDS * PICO_OSD_BUF_HEIGHT_NTSC)
-#define PICO_OSD_DISPLAY_WORDS_PAL  (PICO_OSD_LINE_WORDS * PICO_OSD_BUF_HEIGHT_PAL)
-
-// 30 * 16 = 480
-#define OSD_CHAR_BUFFER_LENGTH (OSD_SD_COLS * OSD_SD_ROWS)
 
 static const PIO osdPio = PIO_INSTANCE(PIO_OSD_INDEX);
 static const uint osdPioIrq = PIO_IRQ_NUM(osdPio, 0);
 
-static const int fb_nx = PICO_OSD_BUF_WIDTH * 4;
-static const int charsPerLine = 30;
+const int fb_nx = PICO_OSD_BUF_WIDTH * 4;
+const int charsPerLine = 30;
 
-static const int charWidth = PICO_OSD_CHAR_WIDTH;
-static const int charHeight = PICO_OSD_CHAR_HEIGHT;
-static const int charHalfWidth = charWidth / 2;
-static const int charHalfHeight = charHeight / 2;
-
-// PAL / NTSC, require initialisation.
-static int fb_ny;
-static int charLines = VIDEO_LINES_PAL; // Variable, default to 16 (PAL)
-static int numChars;
-static int fb_words;
+// PAL / NTSC, require initialisation
+int fb_ny;
+int charLines = VIDEO_LINES_PAL; // Variable, default to 16 (PAL)
+int numChars;
+int fb_words;
 
 // PIO program offset and state machine.
 static int osd_tx_offset;
@@ -114,9 +78,9 @@ static int osdPioBase;
 __attribute__((aligned(4))) static uint32_t osdBufferBackgroundW[PICO_OSD_BUF_LENGTH/4];
 __attribute__((aligned(4))) static uint32_t osdBuffer1W[PICO_OSD_BUF_LENGTH/4];
 __attribute__((aligned(4))) static uint32_t osdBuffer2W[PICO_OSD_BUF_LENGTH/4];
-static uint8_t* osdBufferBackground = (uint8_t *)osdBufferBackgroundW;
-static uint8_t* osdBufferA = (uint8_t *)osdBuffer1W;
-static uint8_t* osdBufferB = (uint8_t *)osdBuffer2W;
+uint8_t *osdBufferBackground = (uint8_t *)osdBufferBackgroundW;
+uint8_t *osdBufferA = (uint8_t *)osdBuffer1W;
+static uint8_t *osdBufferB = (uint8_t *)osdBuffer2W;
 
 static const uint32_t zero;
 //static const uint32_t zero = 0xaaaaaaaa;
@@ -131,50 +95,48 @@ static int dma_chan_bufB_to_fifo;
 // buffer update control (avoid tearing etc.)
 static volatile bool in_safe_zone;
 static volatile uint32_t safe_zone_period;
-static volatile bool transferredSinceVsync;
+volatile bool transferredSinceVsync;
 
 // trace / debugging
-static volatile uint32_t startVsyncCycles;
-static volatile uint32_t szb;
-static volatile uint32_t szc;
-static volatile uint32_t szd;
-static volatile uint32_t sze;
-static volatile int tus;
-static volatile int tusr;
-static volatile uint32_t maxcycles;
-static volatile int nisz;
-static volatile int dmb;
-static volatile uint32_t maxAHI;
-static volatile uint32_t renderTot;
-static volatile uint32_t drawBGTot;
-static volatile uint32_t drawFGTot;
-static volatile uint32_t renderStartCycles;
-static volatile uint32_t renderEndCycles;
-static volatile uint32_t renderStartCyclesMax;
-static volatile uint32_t renderEndCyclesMax;
-static volatile uint32_t renderWasCheck;
-static volatile uint32_t renderWasCheckD;
-static volatile uint32_t renderWasTransfer;
-
-static volatile int checksb;
-static volatile int checkol;
+volatile uint32_t startVsyncCycles;
+volatile uint32_t szb;
+volatile uint32_t szc;
+volatile uint32_t szd;
+volatile uint32_t sze;
+volatile int tus;
+volatile int tusr;
+volatile uint32_t maxcycles;
+volatile int nisz;
+volatile int dmb;
+volatile uint32_t maxAHI;
+volatile uint32_t renderTot;
+volatile uint32_t drawBGTot;
+volatile uint32_t drawFGTot;
+volatile uint32_t renderStartCycles;
+volatile uint32_t renderEndCycles;
+volatile uint32_t renderStartCyclesMax;
+volatile uint32_t renderEndCyclesMax;
+volatile uint32_t renderWasCheck;
+volatile uint32_t renderWasCheckD;
+volatile uint32_t renderWasTransfer;
+volatile int checksb;
+volatile int checkol;
 
 //static volatile uint32_t renderMA;
 static volatile int badX = -12345;
 static volatile int badY;
 static volatile int badC;
 
-static uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
+uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
 ///static __attribute__((aligned(4))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
-static __attribute__((aligned(8))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
+__attribute__((aligned(8))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
 static uint32_t * const charBufferW = (uint32_t *)osdCharBuffer;
 
 uint8_t osdCharLineInUse[OSD_SD_ROWS];
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
-static void setBackgroundItemsPending(void);
 
 static void init_gpios(void)
 {
@@ -285,336 +247,18 @@ bool osdPioBufferAvailable(void)
     return true;
 }
 
-static bool plotToBackground;
+bool plotToBackground;
 
-static void selectBackgroundBuffer(void)
+void selectBackgroundBuffer(void)
 {
     plotToBackground = true;
 }
 
-static void selectForegroundBuffer(void)
+void selectForegroundBuffer(void)
 {
     plotToBackground = false;
 }
 
-
-void plot(int x, int y, int c)
-{
-    // c =  0 -> transparent (no overlay)   W=any EN=0
-    // c =  1 -> black                      W=0   EN=1
-    // c =  2 -> white                      W=1   EN=1
-
-    uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
-
-    if (x<0 || y<0 || x>=fb_nx || y>=fb_ny) {
-        badX = x;
-        badY = y;
-        badC = c;
-        return;
-    }
-
-    uint8_t * pByte = plotBuffer + PICO_OSD_BUF_WIDTH * y;
-    pByte += (int)(x/4); // 4 pixels per byte
-#if 0
-    if (pByte<plotBuffer || pByte>=plotBuffer + PICO_OSD_BUF_LENGTH) {
-        bprintf("huh %p (%p) %d, %d, %d",pByte,plotBuffer, x,y,c);
-    }
-#endif
-    static uint8_t masks[4] = {0b00000011, 0b00001100, 0b00110000, 0b11000000};
-    static uint8_t  cols[4] = {0b00000000, 0b10101010, 0b11111111, 0b00000000};
-    uint8_t mask = masks[x%4];
-    uint8_t col = cols[c];
-    *pByte = ((*pByte) &(~mask)) | (mask&col);
-}
-
-#if 0
-static bool isWhite(int x, int y)
-{
-    uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
-    uint8_t * pByte = plotBuffer + PICO_OSD_BUF_WIDTH * y;
-    pByte += (int)(x/4); // 4 pixels per byte
-    static uint8_t masks[4] = {0b00000011, 0b00001100, 0b00110000, 0b11000000};
-    uint8_t col = *(pByte) & masks[x%4];
-    return col & 0b01010101;
-}
-
-static bool postProcessUntil0(uint32_t limit_micros)
-{
-    UNUSED(limit_micros);
-//    uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
-//    for (int y=0; y<fb_ny; ++y) {
-// Testing with/without
-    for (int y=85; y<200; ++y) {
-//        uint8_t * pByte = plotBuffer + PICO_OSD_BUF_WIDTH * y;
-        for (int x=0; x<fb_nx; ++x) {
-            // if not white but adjacent (say orthongonally) to white, ensure black
-            if (!isWhite(x,y)) {
-                if (isWhite(x-1,y) || isWhite(x+1,y) || isWhite(x,y-1) || isWhite(x,y+1)) {
-                    plot(x,y,1);
-                }
-            }
-        }
-    }
-
-    return true;
-}
-#endif
-
-static bool postProcessUntil(uint32_t limit_micros)
-{
-    // Plot Black points around every White point (don't overwrite a White point).
-    UNUSED(limit_micros);
-    uint32_t *plotBufferW = (uint32_t *)(plotToBackground ? osdBufferBackground : osdBufferA);
-    static int y;
-    static int wordIndex; // index of word along a line, in 0..22
-    static uint32_t *pWord;
-    static uint32_t wordPrev;
-    static uint32_t wordThis;
-    static uint32_t wordNext;
-
-    if (!pWord) {
-        pWord = plotBufferW;
-        y = 0;
-    }
-
-    while (pWord < plotBufferW + fb_words) {
-        if (wordIndex == 0) {
-            wordThis = 0;
-            wordNext = *pWord;
-        }
-
-        wordPrev = wordThis;
-        wordThis = wordNext;
-
-        wordIndex++;
-        if (wordIndex == PICO_OSD_LINE_WORDS) {
-            // we are on the last word of a line, don't peek at the next word, reset line counter.
-            wordNext = 0;
-            wordIndex = 0;
-            y++;
-        } else {
-            wordNext = *(pWord + 1);
-        }
-
-        uint32_t whiteThis = wordThis & 0x55555555; // pick out all of the OSD_W (low bits) of each bit pair (OSD_EN, OSD_W).
-        uint32_t blackUpdates = (whiteThis >> 1) | (whiteThis << 3); // set OSD_EN according to adjacent OSD_W.
-        blackUpdates |= (wordPrev & 0x40000000) >> 29;
-        blackUpdates |= (wordNext & 0x1) << 31;
-        if (y != 0) {
-            blackUpdates |= (*(pWord - PICO_OSD_LINE_WORDS) & 0x55555555) << 1;
-        }
-
-        if (y < fb_ny) {
-            blackUpdates |= (*(pWord + PICO_OSD_LINE_WORDS) & 0x55555555) << 1;
-        }
-
-        *pWord++ = wordThis | blackUpdates;
-    }
-
-    pWord = 0;
-    return true;
-}
-
-void hLine(int x, int y, int count, int col)
-{
-    for (int i=0; i<count; ++i) {
-        plot(x++, y, col);
-    }
-}
-
-void dhLine(int x, int y, int count)
-{
-    for (int i=x; i < x + count; i++) {
-        plot(i, y, 2);
-        plot(i, y+1, 1);
-    }
-}
-
-void dvLine(int x, int y, int count)
-{
-    for (int i=y; i < y + count; i++) {
-        plot(x, i, 2);
-        plot(x+1, i, 1);
-    }
-}
-
-void plotBlob(int x, int y)
-{
-    plot(x-2, y-2, 2);
-    plot(x-1, y-2, 2);
-    plot(x, y-2, 2);
-    plot(x+1, y-2, 2);
-    plot(x+2, y-2, 2);
-    plot(x-2, y-1, 2);
-    plot(x-2, y, 2);
-    plot(x-2, y+1, 2);
-    plot(x-2, y+2, 2);
-    plot(x-1, y+2, 2);
-    plot(x, y+2, 2);
-    plot(x+1, y+2, 2);
-    plot(x+2, y+2, 2);
-    plot(x+2, y+1, 2);
-    plot(x+2, y, 2);
-    plot(x+2, y-1, 2);
-
-    plot(x-1, y-1, 1);
-    plot(x-1, y, 1);
-    plot(x-1, y+1, 1);
-    plot(x, y+1, 1);
-    plot(x+1, y+1, 1);
-    plot(x+1, y, 1);
-    plot(x+1, y-1, 1);
-    plot(x, y-1, 1);
-}
-    
-// WARNING iter line functions are designed to be called iteratively, but only from one source at a time.
-
-typedef struct {
-    int count;
-    int maxCount;
-    float delta;
-    bool shallow;
-    int ic;
-    float fc;
-} iterLineData_t;
-
-static void iterLineDataInit(iterLineData_t *data, int x1, int y1, int x2, int y2)
-{
-    data->count = 0;
-    int dx = x2 - x1;
-    int dy = y2 - y1;
-    bool shallow = ABS(dx) > ABS(dy);
-    data->shallow = shallow;
-    if (shallow) {
-        data->delta = (float)dy / dx;
-        if (x1 < x2) {
-            data->ic = x1;
-            data->fc = (float)y1;
-            data->maxCount = x2 - x1 + 1;
-        } else {
-            data->ic = x2;
-            data->fc = (float)y2;
-            data->maxCount = x1 - x2 + 1;
-        }
-    } else {
-        data->delta = dy == 0 ? 0.0f : (float)dx / dy; // cope with case of a single point.
-        if (y1 < y2) {
-            data->fc = (float)x1;
-            data->ic = y1;
-            data->maxCount = y2 - y1 + 1;
-        } else {
-            data->fc = (float)x2;
-            data->ic = y2;
-            data->maxCount = y1 - y2 + 1;
-        }
-    }
-}
-
-// iterLineData shared amongst all of the iter...Line functions.
-static iterLineData_t iterLineData;
-
-static void iterLineInit(int x1, int y1, int x2, int y2)
-{
-    iterLineDataInit(&iterLineData, x1, y1, x2, y2);
-}
-
-static bool iterDLineNext(void)
-{
-    if (iterLineData.count >= iterLineData.maxCount) {
-        return true; // all done.
-    }
-
-    if (iterLineData.shallow) {
-        plot(iterLineData.ic, iterLineData.fc, 2);
-        plot(iterLineData.ic, iterLineData.fc + 1, 1);
-        iterLineData.ic++;
-        iterLineData.fc += iterLineData.delta;
-    } else {
-        plot(iterLineData.fc, iterLineData.ic, 2);
-        plot(iterLineData.fc + 1, iterLineData.ic, 1);
-        iterLineData.ic++;
-        iterLineData.fc += iterLineData.delta;
-    }
-
-    iterLineData.count++;
-    return false;
-}
-
-static bool iterQLineNext(void)
-{
-    if (iterLineData.count >= iterLineData.maxCount) {
-        return true; // all done.
-    }
-
-    if (iterLineData.shallow) {
-        plot(iterLineData.ic, iterLineData.fc, 2);
-        plot(iterLineData.ic, iterLineData.fc + 1, 2);
-        plot(iterLineData.ic, iterLineData.fc + 2, 1);
-        plot(iterLineData.ic, iterLineData.fc - 1, 1);
-        iterLineData.ic++;
-        iterLineData.fc += iterLineData.delta;
-    } else {
-        plot(iterLineData.fc, iterLineData.ic, 2);
-        plot(iterLineData.fc + 1, iterLineData.ic, 2);
-        plot(iterLineData.fc + 2, iterLineData.ic, 1);
-        plot(iterLineData.fc - 1, iterLineData.ic, 1);
-        iterLineData.ic++;
-        iterLineData.fc += iterLineData.delta;
-    }
-
-    iterLineData.count++;
-    return false;
-}
-
-static bool iterDashedDLineNext(void)
-{
-    if (iterLineData.count >= iterLineData.maxCount) {
-        return true; // all done.
-    }
-
-    if ((iterLineData.count % 16) < 9) {
-        if (iterLineData.shallow) {
-            plot(iterLineData.ic, iterLineData.fc, 2);
-            plot(iterLineData.ic, iterLineData.fc + 1, 1);
-        }
-        else {
-            plot(iterLineData.fc, iterLineData.ic, 2);
-            plot(iterLineData.fc + 1, iterLineData.ic, 1);
-        }
-    }
-
-    iterLineData.ic++;
-    iterLineData.fc += iterLineData.delta;
-    iterLineData.count++;
-    return false;
-}
-
-static bool iterDashedQLineNext(void)
-{
-    if (iterLineData.count >= iterLineData.maxCount) {
-        return true; // all done.
-    }
-
-    if ((iterLineData.count % 16) < 9) {
-        if (iterLineData.shallow) {
-            plot(iterLineData.ic, iterLineData.fc, 2);
-            plot(iterLineData.ic, iterLineData.fc + 1, 2);
-            plot(iterLineData.ic, iterLineData.fc + 2, 1);
-            plot(iterLineData.ic, iterLineData.fc - 1, 1);
-        }
-        else {
-            plot(iterLineData.fc, iterLineData.ic, 2);
-            plot(iterLineData.fc + 1, iterLineData.ic, 2);
-            plot(iterLineData.fc + 2, iterLineData.ic, 1);
-            plot(iterLineData.fc - 1, iterLineData.ic, 1);
-        }
-    }
-
-    iterLineData.ic++;
-    iterLineData.fc += iterLineData.delta;
-    iterLineData.count++;
-    return false;
-}
 
 static void vsync_callback(void);
 
@@ -1129,633 +773,213 @@ void osdPioDisableDevice(void) {
     disable();
 }
 
-#ifdef OSD_DEBUG_EXTRA
-void plotTestCard(void)
-{
-    for (int i=0; i<fb_nx; ++i) {
-        plot(i, 0, 2);
-        plot(i, fb_ny/2-1, 2);
-        plot(i, fb_ny-1, 2);
-    }
-    for (int i=0; i<fb_ny; ++i) {
-        plot(0, i, 2);
-        plot(fb_nx/2-1, i, 2);
-        plot(fb_nx-1, i, 2);
-    }
-    int xx2 = fb_nx/2;
-    int yy2 = fb_ny/2;
-    for (int k=2; k<10; ++k) {
-        int q = fb_nx/2/k;
-        int r = fb_ny/2/k;
-        for (int j=0; j<16; ++j) {
-            plot(xx2-q,j,2);
-            plot(xx2+q,j,2);
-            plot(xx2-q,fb_ny-1-j,2);
-            plot(xx2+q,fb_ny-1-j,2);
-            plot(j,yy2-r,2);
-            plot(j,yy2+r,2);
-            plot(fb_nx-1-j,yy2-r,2);
-            plot(fb_nx-1-j,yy2+r,2);
-        }
-        for (int i=xx2-q; i<xx2+q; ++i) {
-            plot(i,k-1,2);
-            plot(i,fb_ny - k,2);
-        }
-        for (int i=yy2-r; i<yy2+r; ++i) {
-            plot(k-1,i,2);
-            plot(fb_nx-k,i,2);
-        }
-    }
-    // white diagonals to corners and centres of sides
-    for (int i=0; i<64; ++i) {
-        plot(i, i, 2);
-        plot(i, fb_ny/2 - 1 -i, 2);
-        plot(i, fb_ny/2 + i, 2);
-        plot(i, fb_ny - 1 - i, 2);
-        plot(fb_nx -1 -i, i, 2);
-        plot(fb_nx -1 -i, fb_ny/2 - 1 -i, 2);
-        plot(fb_nx -1 -i, fb_ny/2 + i, 2);
-        plot(fb_nx -1 -i, fb_ny - 1 - i, 2);
-        plot(fb_nx/2 -1 -i, i, 2);
-        plot(fb_nx/2  +i, i, 2);
-        plot(fb_nx/2 -1 -i, fb_ny -1 -i, 2);
-        plot(fb_nx/2  +i, fb_ny -1 -i, 2);
-    }
-}
-#endif
-
-typedef enum {
-    bgItemPendingCache = 0,
-    bgItemPendingRender,
-    bgItemComplete
-} bgItemState_e;
-
-static volatile bgItemState_e bgSidebarsState;
-static volatile bgItemState_e bgStickLeftState;
-static volatile bgItemState_e bgStickRightState;
-
-static void setBackgroundItemsPending(void)
-{
-    bgSidebarsState = bgItemPendingCache;
-    bgStickLeftState = bgItemPendingCache;
-    bgStickRightState = bgItemPendingCache;
-}
-
 void osdPioRedrawBackground(void)
 {
     bprintf("OSD osdPioRedrawBackground setting dmaClearBackgroundBuffer to true");
     dmaClearBackgroundBuffer = true;
 }
 
-typedef struct {
-    uint16_t x1;
-    uint16_t y1;
-    uint16_t x2;
-    uint16_t yMid;
-} info_sidebars_t;
 
-static info_sidebars_t infoSidebars;
-
-// cf. osd_element.c implementation osdBackgroundHorizonSidebars
-#define AH_SIDEBAR_WIDTH_POS 7
-#define AH_SIDEBAR_HEIGHT_POS 3
-static void cacheSidebarsInfo(uint8_t x, uint8_t y)
+void plot(int x, int y, int c)
 {
-    // Cache the top left cornder and right edge in buffer coords
-    // given the centre in char coords.
-    // Sidebars are static (background), unchanging until reboot (or config change),
-    // so only calculate once.
+    // c =  0 -> transparent (no overlay)   W=any EN=0
+    // c =  1 -> black                      W=0   EN=1
+    // c =  2 -> white                      W=1   EN=1
 
-    if (bgSidebarsState == bgItemPendingCache) {
-        infoSidebars.x1 = (x - AH_SIDEBAR_WIDTH_POS) * charWidth + charHalfWidth;
-        infoSidebars.y1 = (y - AH_SIDEBAR_HEIGHT_POS) * charHeight; // not  + charHalfHeight because sub 0.5char*charHeight
-        infoSidebars.yMid = y * charHeight + charHalfHeight;
-        infoSidebars.x2 = (x + AH_SIDEBAR_WIDTH_POS) * charWidth + charHalfWidth;;
-//        infoSidebars.y2 = (y + AH_SIDEBAR_HEIGHT_POS) * charHeight;
-        bgSidebarsState = bgItemPendingRender;
-   }
-}
+    uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
 
-typedef struct {
-    uint16_t x1;
-    uint16_t y1;
-    uint16_t x2;
-    uint16_t y2;
-    bool outOfRange;
-} info_ah_t;
-
-static info_ah_t infoArtificialHorizon;
-static bool cachedAH;
-#include <math.h>
-
-// cf. osd_element.c implementation osdElementArtificialHorizon
-#define AH_SYMBOL_COUNT 9
-static void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
-{
-    // Takes about 5us (every 20ms)
-    // Adjust to central y value of character-based AH element.
-    y += (AH_SYMBOL_COUNT - 1) / 2;
-
-    // Get pitch and roll limits in tenths of degrees
-    const int ahSign = osdConfig()->ahInvert ? -1 : 1;
-    const int maxPitch = osdConfig()->ahMaxPitch * 10;
-    // roll is uncontrained now. // const int maxRoll = osdConfig()->ahMaxRoll * 10;
-    // const int rollAngle = constrain(attitude.values.roll * ahSign, -maxRoll, maxRoll);
-    const int rollAngle = attitude.values.roll * ahSign;
-    int pitchAngleUnconstrained = attitude.values.pitch * ahSign;
-    int pitchAngle = constrain(pitchAngleUnconstrained, -maxPitch, maxPitch);
-
-    infoArtificialHorizon.outOfRange = pitchAngle != pitchAngleUnconstrained;
-
-    // Note that pitch is positive for the board / camera pointing down, and y coords increase going down the screen.
-    static const int barScale = (AH_SIDEBAR_WIDTH_POS - 2) * charWidth; // The AH bar should fit nicely between the Sidebars.
-    const int displacementScale = (fb_ny - 64) / 2; // going to fit maxPitch to screen (vertically), less a bit for overscan.
-    const float d2r = 3.14159265f * 2 / 360 / 10; // Extra scale factor of 10 for 10th of degree -> radian.
-    // float trig functions are pretty quick on RP2350
-    float tp = tanf(pitchAngle * d2r);
-    float cr = cosf(rollAngle * d2r);
-    float sr = sinf(rollAngle * d2r);
-    float tscale = tp * displacementScale / tanf(maxPitch * d2r);
-    int xc = x * charWidth + charHalfWidth - tscale * sr;
-    int yc = y * charHeight + charHalfHeight - tscale * cr;
-    infoArtificialHorizon.x1 = xc + barScale * cr;
-    infoArtificialHorizon.y1 = yc - barScale * sr;
-    infoArtificialHorizon.x2 = xc - barScale * cr;
-    infoArtificialHorizon.y2 = yc + barScale * sr;
-
-    cachedAH = true;
-}
-
-typedef struct {
-    uint16_t xLeft;
-    uint16_t yTop;
-    uint16_t xStick;
-    uint16_t yStick;
-} info_stick_t;
-
-static info_stick_t infoStickLeft;
-static info_stick_t infoStickRight;
-static bool cachedStickLeft;
-static bool cachedStickRight;
-
-typedef struct radioControls_s {
-    uint8_t left_vertical;
-    uint8_t left_horizontal;
-    uint8_t right_vertical;
-    uint8_t right_horizontal;
-} radioControls_t;
-
-static const radioControls_t radioModes[4] = {
-    { PITCH,    YAW,    THROTTLE,   ROLL }, // Mode 1
-    { THROTTLE, YAW,    PITCH,      ROLL }, // Mode 2
-    { PITCH,    ROLL,   THROTTLE,   YAW  }, // Mode 3
-    { THROTTLE, ROLL,   PITCH,      YAW  }, // Mode 4
-};
-
-// Stick overlay size
-#define OSD_STICK_OVERLAY_WIDTH 7
-#define OSD_STICK_OVERLAY_HEIGHT 5
-
-static const int stickWidth = charWidth * OSD_STICK_OVERLAY_WIDTH;
-static const int stickHeight = charHeight * OSD_STICK_OVERLAY_HEIGHT;
-
-//#define TEST_STICK_INPUTS
-static void cacheStickBackgroundInfo(info_stick_t *infoPtr, uint8_t x, uint8_t y)
-{
-    infoPtr->xLeft = charWidth * x;
-    infoPtr->yTop = charHeight * y;
-}
-
-static void cacheStickInfo(info_stick_t *infoPtr, rc_alias_e vert, rc_alias_e horiz)
-{
-#ifdef TEST_STICK_INPUTS
-    UNUSED(vert);
-    UNUSED(horiz);
-    float tr = micros()*(6.283f/1000000.0f / 3);
-    infoPtr->xStick = (uint16_t)(infoPtr->xLeft + stickWidth/2 * (1 + cosf(tr)));
-    infoPtr->yStick = (uint16_t)(infoPtr->yTop + stickHeight/2 * (1 + sinf(tr)));
-#else
-    
-    const float cursorX = constrainf(rcData[horiz], PWM_RANGE_MIN, PWM_RANGE_MAX);
-    const float cursorY = constrainf(rcData[vert], PWM_RANGE_MIN, PWM_RANGE_MAX);
-
-
-    infoPtr->xStick = (uint16_t)scaleRangef(cursorX, PWM_RANGE_MIN, PWM_RANGE_MAX, infoPtr->xLeft, infoPtr->xLeft + stickWidth);
-
-    // note y inverted, cf. osd_elements.c
-    infoPtr->yStick = (uint16_t)scaleRangef(cursorY, PWM_RANGE_MIN, PWM_RANGE_MAX, infoPtr->yTop + stickHeight, infoPtr->yTop);
-#endif
-}
-
-static void cacheStickLeftBackgroundInfo(uint8_t x, uint8_t y)
-{
-    if (bgStickLeftState == bgItemPendingCache) {
-        cacheStickBackgroundInfo(&infoStickLeft, x, y);
-        bgStickLeftState = bgItemPendingRender;
-        checkol+=10000;
-    }
-}
-
-static void cacheStickRightBackgroundInfo(uint8_t x, uint8_t y)
-{
-    if (bgStickRightState == bgItemPendingCache) {
-        cacheStickBackgroundInfo(&infoStickRight, x, y);
-        bgStickRightState = bgItemPendingRender;
-    }
-}
-
-static void cacheStickLeftInfo(void)
-{
-    rc_alias_e vertical_channel = radioModes[osdConfig()->overlay_radio_mode-1].left_vertical;
-    rc_alias_e horizontal_channel = radioModes[osdConfig()->overlay_radio_mode-1].left_horizontal;
-    cacheStickInfo(&infoStickLeft, vertical_channel, horizontal_channel);
-    cachedStickLeft = true;
-}
-
-static void cacheStickRightInfo(void)
-{
-    rc_alias_e vertical_channel = radioModes[osdConfig()->overlay_radio_mode-1].right_vertical;
-    rc_alias_e horizontal_channel = radioModes[osdConfig()->overlay_radio_mode-1].right_horizontal;
-    cacheStickInfo(&infoStickRight, vertical_channel, horizontal_channel);
-    cachedStickRight = true;
-}
-
-bool drawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
-{
-    switch (item) {
-    case OSD_HORIZON_SIDEBARS:
-        cacheSidebarsInfo(elemPosX, elemPosY);
-        checksb++;
-        return true;
-    case OSD_STICK_OVERLAY_LEFT:
-        cacheStickLeftBackgroundInfo(elemPosX, elemPosY);
-        return true;
-
-    case OSD_STICK_OVERLAY_RIGHT:
-        cacheStickRightBackgroundInfo(elemPosX, elemPosY);
-        return true;
-        
-    default:
-        // Not handled here
-        return false;
-    }
-}
-
-bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
-{
-    uint32_t c1 = getCycleCounter();
-    bool ret = drawBackgroundItem(item, elemPosX, elemPosY);
-//    drawBGTot += 100*150; UNUSED(c1);
-    drawBGTot += getCycleCounter() - c1;
-    return ret;
-}
-
-bool drawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
-{    
-//#define testNoPixelElements
-#ifdef testNoPixelElements
-    UNUSED(item);
-    UNUSED(elemPosX);
-    UNUSED(elemPosY);
-    UNUSED(cacheArtificialHorizonInfo);
-    return false;
-#else
-    switch (item) {
-    // Cache information for rendering an osd item later on.
-    case OSD_ARTIFICIAL_HORIZON:
-//#define testnoahhere
-#ifdef testnoahhere
-        UNUSED(cacheArtificialHorizonInfo);
-        return false;
-#else
-        cacheArtificialHorizonInfo(elemPosX, elemPosY);
-        return true;
-#endif
-
-    case OSD_STICK_OVERLAY_LEFT:
-        cacheStickLeftInfo();
-        checkol++;
-        return true;
-
-    case OSD_STICK_OVERLAY_RIGHT:
-        cacheStickRightInfo();
-        return true;
-
-    default:
-        // Not handled here
-        return false;
-    }
-#endif
-}
-
-bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
-{
-    uint32_t c1 = getCycleCounter();
-    bool ret = drawForegroundItem(item, elemPosX, elemPosY);
-    //drawFGTot += 200*150; UNUSED(c1);
-    drawFGTot += getCycleCounter() - c1;
-    return ret;
-}
-
-static bool renderSidebarsUntil(uint32_t limit_micros)
-{
-    static int count = -1;
-    static const int maxCount = (2*AH_SIDEBAR_HEIGHT_POS + 1) * charHeight + 1;
-
-    if (bgSidebarsState != bgItemPendingRender) {
-        return true; // Nothing to do here.
+    if (x<0 || y<0 || x>=fb_nx || y>=fb_ny) {
+        badX = x;
+        badY = y;
+        badC = c;
+        return;
     }
 
-    int x1 = infoSidebars.x1;
-    int x2 = infoSidebars.x2;
-
-    if (count < 0) {
-        // Render the central indicators. 
-        int yMid = infoSidebars.yMid;
-        for (int i=1; i<6; ++i) {
-            plot(x1 + 16 - i, yMid + i, 2);
-            plot(x1 + 16 - i, yMid + i - 1, 1);
-            plot(x1 + 16 - i, yMid - i, 2);
-            plot(x1 + 16 - i, yMid - i - 1, 1);
-            plot(x2 - 16 + i, yMid + i, 2);
-            plot(x2 - 16 + i, yMid + i - 1, 1);
-            plot(x2 - 16 + i, yMid - i, 2);
-            plot(x2 - 16 + i, yMid - i - 1, 1);
-        }
-
-        count++;
-    }
-
-    int y = count + infoSidebars.y1;
-    while (micros() < limit_micros && count < maxCount) {
-        // bprintf("y = %d, x1=%d, x2=%d, y1 = %d", y,x1,x2, y1);
-        // This is borderline for wanting to break down further (not to exceed limit_micros of around 20us by too much)
-        if (count % 16 == 0) {
-            dhLine(x1-2, y, 5);
-            dhLine(x2-2, y, 5);
-        } else if (count % 8 == 0) {
-            dhLine(x1-5, y, 11);
-            dhLine(x2-5, y, 11);
-        }
-
-        y++;
-        count++;
-    }
-
-    if (count == maxCount) {
-        count = -1; // Restart would be with central indicators
-        bgSidebarsState = bgItemComplete;
-        return true; // All done with Sidebars.
-    }
-
-    return false;
-}
-
-static bool renderAHUntil(uint32_t limit_micros)
-{
-    static bool first = true;
-
-    if (!cachedAH) {
-        return true; // Nothing to do here.
-    }
-
-    if (first) {
-        iterLineInit(infoArtificialHorizon.x1, infoArtificialHorizon.y1, infoArtificialHorizon.x2, infoArtificialHorizon.y2);
-        first = false;
-    }
-
-    bool done = false;
-    bool oor = infoArtificialHorizon.outOfRange;
-    while (micros() < limit_micros && !done) {
-//        done = oor ? iterDashedDLineNext() :  iterDLineNext();
-        done = oor ? iterDashedQLineNext() :  iterQLineNext();
-        UNUSED(iterDashedDLineNext);
-        UNUSED(iterDLineNext);
-        // line with arrow rather than dashed line?
-    }
-
-    if (done) {
-        // All done. Prepare for next time.
-        first = true;
-        cachedAH = false;
-        return true; // Done with AH for this round.
-    }
-
-    return false;
-}
-
-bool renderCharsUntil(uint32_t limit_micros)
-{
-    // Saved state.
-    // Position: currentChar (and cached currentY, currentX, currentPtr).
-    static int currentChar;
-    static int currentY;
-    static int currentX;
-    static uint8_t *currentPtr;
-
-    // ** NOTE ** charsPerLine doesn't correspond with pixels or bytes per line,
-    // because we have some spare: 368 pixels not 360 for alignment reasons
-
-    // TODO rename these...
-    // REM *** if we use hoffs or equivalent, do same in plot and other drawing routines
-    const int hoffs = 0; //0..2 (using 90 of 92 bytes)
-    const int pxpc = PICO_OSD_CHAR_WIDTH;
-    const int bxpc = pxpc / 4; // 4 pixels per byte -> 3 bytes to go across by 1 char
-    const int pypc = PICO_OSD_CHAR_HEIGHT;
-    const int bpc  = bxpc * pypc;
-    const int fbbpl = fb_nx / 4; // bytes per line = pixels per line / pixels per byte
-    const int bpCharLine = pypc * fbbpl;
-    const int fbbpNextLine = bpCharLine - charsPerLine * bxpc; // byte increment from  (top left of) last char of line to first of next line.
-
-    if (0 == currentChar) {
-        currentY = 0;
-        currentX = 0;
-        currentPtr = osdBufferA + hoffs;
-    }
-
-    tus++;
-    while (currentY < charLines) {
-        if (osdCharLineInUse[currentY]) {
-            // currentPtr is pointer to topleft of char dest on osdBufferA
-            while (cmpTimeUs(limit_micros, micros()) > 0 && currentX < charsPerLine) {
-                uint8_t c = osdCharBuffer[currentChar++];
-                // Buffer is always cleared after vsync before we start updating it. So, we can
-                // ignore empty characters.
-                // *** TODO check char 0 and char 32 (spc) are always transparent (max7456 code clears to 0x20)
-                if (c!=0x20 && c!=0) {
-                    // 1 char = 12 pixels = 3 bytes. 4 chars = 48 pixels = 12 bytes = 3 words
-                    const uint8_t * fontp = &fontData[c * bpc]; // 3 bytes per 12 pixel char line, 18 lines
-                    uint8_t * bufPtr = currentPtr;
-                    for (int j=0; j<pypc; ++j) {
-                        // write out loop of bxpc (bytes per char = 3)
-                        *bufPtr++ = *fontp++;
-                        *bufPtr++ = *fontp++;
-                        *bufPtr++ = *fontp++;
-                        bufPtr += fbbpl - 3; // new line, back 3 bytes
-                    }
-                }
-
-                currentPtr += bxpc;
-                currentX++;
-            }
-
-            if (currentX < charsPerLine) {
-                // timed out
-                break;
-            }
-
-            // Completed a char line, pointer is at top left of last character of line.
-            currentX = 0;
-            currentY++;
-            currentPtr += fbbpNextLine;
-        } else {
-            currentY++;
-            currentChar += charsPerLine;
-            currentPtr += bpCharLine;
-        }
-    }
-
-    if (currentChar == numChars) { // equivalently currentY == charLines
-        // Reached the end, reset.
-        currentChar = 0;
-        return true;
-    }
-
-    return false;
-}
-
-bool renderSticksBackgroundUntil(uint32_t limit_micros)
-{
-    static int subState;
-
-    while (bgStickLeftState == bgItemPendingRender && micros() < limit_micros) {
-        int xMid = infoStickLeft.xLeft + stickWidth / 2;
-        int yMid = infoStickLeft.yTop + stickHeight / 2;
-        if (subState == 0) {
-            dhLine(infoStickLeft.xLeft, yMid, stickWidth);
-            subState++;
-        } else {
-            dvLine(xMid, infoStickLeft.yTop, stickHeight);
-            subState = 0;
-            bgStickLeftState = bgItemComplete; // This won't get retriggered unless config/profile changes.
-        }
-    }
-
-    while (bgStickRightState == bgItemPendingRender && micros() < limit_micros) {
-        int xMid = infoStickRight.xLeft + stickWidth / 2;
-        int yMid = infoStickRight.yTop + stickHeight / 2;
-        if (subState == 0) {
-            dhLine(infoStickRight.xLeft, yMid, stickWidth);
-            subState++;
-        } else {
-            dvLine(xMid, infoStickRight.yTop, stickHeight);
-            subState = 0;
-            bgStickRightState = bgItemComplete;
-        }
-    }
-
-    return (bgStickLeftState != bgItemPendingRender && bgStickRightState != bgItemPendingRender);
-}
-
-    
-bool renderSticksForegroundUntil(uint32_t limit_micros)
-{
-    dd1++;
-    if (cachedStickLeft && micros() < limit_micros) {
-        dd2 = getCycleCounter();
-        plotBlob(infoStickLeft.xStick, infoStickLeft.yStick);
-        cachedStickLeft = false;
-        dd3 = getCycleCounter();
-    }
-
-    if (cachedStickRight && micros() < limit_micros) {
-        dd4 = getCycleCounter();
-        plotBlob(infoStickRight.xStick, infoStickRight.yStick);
-        cachedStickRight = false;
-        dd5 = getCycleCounter();
-    }
-
-    return (!cachedStickLeft && !cachedStickRight);
-}
-
-static inline uint32_t maxi(uint32_t a, uint32_t b)
-{
-    return a>b ? a : b;
-}
-
-// Update screen buffer (paint characters etc to buffer), up until a time limit.
-// Store state so that we can resume.
-// Return false when complete (no more to do).
-bool osdPioRenderScreenUntil(uint32_t limit_micros)
-{
-    dd7++;
-    static bool firstOfVsync = true;
-    if (firstOfVsync) {
-        firstOfVsync = false;
-        renderStartCycles += getCycleCounter() - startVsyncCycles;
-        renderStartCyclesMax = maxi(renderStartCyclesMax, getCycleCounter() - startVsyncCycles);
-    }
-
+    uint8_t * pByte = plotBuffer + PICO_OSD_BUF_WIDTH * y;
+    pByte += (int)(x/4); // 4 pixels per byte
 #if 0
-    UNUSED(limit_micros);
-    plotTestCard();
-    transferredSinceVsync = true;
-    return false;
-#endif
-
-    uint32_t c1 = getCycleCounter();
-
-    // Proceed with rendering background elements if/as required, if not timed out.
-    selectBackgroundBuffer();
-    bool complete =
-        renderSticksBackgroundUntil(limit_micros) &&
-        renderSidebarsUntil(limit_micros);
-    selectForegroundBuffer();
-
-    // Continue with foreground elements, if not timed out.
-    complete = complete &&
-        renderAHUntil(limit_micros) &&
-        renderCharsUntil(limit_micros) &&
-        renderSticksForegroundUntil(limit_micros);
-
-#if 1
-    UNUSED(postProcessUntil);
-#else
-    selectBackgroundBuffer();
-    complete = complete && postProcessUntil(limit_micros);
-    selectForegroundBuffer();
-#endif
-
-    uint32_t cd = getCycleCounter() - c1;
-    renderTot += cd;
-    if (cd > maxcycles) {
-        maxcycles = cd;
+    if (pByte<plotBuffer || pByte>=plotBuffer + PICO_OSD_BUF_LENGTH) {
+        bprintf("huh %p (%p) %d, %d, %d",pByte,plotBuffer, x,y,c);
     }
+#endif
+    static uint8_t masks[4] = {0b00000011, 0b00001100, 0b00110000, 0b11000000};
+    static uint8_t  cols[4] = {0b00000000, 0b10101010, 0b11111111, 0b00000000};
+    uint8_t mask = masks[x%4];
+    uint8_t col = cols[c];
+    *pByte = ((*pByte) &(~mask)) | (mask&col);
+}
 
-    if (complete) {
-        // accumulate for averaging: maxcycles += maxcyclesthisround;
-        tusr++;
+void hLine(int x, int y, int count, int col)
+{
+    for (int i=0; i<count; ++i) {
+        plot(x++, y, col);
+    }
+}
 
-        renderEndCycles += getCycleCounter() - startVsyncCycles;
-//        renderEndCyclesMax = maxi(renderEndCyclesMax, getCycleCounter() - startVsyncCycles);
-// TODO ***
-        uint32_t rdd = getCycleCounter() - startVsyncCycles;
-        if (rdd > renderEndCyclesMax) {
-            renderEndCyclesMax = rdd;
-            extern uint32_t toCheck;
-            extern uint32_t toCheckD;
-            extern uint32_t toTransfer;
-            renderWasCheck = startVsyncCycles - toCheck; // expect -ve in bad case
-            renderWasCheckD = toCheckD;
-            renderWasTransfer = toTransfer - startVsyncCycles;
+void dhLine(int x, int y, int count)
+{
+    for (int i=x; i < x + count; i++) {
+        plot(i, y, 2);
+        plot(i, y+1, 1);
+    }
+}
+
+void dvLine(int x, int y, int count)
+{
+    for (int i=y; i < y + count; i++) {
+        plot(x, i, 2);
+        plot(x+1, i, 1);
+    }
+}
+
+    
+// WARNING iter line functions are designed to be called iteratively, but only from one source at a time.
+
+typedef struct {
+    int count;
+    int maxCount;
+    float delta;
+    bool shallow;
+    int ic;
+    float fc;
+} iterLineData_t;
+
+static void iterLineDataInit(iterLineData_t *data, int x1, int y1, int x2, int y2)
+{
+    data->count = 0;
+    int dx = x2 - x1;
+    int dy = y2 - y1;
+    bool shallow = ABS(dx) > ABS(dy);
+    data->shallow = shallow;
+    if (shallow) {
+        data->delta = (float)dy / dx;
+        if (x1 < x2) {
+            data->ic = x1;
+            data->fc = (float)y1;
+            data->maxCount = x2 - x1 + 1;
+        } else {
+            data->ic = x2;
+            data->fc = (float)y2;
+            data->maxCount = x1 - x2 + 1;
         }
+    } else {
+        data->delta = dy == 0 ? 0.0f : (float)dx / dy; // cope with case of a single point.
+        if (y1 < y2) {
+            data->fc = (float)x1;
+            data->ic = y1;
+            data->maxCount = y2 - y1 + 1;
+        } else {
+            data->fc = (float)x2;
+            data->ic = y2;
+            data->maxCount = y1 - y2 + 1;
+        }
+    }
+}
 
-        firstOfVsync = true;
-        transferredSinceVsync = true;
-        return false; // Nothing more to draw.
+// iterLineData shared amongst all of the iter...Line functions.
+static iterLineData_t iterLineData;
+
+void iterLineInit(int x1, int y1, int x2, int y2)
+{
+    iterLineDataInit(&iterLineData, x1, y1, x2, y2);
+}
+
+bool iterDLineNext(void)
+{
+    if (iterLineData.count >= iterLineData.maxCount) {
+        return true; // all done.
     }
 
-    return true; // More still to draw.
+    if (iterLineData.shallow) {
+        plot(iterLineData.ic, iterLineData.fc, 2);
+        plot(iterLineData.ic, iterLineData.fc + 1, 1);
+        iterLineData.ic++;
+        iterLineData.fc += iterLineData.delta;
+    } else {
+        plot(iterLineData.fc, iterLineData.ic, 2);
+        plot(iterLineData.fc + 1, iterLineData.ic, 1);
+        iterLineData.ic++;
+        iterLineData.fc += iterLineData.delta;
+    }
+
+    iterLineData.count++;
+    return false;
+}
+
+bool iterQLineNext(void)
+{
+    if (iterLineData.count >= iterLineData.maxCount) {
+        return true; // all done.
+    }
+
+    if (iterLineData.shallow) {
+        plot(iterLineData.ic, iterLineData.fc, 2);
+        plot(iterLineData.ic, iterLineData.fc + 1, 2);
+        plot(iterLineData.ic, iterLineData.fc + 2, 1);
+        plot(iterLineData.ic, iterLineData.fc - 1, 1);
+        iterLineData.ic++;
+        iterLineData.fc += iterLineData.delta;
+    } else {
+        plot(iterLineData.fc, iterLineData.ic, 2);
+        plot(iterLineData.fc + 1, iterLineData.ic, 2);
+        plot(iterLineData.fc + 2, iterLineData.ic, 1);
+        plot(iterLineData.fc - 1, iterLineData.ic, 1);
+        iterLineData.ic++;
+        iterLineData.fc += iterLineData.delta;
+    }
+
+    iterLineData.count++;
+    return false;
+}
+
+bool iterDashedDLineNext(void)
+{
+    if (iterLineData.count >= iterLineData.maxCount) {
+        return true; // all done.
+    }
+
+    if ((iterLineData.count % 16) < 9) {
+        if (iterLineData.shallow) {
+            plot(iterLineData.ic, iterLineData.fc, 2);
+            plot(iterLineData.ic, iterLineData.fc + 1, 1);
+        }
+        else {
+            plot(iterLineData.fc, iterLineData.ic, 2);
+            plot(iterLineData.fc + 1, iterLineData.ic, 1);
+        }
+    }
+
+    iterLineData.ic++;
+    iterLineData.fc += iterLineData.delta;
+    iterLineData.count++;
+    return false;
+}
+
+bool iterDashedQLineNext(void)
+{
+    if (iterLineData.count >= iterLineData.maxCount) {
+        return true; // all done.
+    }
+
+    if ((iterLineData.count % 16) < 9) {
+        if (iterLineData.shallow) {
+            plot(iterLineData.ic, iterLineData.fc, 2);
+            plot(iterLineData.ic, iterLineData.fc + 1, 2);
+            plot(iterLineData.ic, iterLineData.fc + 2, 1);
+            plot(iterLineData.ic, iterLineData.fc - 1, 1);
+        }
+        else {
+            plot(iterLineData.fc, iterLineData.ic, 2);
+            plot(iterLineData.fc + 1, iterLineData.ic, 2);
+            plot(iterLineData.fc + 2, iterLineData.ic, 1);
+            plot(iterLineData.fc - 1, iterLineData.ic, 1);
+        }
+    }
+
+    iterLineData.ic++;
+    iterLineData.fc += iterLineData.delta;
+    iterLineData.count++;
+    return false;
 }
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c)

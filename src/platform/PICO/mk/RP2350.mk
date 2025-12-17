@@ -551,6 +551,7 @@ MCU_COMMON_SRC = \
             PICO/io_pico.c \
             PICO/osd/font_betaflight.c \
             PICO/osd/fb_osd_pico.c \
+            PICO/osd/osd_elements_pico.c \
             PICO/osd/osd_pico.c \
             PICO/persistent.c \
             PICO/pwm_motor_pico.c \
