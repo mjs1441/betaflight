@@ -161,7 +161,8 @@ static volatile int badC;
 
 static uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
-static __attribute__((aligned(4))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
+///static __attribute__((aligned(4))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
+static __attribute__((aligned(8))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
 static uint32_t * const charBufferW = (uint32_t *)osdCharBuffer;
 
 uint8_t osdCharLineInUse[OSD_SD_ROWS];
@@ -203,7 +204,31 @@ void osdPioClearCharBuffer(void)
 {
     dd6++;
     uint32_t c1 = getCycleCounter();
-#if 1
+#if 0
+    // This pulls in __aeabi_memset from libc_nano, which is fairly efficient
+    // (will unroll up to 4 32-bit writes at a time)
+    UNUSED(charBufferW);
+    #define tryfunc __aeabi_memset
+    void *tryfunc(void *s, int c, size_t n);
+//    tryfunc(osdCharBuffer, 0x20, OSD_CHAR_BUFFER_LENGTH);
+    // ** parameters swapped compared to memset **
+    tryfunc(osdCharBuffer, OSD_CHAR_BUFFER_LENGTH, 0x20);
+//    tryfunc(osdCharLineInUse, 0, OSD_SD_ROWS);
+#elif 1
+    // Enforce a word copy.
+    // unroll a bit
+    // (We could go even faster with DMA, but that would add complication and use up a DMA channel.)
+    // 30*16 = 480 is divisible by 8 (and 16, and 32)
+    STATIC_ASSERT(0 == OSD_CHAR_BUFFER_LENGTH % 8, pico_osdcharbuffer_length);
+    uint32_t *p = charBufferW;
+    const uint32_t *q = p + OSD_CHAR_BUFFER_LENGTH / 4;
+    while (p<q) {
+        *p++ = clearBufferPattern;
+        *p++ = clearBufferPattern;
+    }
+
+    memset(osdCharLineInUse, 0, OSD_SD_ROWS);
+#elif 1
     // Enforce a word copy.
     // (We could go even faster with DMA, but that would add complication and use up a DMA channel.)
     STATIC_ASSERT(0 == OSD_CHAR_BUFFER_LENGTH % 4, pico_osdcharbuffer_length);
@@ -943,13 +968,16 @@ static void vsync_callback(void)
     // the rest is just debug and testing.
 
     ++c;
+
+//#define NN 250
+#define NN 472
     
     static uint32_t vmax = 0;
     static uint32_t szo;
     uint32_t q;
     static uint32_t qtot;
     uint32_t szn = getCycleCounter();
-    int cm = c % 250;
+    int cm = c % NN;
     if (c>20) {
         q = szn-szo;
         if (cm != 1) {
@@ -960,7 +988,7 @@ static void vsync_callback(void)
 
     static uint32_t n_to_c;
 
-    if (c % 250 == 0) {
+    if (c % NN == 0) {
 #if defined PICO_TRACE && defined TASKREPORT
         uint32_t tmpNow = getCycleCounter();
         static uint32_t lastCyclesHere;
@@ -1015,7 +1043,7 @@ static void vsync_callback(void)
 //        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
 //        bprintf("tus %d, tusr %d, ave %.1f calls per VS, %.1f rds per VS, %.1f calls/rd",
 //                tus, tusr,
-//                (double)tus/250, (double)tusr/250, (double)tus/tusr);
+//                (double)tus/NN, (double)tusr/NN, (double)tus/tusr);
 //        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
 //                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
 #if 0
@@ -1023,17 +1051,17 @@ static void vsync_callback(void)
 #endif
         bprintf("%d completed %d, ave us (duty cycle) per vsync render %d (%.1f), ave start, end us %.1f, %.1f [%d %d %d %d %d %d]",
                 c, tusr,
-                renderTot/(250*150), ((double)renderTot)/(250*150*20000/100),
-                ((double)renderStartCycles)/(250*150), ((double)renderEndCycles)/(250*150),
+                renderTot/(NN*150), ((double)renderTot)/(NN*150*20000/100),
+                ((double)renderStartCycles)/(NN*150), ((double)renderEndCycles)/(NN*150),
                 dd1,dd3-dd2,dd5-dd4,dd6,dd7,dd8
                );
         dd1 = dd2 = dd3 = dd4 = dd5 = dd6 = dd7 = dd8 = 0;
         
 #if 0
                 bprintf(", fg %d (%.1f), bg %d (%.1f), fg+bg %d (%.1f)",
-                drawBGTot/(250*150), ((double)drawBGTot)/(250*150*20000/100),
-                drawFGTot/(250*150), ((double)drawFGTot)/(250*150*20000/100),
-                (drawFGTot + drawBGTot)/(250*150), ((double)(drawFGTot + drawBGTot))/(250*150*20000/100));
+                drawBGTot/(NN*150), ((double)drawBGTot)/(NN*150*20000/100),
+                drawFGTot/(NN*150), ((double)drawFGTot)/(NN*150*20000/100),
+                (drawFGTot + drawBGTot)/(NN*150), ((double)(drawFGTot + drawBGTot))/(NN*150*20000/100));
 #endif
         if (badX != -12345) {
             bprintf("*** detected out of range plot, last was %d, %d, %d", badX, badY, badC);
