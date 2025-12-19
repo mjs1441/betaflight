@@ -474,7 +474,8 @@ PICO_FLASH_MB ?= 4
 LD_SCRIPT       = $(LINKER_DIR)/pico_flash_$(PICO_FLASH_MB)MB.ld
 
 ifeq ($(RUN_FROM_RAM),1)
-EXTRA_LD_FLAGS  += -T$(LINKER_DIR)/pico_rp2350_RunFromRAM.ld
+#EXTRA_LD_FLAGS  += -T$(LINKER_DIR)/pico_rp2350_RunFromRAM.ld
+EXTRA_LD_FLAGS  += -T$(LINKER_DIR)/pico_rp2350_RunFromHybrid.ld
 else
 EXTRA_LD_FLAGS  += -T$(LINKER_DIR)/pico_rp2350_RunFromFLASH.ld
 endif

@@ -55,6 +55,10 @@ SECTIONS
         __embedded_block_end = .;
         KEEP (*(.reset))
         . = ALIGN(4);
+        */cli/*(*.text*)
+        */config/*(*.text*)
+        */pg/*(*.text*)
+        . = ALIGN(4);
     } > FLASH
 
     /* Note the boot2 section is optional, and should be discarded if there is
@@ -81,6 +85,10 @@ SECTIONS
     .rodata : {
         /* segments not marked as .flashdata are instead pulled into .data (in RAM) to avoid accidental flash accesses */
         *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.flashdata*)))
+        . = ALIGN(4);
+        */cli/*(*.rodata*)
+        */config/*(*.rodata*)
+        */pg/*(*.rodata*)
         . = ALIGN(4);
     } > FLASH
 
