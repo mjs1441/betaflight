@@ -55,8 +55,10 @@ SECTIONS
         __embedded_block_end = .;
         KEEP (*(.reset))
         . = ALIGN(4);
+        */build/*(*.text*)
         */cli/*(*.text*)
         */config/*(*.text*)
+        */msc/*(*.text*)
         */pg/*(*.text*)
         . = ALIGN(4);
     } > FLASH
@@ -86,8 +88,10 @@ SECTIONS
         /* segments not marked as .flashdata are instead pulled into .data (in RAM) to avoid accidental flash accesses */
         *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.flashdata*)))
         . = ALIGN(4);
+        */build/*(*.rodata*)
         */cli/*(*.rodata*)
         */config/*(*.rodata*)
+        */msc/*(*.rodata*)
         */pg/*(*.rodata*)
         . = ALIGN(4);
     } > FLASH
