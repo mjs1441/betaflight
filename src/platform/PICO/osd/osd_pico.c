@@ -129,9 +129,8 @@ static volatile int badC;
 
 uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
-///static __attribute__((aligned(4))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
+//__attribute__((aligned(4))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
 __attribute__((aligned(8))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
-static uint32_t * const charBufferW = (uint32_t *)osdCharBuffer;
 
 uint8_t osdCharLineInUse[OSD_SD_ROWS];
 
@@ -161,54 +160,12 @@ static void init_gpios(void)
     }
 }
 
-// Not static, not const, don't let the compiler know it's a constant
-// so it can't replace the loop with a call to memset (which is a byte loop
-// at time of writing).
-// NB only effective when lto is disabled.
-uint32_t clearBufferPattern = 0x20202020;
-
 void osdPioClearCharBuffer(void)
 {
     dd6++;
     uint32_t c1 = getCycleCounter();
-#if 0
-    // This pulls in __aeabi_memset from libc_nano, which is fairly efficient
-    // (will unroll up to 4 32-bit writes at a time)
-    UNUSED(charBufferW);
-    #define tryfunc __aeabi_memset
-    void *tryfunc(void *s, int c, size_t n);
-//    tryfunc(osdCharBuffer, 0x20, OSD_CHAR_BUFFER_LENGTH);
-    // ** parameters swapped compared to memset **
-    tryfunc(osdCharBuffer, OSD_CHAR_BUFFER_LENGTH, 0x20);
-//    tryfunc(osdCharLineInUse, 0, OSD_SD_ROWS);
-#elif 1
-    // Enforce a word copy.
-    // unroll a bit
-    // (We could go even faster with DMA, but that would add complication and use up a DMA channel.)
-    // 30*16 = 480 is divisible by 8 (and 16, and 32)
-    STATIC_ASSERT(0 == OSD_CHAR_BUFFER_LENGTH % 8, pico_osdcharbuffer_length);
-    uint32_t *p = charBufferW;
-    const uint32_t *q = p + OSD_CHAR_BUFFER_LENGTH / 4;
-    while (p<q) {
-        *p++ = clearBufferPattern;
-        *p++ = clearBufferPattern;
-    }
-
-    memset(osdCharLineInUse, 0, OSD_SD_ROWS);
-#elif 1
-    // Enforce a word copy.
-    // (We could go even faster with DMA, but that would add complication and use up a DMA channel.)
-    STATIC_ASSERT(0 == OSD_CHAR_BUFFER_LENGTH % 4, pico_osdcharbuffer_length);
-    for (int i=0; i<OSD_CHAR_BUFFER_LENGTH/4; ++i) {
-        charBufferW[i] = clearBufferPattern;
-    }
-
-    memset(osdCharLineInUse, 0, OSD_SD_ROWS);
-#else
-    UNUSED(charBufferW);
     memset(osdCharBuffer, 0x20, OSD_CHAR_BUFFER_LENGTH);
     memset(osdCharLineInUse, 0, OSD_SD_ROWS);
-#endif
     dd8 = getCycleCounter() - c1;
 }
 
