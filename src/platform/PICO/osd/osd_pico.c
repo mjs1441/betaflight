@@ -23,8 +23,6 @@
 
 #ifdef USE_FB_OSD
 
-#define OSD_DEBUG_EXTRA
-
 #if !(defined OSD_W_PIN && defined OSD_EN_PIN && defined OSD_SYNC_PIN)
 #error This PICO OSD requires OSD_W_PIN, OSD_EN_PIN and OSD_SYNC_PIN to be defined
 #endif
@@ -97,6 +95,7 @@ static volatile bool in_safe_zone;
 static volatile uint32_t safe_zone_start_us;
 volatile bool transferredSinceVsync;
 
+#ifdef OSD_DEBUG
 // trace / debugging
 volatile uint32_t startVsyncCycles;
 volatile uint32_t szb;
@@ -121,15 +120,13 @@ volatile uint32_t renderWasCheckD;
 volatile uint32_t renderWasTransfer;
 volatile int checksb;
 volatile int checkol;
-
 static volatile int badX = -12345;
 static volatile int badY;
 static volatile int badC;
-
 uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
+#endif
 
-//__attribute__((aligned(4))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
-__attribute__((aligned(8))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
+__attribute__((aligned(4))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
 
 uint8_t osdCharLineInUse[OSD_SD_ROWS];
 
@@ -169,7 +166,7 @@ void osdPioClearCharBuffer(void)
     uint32_t c1 = getCycleCounter();
     memset(osdCharBuffer, 0x20, OSD_CHAR_BUFFER_LENGTH);
     memset(osdCharLineInUse, 0, OSD_SD_ROWS);
-    dd8 = getCycleCounter() - c1;
+    DEBUG_COUNTER_DIFF(dd8,c1);
 }
 
 int64_t safe_zone_callback(alarm_id_t id, void * user_data)
@@ -552,6 +549,7 @@ static void vsync_callback(void)
     aid = add_alarm_in_us(safe_zone_start_us, safe_zone_callback, 0, true);
     in_safe_zone = true;
     
+#ifdef OSD_DEBUG
     // the rest is just debug and testing.
 
     ++c;
@@ -637,6 +635,7 @@ static void vsync_callback(void)
     szo = szn;
     
     szc=getCycleCounter();
+#endif
 }
 
 static void enable(void)

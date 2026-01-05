@@ -21,6 +21,7 @@
 
 #pragma once
 
+#define OSD_DEBUG
 // #define OSD_DEBUG_EXTRA
 
 #include <stdint.h>
@@ -87,6 +88,7 @@ bool iterDashedDLineNext(void);
 bool iterDashedQLineNext(void);
 
 // trace / debugging
+#ifdef OSD_DEBUG
 extern volatile uint32_t startVsyncCycles;
 extern volatile uint32_t szb;
 extern volatile uint32_t szc;
@@ -111,3 +113,17 @@ extern volatile uint32_t renderWasTransfer;
 extern volatile int checksb;
 extern volatile int checkol;
 extern uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
+
+#define DEBUG_ZERO(x) x=0
+#define DEBUG_INC(x) ++x
+#define DEBUG_COUNTER(x) x = getCycleCounter()
+#define DEBUG_COUNTER_DIFF(x,y) x = getCycleCounter() - y
+
+#else
+
+#define DEBUG_ZERO(x)
+#define DEBUG_INC(x)
+#define DEBUG_COUNTER(x)
+#define DEBUG_COUNTER_DIFF(x,y)
+
+#endif
