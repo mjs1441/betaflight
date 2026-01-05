@@ -94,7 +94,7 @@ static int dma_chan_bufB_to_fifo;
 
 // buffer update control (avoid tearing etc.)
 static volatile bool in_safe_zone;
-static volatile uint32_t safe_zone_period;
+static volatile uint32_t safe_zone_start_us;
 volatile bool transferredSinceVsync;
 
 // trace / debugging
@@ -174,14 +174,9 @@ void osdPioClearCharBuffer(void)
 
 int64_t safe_zone_callback(alarm_id_t id, void * user_data)
 {
-    static int cc;
     UNUSED(id);
     UNUSED(user_data);
     in_safe_zone = false;
-    szd = getCycleCounter();
-    if (++cc == 99999991) {
-        bprintf("\nsz %d %d %d %d  %d\n",startVsyncCycles,szb,szc,szd,sze);
-    }
     return 0; // don't automatically reschedule
 }
 
@@ -228,25 +223,17 @@ static dma_channel_config config_bg_to_bufA;
 static bool osd_init_device(bool isPAL, int displayLines, int transferWords)
 {
     fb_words = transferWords;
-//    safe_zone_period = 18000;
-    safe_zone_period = 16000;
-//     safe_zone_period = 12000; // half of PAL 20000us, disallow TRANSFER (render to osdBufferA) during final 10000 or so
+
+    // PAL field period = 20000us, NTSC ~= 16833us.
+    // Disallow TRANSFER (render to osdBufferA) during final 4000us or so.
+    safe_zone_start_us = isPAL ? 16000 : 12600;
     in_safe_zone = true;
 
     bprintf("OSD osd_init_device lines %d words %d", displayLines, fb_words);
     bprintf("pbw %d, pbh %d, bpl %d", PICO_OSD_BUF_WIDTH, PICO_OSD_BUF_HEIGHT_MAX, PICO_OSD_BUF_LENGTH);
     bprintf("osdBuffer1: %p osdBuffer2: %p", osdBuffer1W, osdBuffer2W);
     bprintf("nx %d, ny %d", fb_nx, fb_ny);
-    for (int i=0; i<PICO_OSD_BUF_LENGTH; ++i) {
-//        int y = i / PICO_OSD_BUF_WIDTH;
-//        int x = (i % PICO_OSD_BUF_WIDTH) * 4; // approx. pixels
-//        int dd = (x-184)*(x-184)+(y-128)*(y-128);
-//        monoBuffer[i] = dd < 15000 ? 0xff : 0;
-//        osdBuffer1[i] = dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
-//        osdBuffer1[i] = 0xff; // dd < 15000 ? (dd < 3720 ? 0b10101010 : 0xff) : 0;
-        osdBufferA[i] = 0;
-    }
-
+    memset(osdBufferA, PICO_OSD_BUF_LENGTH, 0);
     osdPioClearCharBuffer();
 
     if (!init_gpios()) {
@@ -261,13 +248,13 @@ static bool osd_init_device(bool isPAL, int displayLines, int transferWords)
         return false;
     }
 
-    // set up for outputs from PIO
+    // Set up for outputs from PIO
     gpio_put(osd_w_gpio, false);
     gpio_put(osd_en_gpio, false);
     pio_gpio_init(osdPio, osd_w_gpio);
     pio_gpio_init(osdPio, osd_en_gpio);
 
-    // default config with wrap set    
+    // Default config with wrap set    
     pio_sm_config config = isPAL ? osd_tx_pal_program_get_default_config(osd_tx_offset)
         : osd_tx_ntsc_program_get_default_config(osd_tx_offset);
 
@@ -279,9 +266,7 @@ static bool osd_init_device(bool isPAL, int displayLines, int transferWords)
     sm_config_set_set_pins(&config, osd_w_gpio, 2);    // set PIN set W, EN
     sm_config_set_out_pins(&config, osd_w_gpio, 2);    // out PIN set W, EN
 
-    // * TODO auto pull for OSR, or not
-
-    sm_config_set_out_shift(&config, true, false, 32); // no autopull
+    sm_config_set_out_shift(&config, true, false, 32); // No autopull
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
 
     int pioclock = (int)75e6;
@@ -298,8 +283,6 @@ static bool osd_init_device(bool isPAL, int displayLines, int transferWords)
     pio_set_irq0_source_enabled(osdPio, pis_interrupt0, true); // enable state machine IRQ 0 => system irq PIO_thisone_IRQ_0
     irq_set_exclusive_handler(osdPioIrq, vsync_callback);
     irq_set_enabled(osdPioIrq, true);
-
-    // TODO *** consistent dma_claim vs dmaAllocate in PICO, probably follow SPI example
 
     dma_chan_bg_to_bufA = dma_claim_unused_channel(false);
     if (-1 == dma_chan_bg_to_bufA) {
@@ -446,18 +429,9 @@ int osdPioCountHSyncs(void)
     return hsyncs;
 }
 
-#define TASKREPORT
-#ifdef TASKREPORT
-#include "scheduler/scheduler.h"
-#include "fc/tasks.h"
-#endif
-
 static void vsync_callback(void)
 {
     startVsyncCycles=getCycleCounter();
-#if defined PICO_TRACE && defined TASKREPORT
-    static uint32_t thisFunctionUs;
-#endif
     // static int fieldOddEven;
     // fieldOddEven = fieldOddEven ^ 0x1;  // odd or even field (we can't tell which is which), alternate 0, 1
 
@@ -553,29 +527,19 @@ static void vsync_callback(void)
 
     }
     
-    // Start DMA for bg->osdBufferA (effectively clears screen buffer)
-    // chains to DMA for osdBufferB -> screen
-
-// testing dma speed
-//    if (c==123) {
-//         uint32_t dc1 = getCycleCounter();
-//         dma_channel_start(dma_chan_buf1_to_buf2);
-//         uint32_t dc2 = getCycleCounter();
-//         while (dma_channel_is_busy(dma_chan_buf1_to_buf2)) ;
-//         uint32_t dc3 = getCycleCounter();
-//         bprintf("* dc3-dc1 %d dc3-dc2 %d buf1 %p werc %p buf2 %p", dc3-dc1, dc3-dc2, osdBuffer1, &werc[0], osdBuffer2);
-//     }
-
     if (dmaClearBackgroundBuffer || flipThisVSync) {
+        // Start DMA for bg->osdBufferA (effectively clears screen buffer)
+        // which chains to DMA for osdBufferB -> screen
         dma_channel_start(dma_chan_bg_to_bufA);
     } else {
         // If not updating this time, just repeat the dma copy from bufB to fifo.
         dma_channel_start(dma_chan_bufB_to_fifo);
     }
 
-    dmaClearBackgroundBuffer = false;   // Reset the background clear request flag if it was set.
+    // Reset the background clear request flag if it was set.
+    dmaClearBackgroundBuffer = false;
 
-    // probably best clear at end, just in case there are re-trigger issues if cleared earlier...
+    // Probably best clear the interrupt here at the end, just in case there are re-trigger issues if cleared earlier...
     pio_interrupt_clear(osdPio, 0);
 
     szb = getCycleCounter();
@@ -585,7 +549,7 @@ static void vsync_callback(void)
     if (aid != -1) {
         cancel_alarm(aid);
     }
-    aid = add_alarm_in_us(safe_zone_period, safe_zone_callback, 0, true);
+    aid = add_alarm_in_us(safe_zone_start_us, safe_zone_callback, 0, true);
     in_safe_zone = true;
     
     // the rest is just debug and testing.
@@ -613,48 +577,6 @@ static void vsync_callback(void)
     static int printq;
 
     if (c % NN == 0) {
-#if defined PICO_TRACE && defined TASKREPORT
-        uint32_t tmpNow = getCycleCounter();
-        static uint32_t lastCyclesHere;
-        uint32_t cyclesSince = tmpNow - lastCyclesHere;
-        lastCyclesHere = tmpNow;
-        static uint32_t lastPIDTot;
-        static uint32_t lastOSDTot;
-        static uint32_t lastAllTot;
-        static uint32_t lastCheckTot;
-        tmpNow = getTask(TASK_PID)->totalExecutionTimeUs;
-        uint32_t sincePID = tmpNow - lastPIDTot;
-        lastPIDTot = tmpNow;
-        tmpNow = getTask(TASK_OSD)->totalExecutionTimeUs;
-        uint32_t sinceOSD = tmpNow - lastOSDTot;
-        lastOSDTot = tmpNow;
-        tmpNow = 0;
-        for (taskId_e taskId = 0; taskId < TASK_COUNT; taskId++) {
-            tmpNow += getTask(taskId)->totalExecutionTimeUs;
-        }
-        uint32_t sinceOther = tmpNow - lastAllTot - sinceOSD - sincePID;
-        lastAllTot = tmpNow;
-        cfCheckFuncInfo_t checkFuncInfo;
-        getCheckFuncInfo(&checkFuncInfo);
-        tmpNow = checkFuncInfo.totalExecutionTimeUs;
-        uint32_t sinceCheck = tmpNow - lastCheckTot;
-        lastCheckTot = tmpNow;
-#if 0
-        bprintf("t %d, PID %d (%.1f%%), OSD %d (%.1f%%), other %d (%.1f%%), Check %d (%.1f%%), this %d (%.1f%%)",
-                cyclesSince/150,
-                sincePID, (double)((float)sincePID)*100*150/cyclesSince,
-                sinceOSD, (double)((float)sinceOSD)*100*150/cyclesSince,
-                sinceOther, (double)((float)sinceOther)*100*150/cyclesSince,
-                sinceCheck, (double)((float)sinceCheck)*100*150/cyclesSince,
-                thisFunctionUs, (double)((float)thisFunctionUs)*100*150/cyclesSince
-               );
-#else
-        UNUSED(sinceCheck);
-        UNUSED(sinceOther);
-        UNUSED(cyclesSince);
-        UNUSED(thisFunctionUs);
-#endif
-#endif
 //        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
 #if 0
         bprintf("%d vsync_callback busy %d %d nisz %d dmb %d (previous tainted n to c %d)",
@@ -715,9 +637,6 @@ static void vsync_callback(void)
     szo = szn;
     
     szc=getCycleCounter();
-#if defined PICO_TRACE && defined TASKREPORT
-    thisFunctionUs = (szc - startVsyncCycles)/150;
-#endif
 }
 
 static void enable(void)
