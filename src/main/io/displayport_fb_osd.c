@@ -164,10 +164,7 @@ static bool checkReady(displayPort_t *displayPort, bool rescan)
 {
     UNUSED(displayPort);
     UNUSED(rescan);
-    if (!fbOsdDeviceDetected) { // haven't returned OK from fbOsdInit function...
-//        if (!rescan) {
-//            return false;
-//        } else {
+    if (!fbOsdDeviceDetected) { // haven't yet returned OK from fbOsdInit function...
         // Try to initialize the device
         if (fbOsdInit(NULL /* fbOsdConfig() */, fbOsdVcdProfile) != FB_OSD_INIT_OK) {
             return false;

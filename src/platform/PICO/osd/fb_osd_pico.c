@@ -101,7 +101,10 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
 
     if (first) {
         fbOsdLoadFont();
-        osdPioDetectStart();
+        if (!osdPioStartDetection()) {
+            return FB_OSD_INIT_NOT_CONFIGURED;
+        }
+
         first = false;
         bprintf("fbOsdInit vcdProfile %p video system %d", vcdProfile, videoSystem);
         return FB_OSD_INIT_INITIALISING;
@@ -144,25 +147,26 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
     }
     
     if (repeatCount == repeatTarget) {
+        bool initOk;
         if (range == 1) {
             bprintf("OSD seen %d of %d (NTSC)", repeatCount, hSyncs);
             if (videoSystem == VIDEO_SYSTEM_PAL) {
                 bprintf("*** Warning: detected NTSC sync pattern but starting as PAL due to configuration ***");
-                osdPioStartPAL();
+                initOk = osdPioStartPAL();
             } else {
-                osdPioStartNTSC();
+                initOk = osdPioStartNTSC();
             }
         } else {
             bprintf("OSD seen %d of %d (PAL)", repeatCount, hSyncs);
             if (videoSystem == VIDEO_SYSTEM_NTSC) {
                 bprintf("*** Warning: detected PAL sync pattern but starting as NTSC due to configuration ***");
-                osdPioStartNTSC();
+                initOk = osdPioStartNTSC();
             } else {
-                osdPioStartPAL();
+                initOk = osdPioStartPAL();
             }
         }
 
-        return FB_OSD_INIT_OK;
+        return initOk ? FB_OSD_INIT_OK : FB_OSD_INIT_NOT_CONFIGURED;
     }
     
     lastHSyncs = hSyncs;

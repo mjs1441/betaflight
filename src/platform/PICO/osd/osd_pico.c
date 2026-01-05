@@ -122,7 +122,6 @@ volatile uint32_t renderWasTransfer;
 volatile int checksb;
 volatile int checkol;
 
-//static volatile uint32_t renderMA;
 static volatile int badX = -12345;
 static volatile int badY;
 static volatile int badC;
@@ -137,7 +136,7 @@ uint8_t osdCharLineInUse[OSD_SD_ROWS];
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);
 
-static void init_gpios(void)
+static bool init_gpios(void)
 {
     static bool did;
     if (!did) {
@@ -146,18 +145,22 @@ static void init_gpios(void)
         osd_en_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_EN_PIN));
         if (osd_en_gpio != osd_w_gpio + 1) {
             bprintf("*** OSD_EN_GPIO must be next pin up from OSD_W_GPIO (%d vs %d)", osd_en_gpio, osd_w_gpio);
+            return false;
         }
         
         osd_sync_gpio = IO_GPIOPinIdxByTag(IO_TAG(OSD_SYNC_PIN));
         if (osd_sync_gpio != osd_en_gpio + 1) {
             // might relax this... wait GPIO vs wait PINS if single SM, or just separate SMs
             bprintf("*** OSD_SYNC_GPIO must be next pin up from OSD_EN_GPIO (%d vs %d)", osd_sync_gpio, osd_en_gpio);
+            return false;
         }
 
         osdPioBase = osd_sync_gpio < 32 ? 0 : 16; // Need the higher range if the highest gpio is not in the low range 0..31.
         bprintf("osd_w gpio %d, osd_en gpio %d, osd_sync gpio %d osdPioBase %d", osd_w_gpio, osd_en_gpio, osd_sync_gpio, osdPioBase);
         did = true;
     }
+
+    return true;
 }
 
 void osdPioClearCharBuffer(void)
@@ -222,7 +225,7 @@ static void vsync_callback(void);
 static dma_channel_config config_zero_to_bg;
 static dma_channel_config config_bg_to_bufA;
 
-static void osd_init_device(bool isPAL, int displayLines, int transferWords)
+static bool osd_init_device(bool isPAL, int displayLines, int transferWords)
 {
     fb_words = transferWords;
 //    safe_zone_period = 18000;
@@ -246,14 +249,16 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
 
     osdPioClearCharBuffer();
 
-    init_gpios();
+    if (!init_gpios()) {
+        return false;
+    }
 
     pio_set_gpio_base(osdPio, osdPioBase);
     osd_tx_offset = pio_add_program(osdPio, isPAL ? &osd_tx_pal_program : &osd_tx_ntsc_program);
     osd_tx_sm = pio_claim_unused_sm(osdPio, false);
     if (osd_tx_sm < 0) {
         bprintf("*** pico osd tx failed to claim state machine");
-        return;
+        return false;
     }
 
     // set up for outputs from PIO
@@ -299,14 +304,14 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
     dma_chan_bg_to_bufA = dma_claim_unused_channel(false);
     if (-1 == dma_chan_bg_to_bufA) {
         bprintf("**** failed to claim dma channel (bg to bufA) for osd pico");
-        return;
+        return false;
     }
 
     dma_chan_bufB_to_fifo = dma_claim_unused_channel(false);
     if (-1 == dma_chan_bufB_to_fifo) {
         bprintf("**** failed to claim dma channel (buf2 to fifo) for osd pico");
         dma_channel_unclaim(dma_chan_bg_to_bufA);
-        return;
+        return false;
     }
 
     // There is no irq to handle on dma completion, so we don't call dmaSetHandler,
@@ -317,7 +322,7 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
         bprintf("*** dmaAllocate failed in osd_init_device ***");
         dma_channel_unclaim(dma_chan_bg_to_bufA);
         dma_channel_unclaim(dma_chan_bufB_to_fifo);
-       return;
+       return false;
     }
 
     dma_channel_config c = dma_channel_get_default_config(dma_chan_bufB_to_fifo);
@@ -345,22 +350,7 @@ static void osd_init_device(bool isPAL, int displayLines, int transferWords)
     channel_config_set_read_increment(&config_bg_to_bufA, true); // increment when copying from the background buffer.
     bprintf("OSD config_bg_to_bufA %08x, config_zero_to_bg %08x", config_bg_to_bufA, config_zero_to_bg);
 
-    // defer dma_channel_configure for dma_chan_bg_to_fifo, will change if clearing the background buffer by copying from Zero.
-
-    /*
-      dma channel abort, workaround for erratum
-    if dma has handler
-// disable the channel on IRQ0
-dma_channel_set_irq0_enabled(channel, false);
-// abort the channel
-dma_channel_abort(channel);
-// clear the spurious IRQ (if there was one)
-dma_channel_acknowledge_irq0(channel);
-// re-enable the channel on IRQ0
-dma_channel_set_irq0_enabled(channel, true);
-
-otherwise just dma_channel_abort
-    */
+    return true;
 }
 
 int osdPioRowsCount(void)
@@ -374,33 +364,44 @@ static void clearCountProgram(void)
     pio_remove_program_and_unclaim_sm(&osd_count_sync_program, osdPio, osd_tx_sm, osd_tx_offset);
 }
 
-void osdPioStartNTSC(void)
+bool osdPioStartNTSC(void)
 {
     fb_ny = PICO_OSD_BUF_HEIGHT_NTSC;
     charLines = VIDEO_LINES_NTSC;
     numChars = charsPerLine * charLines;
     bprintf("OSD set NTSC buf height %d char lines %d numChars %d", fb_ny, charLines, numChars);
     clearCountProgram();
-    osd_init_device(false, PICO_OSD_BUF_HEIGHT_NTSC, PICO_OSD_DISPLAY_WORDS_NTSC);
+    if (!osd_init_device(false, PICO_OSD_BUF_HEIGHT_NTSC, PICO_OSD_DISPLAY_WORDS_NTSC)) {
+        return false;
+    }
+
     osdPioEnableDevice();
+    return true;
 }
 
-void osdPioStartPAL(void)
+bool osdPioStartPAL(void)
 {
     fb_ny = PICO_OSD_BUF_HEIGHT_PAL;
     charLines = VIDEO_LINES_PAL;
     numChars = charsPerLine * charLines;
     bprintf("OSD set PAL buf height %d char lines %d numChars %d", fb_ny, charLines, numChars);
     clearCountProgram();
-    osd_init_device(true, PICO_OSD_BUF_HEIGHT_PAL, PICO_OSD_DISPLAY_WORDS_PAL);
+    if (!osd_init_device(true, PICO_OSD_BUF_HEIGHT_PAL, PICO_OSD_DISPLAY_WORDS_PAL)) {
+        return false;
+    }
+
     osdPioEnableDevice();
+    return true;
 }
 
 static const int initLines = 1000;
 
-void osdPioDetectStart(void)
+bool osdPioStartDetection(void)
 {
-    init_gpios();
+    if (!init_gpios()) {
+        return false;
+    }
+
     pio_set_gpio_base(osdPio, osdPioBase);
     osd_tx_offset = pio_add_program(osdPio, &osd_count_sync_program);
     osd_tx_sm = pio_claim_unused_sm(osdPio, false);
@@ -425,6 +426,8 @@ void osdPioDetectStart(void)
 
     // Start counting...
     pio_sm_set_enabled(osdPio, osd_tx_sm, true);
+
+    return true;
 }
 
 int osdPioCountHSyncs(void)
@@ -489,6 +492,20 @@ static void vsync_callback(void)
 
     static int business;
     static int busybuf;
+
+
+
+#if 0
+    // Note on dma channel aborts, workaround for RP2350 erratum, in the case that dma has a handler
+    // disable the channel on IRQ0
+    dma_channel_set_irq0_enabled(channel, false);
+    // abort the channel
+    dma_channel_abort(channel);
+    // clear the spurious IRQ (if there was one)
+    dma_channel_acknowledge_irq0(channel);
+    // re-enable the channel on IRQ0
+    dma_channel_set_irq0_enabled(channel, true);
+#endif
 
 
     if (dma_channel_is_busy(dma_chan_bg_to_bufA)) {
@@ -644,7 +661,6 @@ static void vsync_callback(void)
                 c, business, busybuf, nisz, dmb, n_to_c);
 #endif
 ///        bprintf(" sb %d ol %d", checksb, checkol);
-///        bprintf("average render call interval: %d us, %.1f hz", renderMA, 1000000.0/renderMA);
         nisz = 0; dmb = 0;
         // NB ave wraps quickly (~1000 vsyncs)
 //        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
@@ -790,7 +806,8 @@ void dvLine(int x, int y, int count)
 }
 
     
-// WARNING iter line functions are designed to be called iteratively, but only from one source at a time.
+// WARNING iter line functions are designed to be called iteratively, but only from one source at a time
+// (only keeps track of one pixel counter, delta etc.)
 
 typedef struct {
     int count;

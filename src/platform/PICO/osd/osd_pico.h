@@ -29,9 +29,9 @@
 void osdPioClearCharBuffer(void);
 
 int osdPioCountHSyncs(void);
-void osdPioDetectStart(void);
-void osdPioStartNTSC(void);
-void osdPioStartPAL(void);
+bool osdPioStartDetection(void);
+bool osdPioStartNTSC(void);
+bool osdPioStartPAL(void);
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c);
 void osdPioWrite(uint8_t x, uint8_t y, const char *text);

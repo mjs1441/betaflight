@@ -564,6 +564,7 @@ static inline uint32_t maxi(uint32_t a, uint32_t b)
 
 
 #if 0
+// Prototyping - slow version of psotProcessUntil
 static bool isWhite(int x, int y)
 {
     uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
@@ -599,7 +600,7 @@ static bool postProcessUntil0(uint32_t limit_micros)
 static bool postProcessUntil(uint32_t limit_micros)
 {
     // Plot Black points around every White point (don't overwrite a White point).
-    UNUSED(limit_micros);
+    UNUSED(limit_micros); // TODO limit time taken, exit and resume
     uint32_t *plotBufferW = (uint32_t *)(plotToBackground ? osdBufferBackground : osdBufferA);
     static int y;
     static int wordIndex; // index of word along a line, in 0..22
