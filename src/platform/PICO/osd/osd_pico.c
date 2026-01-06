@@ -98,6 +98,7 @@ bool transferredSinceVsync;
 #ifdef OSD_DEBUG
 // trace / debugging
 uint32_t startVsyncCycles;
+uint32_t startVsyncCyclesPrev;
 uint32_t szb;
 uint32_t szc;
 uint32_t szd;
@@ -223,8 +224,8 @@ static bool osd_init_device(bool isPAL, int displayLines, int transferWords)
     fb_words = transferWords;
 
     // PAL field period = 20000us, NTSC ~= 16833us.
-    // Disallow TRANSFER (render to osdBufferA) during final 4000us or so.
-    safe_zone_start_us = isPAL ? 16000 : 12600;
+    // Disallow TRANSFER operations (render to osdBufferA) during final 1000us or so.
+    safe_zone_start_us = isPAL ? 19000 : 15800;
     in_safe_zone = true;
 
     bprintf("OSD osd_init_device lines %d words %d", displayLines, fb_words);
@@ -474,14 +475,14 @@ static void vsync_callback_debug(void)
             printq = 0;
             bprintf("%d completed %d, ave us (duty cycle) per vsync render %d (%.1f), "
                     "start ave %.1f max %.1f, end ave %.1f max %.1f "
-                    "check at -%.1f, lateness %d, transfer at %.1f "
+                    "max check at %.1f, lateness %d, transfer at %.1f "
                     "[%d %d %d %d %d %d]",
                     ddc, tusr,
                     renderTot/(NN*150), ((double)renderTot)/(NN*(150*20000/100)),
                     ((double)renderStartCycles)/(NN*150), ((double)renderStartCyclesMax)/(150),
                     ((double)renderEndCycles)/(NN*150), ((double)renderEndCyclesMax)/(150),
                     ((double)renderWasCheck)/(150), renderWasCheckD, ((double)renderWasTransfer)/(150),
-                    dd1,dd3-dd2,dd5-dd4,dd6,dd7,dd8
+                    dd1/150,dd3-dd2,dd5-dd4,dd6,dd7,dd8
                    );
         }
 
@@ -500,6 +501,7 @@ static void vsync_callback_debug(void)
 
         renderStartCycles = 0; renderEndCycles = 0;
         renderStartCyclesMax = 0; renderEndCyclesMax = 0;
+        renderWasCheck = 0; renderWasCheckD = 0; renderWasTransfer = 0;
 //        bprintf("max ah cache cycles %d", maxAHI);
         renderTot = 0; drawFGTot = 0; drawBGTot = 0;
         maxcycles = 0;
@@ -516,6 +518,7 @@ static void vsync_callback_debug(void)
 
 static void vsync_callback(void)
 {
+    startVsyncCyclesPrev = startVsyncCycles;
     startVsyncCycles=getCycleCounter();
     // static int fieldOddEven;
     // fieldOddEven = fieldOddEven ^ 0x1;  // odd or even field (we can't tell which is which), alternate 0, 1

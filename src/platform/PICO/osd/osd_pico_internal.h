@@ -90,6 +90,7 @@ bool iterDashedQLineNext(void);
 // trace / debugging
 #ifdef OSD_DEBUG
 extern uint32_t startVsyncCycles;
+extern uint32_t startVsyncCyclesPrev;
 extern uint32_t szb;
 extern uint32_t szc;
 extern uint32_t szd;

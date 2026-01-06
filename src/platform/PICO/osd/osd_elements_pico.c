@@ -534,7 +534,6 @@ static void plotBlob(int x, int y)
     
 bool renderSticksForegroundUntil(uint32_t limit_micros)
 {
-    dd1++;
     if (cachedStickLeft && micros() < limit_micros) {
         dd2 = getCycleCounter();
         plotBlob(infoStickLeft.xStick, infoStickLeft.yStick);
@@ -654,9 +653,11 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
 {
     dd7++;
     static bool firstOfVsync = true;
+    static uint32_t cycFirst;
     if (firstOfVsync) {
         firstOfVsync = false;
-        renderStartCycles += getCycleCounter() - startVsyncCycles;
+        cycFirst = getCycleCounter();
+        renderStartCycles += cycFirst - startVsyncCycles;
         renderStartCyclesMax = maxi(renderStartCyclesMax, getCycleCounter() - startVsyncCycles);
     }
 
@@ -703,13 +704,16 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
         renderEndCycles += getCycleCounter() - startVsyncCycles;
 //        renderEndCyclesMax = maxi(renderEndCyclesMax, getCycleCounter() - startVsyncCycles);
 // TODO ***
-        uint32_t rdd = getCycleCounter() - startVsyncCycles;
+        uint32_t cycNow = getCycleCounter();
+        uint32_t rdd = cycNow - startVsyncCycles;
+        extern uint32_t toCheck;
+        renderWasCheck = MAX(renderWasCheck, toCheck - startVsyncCyclesPrev);
         if (rdd > renderEndCyclesMax) {
+            dd1 = cycNow - cycFirst;
             renderEndCyclesMax = rdd;
-            extern uint32_t toCheck;
             extern uint32_t toCheckD;
             extern uint32_t toTransfer;
-            renderWasCheck = startVsyncCycles - toCheck; // expect -ve in bad case
+//            renderWasCheck = toCheck - startVsyncCyclesPrev;
             renderWasCheckD = toCheckD;
             renderWasTransfer = toTransfer - startVsyncCycles;
         }
