@@ -717,7 +717,9 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
 
         firstOfVsync = true;
         transferredSinceVsync = true;
+#ifdef OSD_DEBUG
         dd2 += cycNow - cRender;
+#endif
         return false; // Nothing more to draw.
     }
 
