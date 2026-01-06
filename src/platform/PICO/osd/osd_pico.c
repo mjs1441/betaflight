@@ -92,38 +92,41 @@ static int dma_chan_bufB_to_fifo;
 
 // buffer update control (avoid tearing etc.)
 static volatile bool in_safe_zone;
-static volatile uint32_t safe_zone_start_us;
-volatile bool transferredSinceVsync;
+static uint32_t safe_zone_start_us;
+bool transferredSinceVsync;
 
 #ifdef OSD_DEBUG
 // trace / debugging
-volatile uint32_t startVsyncCycles;
-volatile uint32_t szb;
-volatile uint32_t szc;
-volatile uint32_t szd;
-volatile uint32_t sze;
-volatile int tus;
-volatile int tusr;
-volatile uint32_t maxcycles;
-volatile int nisz;
-volatile int dmb;
-volatile uint32_t maxAHI;
-volatile uint32_t renderTot;
-volatile uint32_t drawBGTot;
-volatile uint32_t drawFGTot;
-volatile uint32_t renderStartCycles;
-volatile uint32_t renderEndCycles;
-volatile uint32_t renderStartCyclesMax;
-volatile uint32_t renderEndCyclesMax;
-volatile uint32_t renderWasCheck;
-volatile uint32_t renderWasCheckD;
-volatile uint32_t renderWasTransfer;
-volatile int checksb;
-volatile int checkol;
-static volatile int badX = -12345;
-static volatile int badY;
-static volatile int badC;
+uint32_t startVsyncCycles;
+uint32_t szb;
+uint32_t szc;
+uint32_t szd;
+uint32_t sze;
+int tus;
+int tusr;
+uint32_t maxcycles;
+int nisz;
+int dmb;
+uint32_t maxAHI;
+uint32_t renderTot;
+uint32_t drawBGTot;
+uint32_t drawFGTot;
+uint32_t renderStartCycles;
+uint32_t renderEndCycles;
+uint32_t renderStartCyclesMax;
+uint32_t renderEndCyclesMax;
+uint32_t renderWasCheck;
+uint32_t renderWasCheckD;
+uint32_t renderWasTransfer;
+int checksb;
+int checkol;
 uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
+
+static int badX = -12345;
+static int badY;
+static int badC;
+static int ddc=0;
+
 #endif
 
 __attribute__((aligned(4))) uint8_t osdCharBuffer[OSD_CHAR_BUFFER_LENGTH];
@@ -426,6 +429,8 @@ int osdPioCountHSyncs(void)
     return hsyncs;
 }
 
+static void vsync_callback_debug(void);
+
 static void vsync_callback(void)
 {
     startVsyncCycles=getCycleCounter();
@@ -445,7 +450,6 @@ static void vsync_callback(void)
         transferredSinceVsync = false;
     }
 
-    static int c=0;
     // Need to clear the IRQ flag state from the PIO.
     // This just writes a 1 to a register, doesn't mess with SM execution    
 //    pio_interrupt_clear(osdPio, 0);
@@ -517,11 +521,6 @@ static void vsync_callback(void)
             fb_words,               // Number of transfers
             false                   // Don't start immediately
         );
-//#define TEST_BACKGROUND_EFFECT
-#ifdef TEST_BACKGROUND_EFFECT
-    setBackgroundItemsPending();
-#endif
-
     }
     
     if (dmaClearBackgroundBuffer || flipThisVSync) {
@@ -550,9 +549,15 @@ static void vsync_callback(void)
     in_safe_zone = true;
     
 #ifdef OSD_DEBUG
+    vsync_callback_debug();
+#endif
+}
+
+static void vsync_callback_debug(void)
+{
     // the rest is just debug and testing.
 
-    ++c;
+    ++ddc;
 
 //#define NN 250
 #define NN 100
@@ -562,8 +567,8 @@ static void vsync_callback(void)
     uint32_t q;
     static uint32_t qtot;
     uint32_t szn = getCycleCounter();
-    int cm = c % NN;
-    if (c>20) {
+    int cm = ddc % NN;
+    if (ddc>20) {
         q = szn-szo;
         if (cm != 1) {
             vmax = q > vmax ? q : vmax;
@@ -574,11 +579,11 @@ static void vsync_callback(void)
     static uint32_t n_to_c;
     static int printq;
 
-    if (c % NN == 0) {
+    if (ddc % NN == 0) {
 //        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
 #if 0
         bprintf("%d vsync_callback busy %d %d nisz %d dmb %d (previous tainted n to c %d)",
-                c, business, busybuf, nisz, dmb, n_to_c);
+                ddc, business, busybuf, nisz, dmb, n_to_c);
 #endif
 ///        bprintf(" sb %d ol %d", checksb, checkol);
         nisz = 0; dmb = 0;
@@ -599,7 +604,7 @@ static void vsync_callback(void)
                     "start ave %.1f max %.1f, end ave %.1f max %.1f "
                     "check at -%.1f, lateness %d, transfer at %.1f "
                     "[%d %d %d %d %d %d]",
-                    c, tusr,
+                    ddc, tusr,
                     renderTot/(NN*150), ((double)renderTot)/(NN*(150*20000/100)),
                     ((double)renderStartCycles)/(NN*150), ((double)renderStartCyclesMax)/(150),
                     ((double)renderEndCycles)/(NN*150), ((double)renderEndCyclesMax)/(150),
@@ -635,7 +640,6 @@ static void vsync_callback(void)
     szo = szn;
     
     szc=getCycleCounter();
-#endif
 }
 
 static void enable(void)

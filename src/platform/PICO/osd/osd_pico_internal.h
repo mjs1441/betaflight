@@ -57,7 +57,7 @@ STATIC_ASSERT(PICO_OSD_BUF_HEIGHT_PAL == 288, pico_pal_lines_failed);
 // 30 * 16 = 480
 #define OSD_CHAR_BUFFER_LENGTH (OSD_SD_COLS * OSD_SD_ROWS)
 
-extern volatile bool transferredSinceVsync;
+extern bool transferredSinceVsync;
 
 extern const int fb_nx;
 extern int fb_ny;
@@ -89,29 +89,29 @@ bool iterDashedQLineNext(void);
 
 // trace / debugging
 #ifdef OSD_DEBUG
-extern volatile uint32_t startVsyncCycles;
-extern volatile uint32_t szb;
-extern volatile uint32_t szc;
-extern volatile uint32_t szd;
-extern volatile uint32_t sze;
-extern volatile int tus;
-extern volatile int tusr;
-extern volatile uint32_t maxcycles;
-extern volatile int nisz;
-extern volatile int dmb;
-extern volatile uint32_t maxAHI;
-extern volatile uint32_t renderTot;
-extern volatile uint32_t drawBGTot;
-extern volatile uint32_t drawFGTot;
-extern volatile uint32_t renderStartCycles;
-extern volatile uint32_t renderEndCycles;
-extern volatile uint32_t renderStartCyclesMax;
-extern volatile uint32_t renderEndCyclesMax;
-extern volatile uint32_t renderWasCheck;
-extern volatile uint32_t renderWasCheckD;
-extern volatile uint32_t renderWasTransfer;
-extern volatile int checksb;
-extern volatile int checkol;
+extern uint32_t startVsyncCycles;
+extern uint32_t szb;
+extern uint32_t szc;
+extern uint32_t szd;
+extern uint32_t sze;
+extern int tus;
+extern int tusr;
+extern uint32_t maxcycles;
+extern int nisz;
+extern int dmb;
+extern uint32_t maxAHI;
+extern uint32_t renderTot;
+extern uint32_t drawBGTot;
+extern uint32_t drawFGTot;
+extern uint32_t renderStartCycles;
+extern uint32_t renderEndCycles;
+extern uint32_t renderStartCyclesMax;
+extern uint32_t renderEndCyclesMax;
+extern uint32_t renderWasCheck;
+extern uint32_t renderWasCheckD;
+extern uint32_t renderWasTransfer;
+extern int checksb;
+extern int checkol;
 extern uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
 #define DEBUG_ZERO(x) x=0
