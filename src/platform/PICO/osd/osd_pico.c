@@ -118,8 +118,6 @@ uint32_t renderEndCyclesMax;
 uint32_t renderWasCheck;
 uint32_t renderWasCheckD;
 uint32_t renderWasTransfer;
-int checksb;
-int checkol;
 uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
 static int badX = -12345;
@@ -429,7 +427,92 @@ int osdPioCountHSyncs(void)
     return hsyncs;
 }
 
-static void vsync_callback_debug(void);
+
+#ifdef OSD_DEBUG
+static void vsync_callback_debug(void)
+{
+    ++ddc;
+
+// #define NN 250
+#define NN 50
+
+    static uint32_t vmax = 0;
+    static uint32_t szo;
+    uint32_t q;
+    static uint32_t qtot;
+    uint32_t szn = getCycleCounter();
+    int cm = ddc % NN;
+    if (ddc>20) {
+        q = szn-szo;
+        if (cm != 1) {
+            vmax = q > vmax ? q : vmax;
+        }
+        qtot += q;
+    }
+
+    static uint32_t n_to_c;
+
+    if (ddc % NN == 0) {
+//        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
+#if 0
+        bprintf("%d vsync_callback busy %d %d nisz %d dmb %d (previous tainted n to c %d)",
+                ddc, business, busybuf, nisz, dmb, n_to_c);
+#endif
+        nisz = 0; dmb = 0;
+        // NB ave wraps quickly (~1000 vsyncs)
+//        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
+//        bprintf("tus %d, tusr %d, ave %.1f calls per VS, %.1f rds per VS, %.1f calls/rd",
+//                tus, tusr,
+//                (double)tus/NN, (double)tusr/NN, (double)tus/tusr);
+//        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
+//                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
+#if 0
+        bprintf("max us per render call (last set of vsyncs had %d complete rds) %d", tusr, maxcycles/150);
+#endif
+        static int printq = 0;
+        if (++printq == 3) {
+            printq = 0;
+            bprintf("%d completed %d, ave us (duty cycle) per vsync render %d (%.1f), "
+                    "start ave %.1f max %.1f, end ave %.1f max %.1f "
+                    "check at -%.1f, lateness %d, transfer at %.1f "
+                    "[%d %d %d %d %d %d]",
+                    ddc, tusr,
+                    renderTot/(NN*150), ((double)renderTot)/(NN*(150*20000/100)),
+                    ((double)renderStartCycles)/(NN*150), ((double)renderStartCyclesMax)/(150),
+                    ((double)renderEndCycles)/(NN*150), ((double)renderEndCyclesMax)/(150),
+                    ((double)renderWasCheck)/(150), renderWasCheckD, ((double)renderWasTransfer)/(150),
+                    dd1,dd3-dd2,dd5-dd4,dd6,dd7,dd8
+                   );
+        }
+
+        dd1 = dd2 = dd3 = dd4 = dd5 = dd6 = dd7 = dd8 = 0;
+
+#if 0
+                bprintf(", fg %d (%.1f), bg %d (%.1f), fg+bg %d (%.1f)",
+                drawBGTot/(NN*150), ((double)drawBGTot)/(NN*150*20000/100),
+                drawFGTot/(NN*150), ((double)drawFGTot)/(NN*150*20000/100),
+                (drawFGTot + drawBGTot)/(NN*150), ((double)(drawFGTot + drawBGTot))/(NN*150*20000/100));
+#endif
+        if (badX != -12345) {
+            bprintf("*** detected out of range plot, last was %d, %d, %d", badX, badY, badC);
+            badX = -12345;
+        }
+
+        renderStartCycles = 0; renderEndCycles = 0;
+        renderStartCyclesMax = 0; renderEndCyclesMax = 0;
+//        bprintf("max ah cache cycles %d", maxAHI);
+        renderTot = 0; drawFGTot = 0; drawBGTot = 0;
+        maxcycles = 0;
+        tus = 0; tusr = 0;
+        vmax = 0;
+        n_to_c = getCycleCounter() - szn;
+        UNUSED(n_to_c);
+    }
+
+    szo = szn;
+    szc=getCycleCounter();
+}
+#endif
 
 static void vsync_callback(void)
 {
@@ -551,95 +634,6 @@ static void vsync_callback(void)
 #ifdef OSD_DEBUG
     vsync_callback_debug();
 #endif
-}
-
-static void vsync_callback_debug(void)
-{
-    // the rest is just debug and testing.
-
-    ++ddc;
-
-//#define NN 250
-#define NN 100
-    
-    static uint32_t vmax = 0;
-    static uint32_t szo;
-    uint32_t q;
-    static uint32_t qtot;
-    uint32_t szn = getCycleCounter();
-    int cm = ddc % NN;
-    if (ddc>20) {
-        q = szn-szo;
-        if (cm != 1) {
-            vmax = q > vmax ? q : vmax;
-        }
-        qtot += q;
-    }
-
-    static uint32_t n_to_c;
-    static int printq;
-
-    if (ddc % NN == 0) {
-//        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
-#if 0
-        bprintf("%d vsync_callback busy %d %d nisz %d dmb %d (previous tainted n to c %d)",
-                ddc, business, busybuf, nisz, dmb, n_to_c);
-#endif
-///        bprintf(" sb %d ol %d", checksb, checkol);
-        nisz = 0; dmb = 0;
-        // NB ave wraps quickly (~1000 vsyncs)
-//        bprintf("max time between callbacks: %d, last: %d, ave: %.1f",vmax/150, q/150, (double)(((float)qtot)/c/150));
-//        bprintf("tus %d, tusr %d, ave %.1f calls per VS, %.1f rds per VS, %.1f calls/rd",
-//                tus, tusr,
-//                (double)tus/NN, (double)tusr/NN, (double)tus/tusr);
-//        bprintf("max (per rd) us per call (ave over rds) %.1f, for which painted (ave over rds) %.1f",
-//                (double)maxcycles/150.0/tusr, (double)paintedmaxcycles/tusr);
-#if 0
-        bprintf("max us per render call (last set of vsyncs had %d complete rds) %d", tusr, maxcycles/150);
-#endif
-        printq = (printq + 1) % 2;
-        if (printq) {
-//        if (printq<2) {
-            bprintf("%d completed %d, ave us (duty cycle) per vsync render %d (%.1f), "
-                    "start ave %.1f max %.1f, end ave %.1f max %.1f "
-                    "check at -%.1f, lateness %d, transfer at %.1f "
-                    "[%d %d %d %d %d %d]",
-                    ddc, tusr,
-                    renderTot/(NN*150), ((double)renderTot)/(NN*(150*20000/100)),
-                    ((double)renderStartCycles)/(NN*150), ((double)renderStartCyclesMax)/(150),
-                    ((double)renderEndCycles)/(NN*150), ((double)renderEndCyclesMax)/(150),
-                    ((double)renderWasCheck)/(150), renderWasCheckD, ((double)renderWasTransfer)/(150),                
-                    dd1,dd3-dd2,dd5-dd4,dd6,dd7,dd8
-                   );
-        }
-
-        dd1 = dd2 = dd3 = dd4 = dd5 = dd6 = dd7 = dd8 = 0;
-            
-#if 0
-                bprintf(", fg %d (%.1f), bg %d (%.1f), fg+bg %d (%.1f)",
-                drawBGTot/(NN*150), ((double)drawBGTot)/(NN*150*20000/100),
-                drawFGTot/(NN*150), ((double)drawFGTot)/(NN*150*20000/100),
-                (drawFGTot + drawBGTot)/(NN*150), ((double)(drawFGTot + drawBGTot))/(NN*150*20000/100));
-#endif
-        if (badX != -12345) {
-            bprintf("*** detected out of range plot, last was %d, %d, %d", badX, badY, badC);
-            badX = -12345;
-        }
-
-        renderStartCycles = 0; renderEndCycles = 0;
-        renderStartCyclesMax = 0; renderEndCyclesMax = 0;
-//        bprintf("max ah cache cycles %d", maxAHI);
-        renderTot = 0; drawFGTot = 0; drawBGTot = 0;
-        maxcycles = 0;
-        tus = 0; tusr = 0;
-        vmax = 0;
-        n_to_c = getCycleCounter() - szn;
-        UNUSED(n_to_c);
-    }
-
-    szo = szn;
-    
-    szc=getCycleCounter();
 }
 
 static void enable(void)

@@ -110,20 +110,22 @@ extern uint32_t renderEndCyclesMax;
 extern uint32_t renderWasCheck;
 extern uint32_t renderWasCheckD;
 extern uint32_t renderWasTransfer;
-extern int checksb;
-extern int checkol;
 extern uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
 #define DEBUG_ZERO(x) x=0
 #define DEBUG_INC(x) ++x
+#define DEBUG_COUNTER_INST(x) uint32_t x = getCycleCounter()
 #define DEBUG_COUNTER(x) x = getCycleCounter()
 #define DEBUG_COUNTER_DIFF(x,y) x = getCycleCounter() - y
+#define DEBUG_COUNTER_ACC(x,y) x += getCycleCounter() - y
 
 #else
 
 #define DEBUG_ZERO(x)
 #define DEBUG_INC(x)
+#define DEBUG_COUNTER_INST(x)
 #define DEBUG_COUNTER(x)
 #define DEBUG_COUNTER_DIFF(x,y)
+#define DEBUG_COUNTER_ACC(x,y)
 
 #endif

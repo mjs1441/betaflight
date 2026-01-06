@@ -203,7 +203,6 @@ static void cacheStickLeftBackgroundInfo(uint8_t x, uint8_t y)
     if (bgStickLeftState == bgItemPendingCache) {
         cacheStickBackgroundInfo(&infoStickLeft, x, y);
         bgStickLeftState = bgItemPendingRender;
-        checkol+=10000;
     }
 }
 
@@ -236,7 +235,6 @@ bool drawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
     switch (item) {
     case OSD_HORIZON_SIDEBARS:
         cacheSidebarsInfo(elemPosX, elemPosY);
-        checksb++;
         return true;
     case OSD_STICK_OVERLAY_LEFT:
         cacheStickLeftBackgroundInfo(elemPosX, elemPosY);
@@ -254,10 +252,9 @@ bool drawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 
 bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
-    uint32_t c1 = getCycleCounter();
+    DEBUG_COUNTER_INST(c1);
     bool ret = drawBackgroundItem(item, elemPosX, elemPosY);
-//    drawBGTot += 100*150; UNUSED(c1);
-    drawBGTot += getCycleCounter() - c1;
+    DEBUG_COUNTER_ACC(drawBGTot, c1);
     return ret;
 }
 
@@ -285,7 +282,6 @@ bool drawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 
     case OSD_STICK_OVERLAY_LEFT:
         cacheStickLeftInfo();
-        checkol++;
         return true;
 
     case OSD_STICK_OVERLAY_RIGHT:
@@ -301,10 +297,9 @@ bool drawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 
 bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
-    uint32_t c1 = getCycleCounter();
+    DEBUG_COUNTER_INST(c1);
     bool ret = drawForegroundItem(item, elemPosX, elemPosY);
-    //drawFGTot += 200*150; UNUSED(c1);
-    drawFGTot += getCycleCounter() - c1;
+    DEBUG_COUNTER_ACC(drawFGTot,c1);
     return ret;
 }
 
