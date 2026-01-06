@@ -449,6 +449,8 @@ static void vsync_callback_debug(void)
 
     static uint32_t n_to_c;
 
+    dd3 = MAX(dd3,dd2); dd2 = 0;
+
     if (ddc % NN == 0) {
 //        bprintf("%d vsync_callback busy %d %d (previous tainted n to c %d)",c, business, busybuf, n_to_c);
 #if 0
@@ -478,7 +480,7 @@ static void vsync_callback_debug(void)
                     ((double)renderStartCycles)/(NN*150), ((double)renderStartCyclesMax)/(150),
                     ((double)renderEndCycles)/(NN*150), ((double)renderEndCyclesMax)/(150),
                     ((double)renderWasCheck)/(150), renderWasCheckD, ((double)renderWasTransfer)/(150),
-                    dd1/150,dd3-dd2,dd5-dd4,dd6,dd7,dd8
+                    dd1/150,dd2/150,dd3/150,dd6,dd7,dd8
                    );
         }
 

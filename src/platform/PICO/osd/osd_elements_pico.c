@@ -643,9 +643,10 @@ static bool postProcessUntil(uint32_t limit_micros)
 // Return false when complete (no more to do).
 bool osdPioRenderScreenUntil(uint32_t limit_micros)
 {
-    DEBUG_INC(dd7);
     static bool firstOfVsync = true;
 #ifdef OSD_DEBUG
+    uint32_t cRender = getCycleCounter();
+    ++dd7;
     static uint32_t cycFirst;
 #endif
     if (firstOfVsync) {
@@ -699,8 +700,8 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
 #ifdef OSD_DEBUG
         tusr++;
 
-        renderEndCycles += getCycleCounter() - startVsyncCycles;
         uint32_t cycNow = getCycleCounter();
+        renderEndCycles += cycNow - startVsyncCycles;
         uint32_t rdd = cycNow - startVsyncCycles;
         extern uint32_t toCheck;
         renderWasCheck = MAX(renderWasCheck, toCheck - startVsyncCyclesPrev);
@@ -716,9 +717,11 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
 
         firstOfVsync = true;
         transferredSinceVsync = true;
+        dd2 += cycNow - cRender;
         return false; // Nothing more to draw.
     }
 
+    DEBUG_COUNTER_ACC(dd2, cRender);
     return true; // More still to draw.
 }
 
