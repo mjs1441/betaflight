@@ -26,11 +26,6 @@
 #include "drivers/display.h"
 #include "osd/osd.h"
 #include "pg/vcd.h"
-// #include "pg/fb_osd.h"
-
-/** PAL or NTSC, value is number of chars total */
-// #define VIDEO_BUFFER_CHARS_NTSC   390
-// #define VIDEO_BUFFER_CHARS_PAL    480
 
 typedef enum {
     FB_OSD_INIT_OK = 0,              // IO defined and fb device was detected
@@ -38,16 +33,11 @@ typedef enum {
     FB_OSD_INIT_NOT_CONFIGURED = -2, // No fb IO defined, which means either the we don't have it or it's not properly configured
 } fbOsdInitStatus_e;
 
-// extern uint16_t maxScreenSize;
-struct fbOsdConfig_s;
+// fbOsdConfig not currently used, we could put e.g. horizontal and vertical offsets in here.
+struct fbOsdConfig_s; 
 
 // Per platform implementation of framebuffer OSD.
-
-// void    fbOsdHardwareReset(void);
-// void    fbOsdPreinit(const struct fbOsdConfig_s *fbOsdConfig);
 fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struct vcdProfile_s *vcdProfile);
-// void  fbOsdInvert(bool invert);
-// void  fbOsdBrightness(uint8_t black, uint8_t white);
 bool fbOsdReInitIfRequired(bool forceStallCheck);
 bool fbOsdDrawScreen(void);
 bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data);
@@ -57,12 +47,18 @@ void fbOsdWriteChar(uint8_t x, uint8_t y, uint8_t attr, uint8_t c);
 void fbOsdClearScreen(void);
 void fbOsdRefreshAll(void);
 bool fbOsdBufferInUse(void);
-// bool fbOsdBuffersSynced(void);
 bool fbOsdLayerSupported(displayPortLayer_e layer);
 bool fbOsdLayerSelect(displayPortLayer_e layer);
 bool fbOsdLayerCopy(displayPortLayer_e destLayer, displayPortLayer_e sourceLayer);
-// bool fbOsdIsDeviceDetected(void);
 void fbOsdSetBackgroundType(displayPortBackground_e backgroundType);
 bool fbOsdDrawItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY, bool isBackground);
 void fbOsdRedrawBackground(void);
 void fbOsdFontUpdateCompletion(void);
+
+// Not currently required / implemented
+// void fbOsdHardwareReset(void);
+// void fbOsdPreinit(const struct fbOsdConfig_s *fbOsdConfig);
+// void fbOsdInvert(bool invert);
+// void fbOsdBrightness(uint8_t black, uint8_t white);
+// bool fbOsdBuffersSynced(void);
+// bool fbOsdIsDeviceDetected(void);

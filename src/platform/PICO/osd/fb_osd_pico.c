@@ -34,15 +34,6 @@
 #include "font_betaflight.h"
 #include "osd_pico.h"
 
-// void    fbOsdHardwareReset(void);
-// void    fbOsdPreinit(const struct fbOsdConfig_s *fbOsdConfig);
-// void    fbOsdInvert(bool invert);
-// void    fbOsdBrightness(uint8_t black, uint8_t white);
-// bool    fbOsdBuffersSynced(void);
-
-// *** TODO merge osd_pico.c into fb_osd_pico.c (probably - might tease out some lower level stuff, pio-related)
-// osd_pico -> osd_pio, DMA, IRQ or so
-
 static uint8_t fontDataMagic[] = {'p', 'f', 'n', 't'};
 
 static bool inNTSCrange(int n)
@@ -75,19 +66,6 @@ static void fbOsdLoadFont(void)
 
 fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struct vcdProfile_s *vcdProfile)
 {
-#if 0 // def PICO_TRACE
-    static int vs1 = -2;
-    static int vs2 = -2;
-    int nvs1 = vcdProfile->video_system;
-    int nvs2 = vcdProfileMutable()->video_system;
-    if (vs1 != nvs1 || vs2 != nvs2) {
-        bprintf("fbOsdInit vcdProfile %p video system %d from %d", vcdProfile, nvs1, vs1);
-        bprintf("fbOsdInit vcdProfileMutable %p video system %d from %d", vcdProfileMutable(), nvs2, vs2);
-        vs1 = nvs1;
-        vs2 = nvs2;
-    }
-#endif
-
     UNUSED(fbOsdConfig);
 
     static bool first = true;
@@ -184,10 +162,11 @@ bool fbOsdReInitIfRequired(bool forceStallCheck)
 // Limit time taken for an individual call to fbOsdDrawScreen.
 // NB not a true limit, we are allowed to start a new operation if time has not gone past this,
 // so it might end up being exceeded by the length of the longest individual operation.
-//#define DRAWSCREEN_TIME_LIMIT_US 20
 
 // set this low to diagnose long operations
-#define DRAWSCREEN_TIME_LIMIT_US 5
+// #define DRAWSCREEN_TIME_LIMIT_US 5
+
+#define DRAWSCREEN_TIME_LIMIT_US 15
 
 // Return true if not complete.
 bool fbOsdDrawScreen(void)
@@ -197,6 +176,7 @@ bool fbOsdDrawScreen(void)
     return osdPioRenderScreenUntil(micros() + DRAWSCREEN_TIME_LIMIT_US);
 }
 
+// Write a character into the font data storage (in RAM)
 bool fbOsdWriteFontCharacter(uint8_t char_address, const uint8_t *font_data)
 {
     uint8_t bitConv[] = {0b10, 0b00, 0b11, 0b00};
@@ -237,7 +217,7 @@ uint8_t fbOsdGetRowsCount(void)
 
 void fbOsdWrite(uint8_t x, uint8_t y, uint8_t attr, const char *text)
 {
-    // *** TODO implement some attr behaviours
+    // *** TODO possibly implement some attr behaviours
     UNUSED(attr);
     osdPioWrite(x, y, text);
 }

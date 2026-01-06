@@ -21,7 +21,7 @@
 
 #pragma once
 
-// #define OSD_DEBUG
+#define OSD_DEBUG
 
 #include <stdint.h>
 #include "drivers/display.h"

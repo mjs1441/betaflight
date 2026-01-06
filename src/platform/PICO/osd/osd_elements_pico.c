@@ -683,6 +683,8 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
 #if 1
     UNUSED(postProcessUntil);
 #else
+    // Testing a post-process operation on the background buffer to start with
+    // Post processing can e.g. surround white pixels with a black border
     selectBackgroundBuffer();
     complete = complete && postProcessUntil(limit_micros);
     selectForegroundBuffer();
