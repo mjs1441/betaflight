@@ -23,6 +23,8 @@
 
 #ifdef USE_FB_OSD
 
+// #define DEBUG_TESTCARD
+
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
@@ -419,7 +421,7 @@ bool renderCharsUntil(uint32_t limit_micros)
         currentPtr = osdBufferA + hoffs;
     }
 
-    tus++;
+    DEBUG_INC(tus);
     while (currentY < charLines) {
         if (osdCharLineInUse[currentY]) {
             // currentPtr is pointer to topleft of char dest on osdBufferA
@@ -535,27 +537,17 @@ static void plotBlob(int x, int y)
 bool renderSticksForegroundUntil(uint32_t limit_micros)
 {
     if (cachedStickLeft && micros() < limit_micros) {
-        dd2 = getCycleCounter();
         plotBlob(infoStickLeft.xStick, infoStickLeft.yStick);
         cachedStickLeft = false;
-        dd3 = getCycleCounter();
     }
 
     if (cachedStickRight && micros() < limit_micros) {
-        dd4 = getCycleCounter();
         plotBlob(infoStickRight.xStick, infoStickRight.yStick);
         cachedStickRight = false;
-        dd5 = getCycleCounter();
     }
 
     return (!cachedStickLeft && !cachedStickRight);
 }
-
-static inline uint32_t maxi(uint32_t a, uint32_t b)
-{
-    return a>b ? a : b;
-}
-
 
 #if 0
 // Prototyping - slow version of psotProcessUntil
@@ -651,24 +643,28 @@ static bool postProcessUntil(uint32_t limit_micros)
 // Return false when complete (no more to do).
 bool osdPioRenderScreenUntil(uint32_t limit_micros)
 {
-    dd7++;
+    DEBUG_INC(dd7);
     static bool firstOfVsync = true;
+#ifdef OSD_DEBUG
     static uint32_t cycFirst;
+#endif
     if (firstOfVsync) {
         firstOfVsync = false;
+#ifdef OSD_DEBUG
         cycFirst = getCycleCounter();
         renderStartCycles += cycFirst - startVsyncCycles;
-        renderStartCyclesMax = maxi(renderStartCyclesMax, getCycleCounter() - startVsyncCycles);
+        renderStartCyclesMax = MAX(renderStartCyclesMax, getCycleCounter() - startVsyncCycles);
+#endif
     }
 
-#if 0
+#ifdef DEBUG_TESTCARD
     UNUSED(limit_micros);
     plotTestCard();
     transferredSinceVsync = true;
     return false;
 #endif
 
-    uint32_t c1 = getCycleCounter();
+    DEBUG_COUNTER_INST(c1);
 
     // Proceed with rendering background elements if/as required, if not timed out.
     selectBackgroundBuffer();
@@ -691,19 +687,19 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
     selectForegroundBuffer();
 #endif
 
+#ifdef OSD_DEBUG
     uint32_t cd = getCycleCounter() - c1;
     renderTot += cd;
     if (cd > maxcycles) {
         maxcycles = cd;
     }
+#endif
 
     if (complete) {
-        // accumulate for averaging: maxcycles += maxcyclesthisround;
+#ifdef OSD_DEBUG
         tusr++;
 
         renderEndCycles += getCycleCounter() - startVsyncCycles;
-//        renderEndCyclesMax = maxi(renderEndCyclesMax, getCycleCounter() - startVsyncCycles);
-// TODO ***
         uint32_t cycNow = getCycleCounter();
         uint32_t rdd = cycNow - startVsyncCycles;
         extern uint32_t toCheck;
@@ -713,10 +709,10 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
             renderEndCyclesMax = rdd;
             extern uint32_t toCheckD;
             extern uint32_t toTransfer;
-//            renderWasCheck = toCheck - startVsyncCyclesPrev;
             renderWasCheckD = toCheckD;
             renderWasTransfer = toTransfer - startVsyncCycles;
         }
+#endif
 
         firstOfVsync = true;
         transferredSinceVsync = true;
@@ -726,7 +722,7 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
     return true; // More still to draw.
 }
 
-#ifdef OSD_DEBUG_EXTRA
+#ifdef DEBUG_TESTCARD
 void plotTestCard(void)
 {
     for (int i=0; i<fb_nx; ++i) {

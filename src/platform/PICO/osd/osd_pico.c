@@ -99,10 +99,6 @@ bool transferredSinceVsync;
 // trace / debugging
 uint32_t startVsyncCycles;
 uint32_t startVsyncCyclesPrev;
-uint32_t szb;
-uint32_t szc;
-uint32_t szd;
-uint32_t sze;
 int tus;
 int tusr;
 uint32_t maxcycles;
@@ -121,9 +117,9 @@ uint32_t renderWasCheckD;
 uint32_t renderWasTransfer;
 uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
-static int badX = -12345;
+static int badX;
 static int badY;
-static int badC;
+static int badC = -1;
 static int ddc=0;
 
 #endif
@@ -164,8 +160,8 @@ static bool init_gpios(void)
 
 void osdPioClearCharBuffer(void)
 {
-    dd6++;
-    uint32_t c1 = getCycleCounter();
+    DEBUG_INC(dd6);
+    DEBUG_COUNTER_INST(c1);
     memset(osdCharBuffer, 0x20, OSD_CHAR_BUFFER_LENGTH);
     memset(osdCharLineInUse, 0, OSD_SD_ROWS);
     DEBUG_COUNTER_DIFF(dd8,c1);
@@ -187,14 +183,14 @@ bool osdPioBufferAvailable(void)
     }
 
     if (!in_safe_zone) {
-        nisz++;
+        DEBUG_INC(nisz);
         return false;
     }
 
     if (dma_channel_is_busy(dma_chan_bg_to_bufA)) {
         // Busy preparing osdBufferA for rendering (copying in background buffer),
         // don't allow rendering into osdBufferA until that is complete.
-        dmb++;
+        DEBUG_INC(dmb);
         return false;
     }
 
@@ -494,9 +490,9 @@ static void vsync_callback_debug(void)
                 drawFGTot/(NN*150), ((double)drawFGTot)/(NN*150*20000/100),
                 (drawFGTot + drawBGTot)/(NN*150), ((double)(drawFGTot + drawBGTot))/(NN*150*20000/100));
 #endif
-        if (badX != -12345) {
+        if (badC != -1) {
             bprintf("*** detected out of range plot, last was %d, %d, %d", badX, badY, badC);
-            badX = -12345;
+            badC = -1;
         }
 
         renderStartCycles = 0; renderEndCycles = 0;
@@ -512,14 +508,16 @@ static void vsync_callback_debug(void)
     }
 
     szo = szn;
-    szc=getCycleCounter();
 }
 #endif
 
 static void vsync_callback(void)
 {
+#ifdef OSD_DEBUG
     startVsyncCyclesPrev = startVsyncCycles;
     startVsyncCycles=getCycleCounter();
+#endif
+
     // static int fieldOddEven;
     // fieldOddEven = fieldOddEven ^ 0x1;  // odd or even field (we can't tell which is which), alternate 0, 1
 
@@ -624,8 +622,6 @@ static void vsync_callback(void)
     // Probably best clear the interrupt here at the end, just in case there are re-trigger issues if cleared earlier...
     pio_interrupt_clear(osdPio, 0);
 
-    szb = getCycleCounter();
-
     // Protect against starting a render operation just before a vsync callback.
     static alarm_id_t aid = -1 ;
     if (aid != -1) {
@@ -681,9 +677,11 @@ void plot(int x, int y, int c)
     uint8_t *plotBuffer = plotToBackground ? osdBufferBackground : osdBufferA;
 
     if (x<0 || y<0 || x>=fb_nx || y>=fb_ny) {
+#ifdef OSD_DEBUG
         badX = x;
         badY = y;
         badC = c;
+#endif
         return;
     }
 

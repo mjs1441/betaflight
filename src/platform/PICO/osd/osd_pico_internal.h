@@ -22,7 +22,6 @@
 #pragma once
 
 #define OSD_DEBUG
-// #define OSD_DEBUG_EXTRA
 
 #include <stdint.h>
 #include "drivers/display.h"
@@ -91,10 +90,6 @@ bool iterDashedQLineNext(void);
 #ifdef OSD_DEBUG
 extern uint32_t startVsyncCycles;
 extern uint32_t startVsyncCyclesPrev;
-extern uint32_t szb;
-extern uint32_t szc;
-extern uint32_t szd;
-extern uint32_t sze;
 extern int tus;
 extern int tusr;
 extern uint32_t maxcycles;
@@ -113,6 +108,7 @@ extern uint32_t renderWasCheckD;
 extern uint32_t renderWasTransfer;
 extern uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
+// Macros to avoid wrapping all debug code in #ifdef OSD_DEBUG
 #define DEBUG_ZERO(x) x=0
 #define DEBUG_INC(x) ++x
 #define DEBUG_COUNTER_INST(x) uint32_t x = getCycleCounter()
