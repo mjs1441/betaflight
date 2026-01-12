@@ -112,9 +112,6 @@ uint32_t renderStartCycles;
 uint32_t renderEndCycles;
 uint32_t renderStartCyclesMax;
 uint32_t renderEndCyclesMax;
-uint32_t renderWasCheck;
-uint32_t renderWasCheckD;
-uint32_t renderWasTransfer;
 uint32_t dd1,dd2,dd3,dd4,dd5,dd6,dd7,dd8;
 
 static int badX;
@@ -473,13 +470,11 @@ static void vsync_callback_debug(void)
             printq = 0;
             bprintf("%d completed %d, ave us (duty cycle) per vsync render %d (%.1f), "
                     "start ave %.1f max %.1f, end ave %.1f max %.1f "
-                    "max check at %.1f, lateness %d, transfer at %.1f "
                     "[%d %d %d %d %d %d]",
                     ddc, tusr,
                     renderTot/(NN*150), ((double)renderTot)/(NN*(150*20000/100)),
                     ((double)renderStartCycles)/(NN*150), ((double)renderStartCyclesMax)/(150),
                     ((double)renderEndCycles)/(NN*150), ((double)renderEndCyclesMax)/(150),
-                    ((double)renderWasCheck)/(150), renderWasCheckD, ((double)renderWasTransfer)/(150),
                     dd1/150,dd2/150,dd3/150,dd6,dd7,dd8
                    );
         }
@@ -499,7 +494,6 @@ static void vsync_callback_debug(void)
 
         renderStartCycles = 0; renderEndCycles = 0;
         renderStartCyclesMax = 0; renderEndCyclesMax = 0;
-        renderWasCheck = 0; renderWasCheckD = 0; renderWasTransfer = 0;
 //        bprintf("max ah cache cycles %d", maxAHI);
         renderTot = 0; drawFGTot = 0; drawBGTot = 0;
         maxcycles = 0;

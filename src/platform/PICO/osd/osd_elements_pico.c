@@ -705,15 +705,9 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
         uint32_t cycNow = getCycleCounter();
         renderEndCycles += cycNow - startVsyncCycles;
         uint32_t rdd = cycNow - startVsyncCycles;
-        extern uint32_t toCheck;
-        renderWasCheck = MAX(renderWasCheck, toCheck - startVsyncCyclesPrev);
         if (rdd > renderEndCyclesMax) {
             dd1 = cycNow - cycFirst;
             renderEndCyclesMax = rdd;
-            extern uint32_t toCheckD;
-            extern uint32_t toTransfer;
-            renderWasCheckD = toCheckD;
-            renderWasTransfer = toTransfer - startVsyncCycles;
         }
 #endif
 

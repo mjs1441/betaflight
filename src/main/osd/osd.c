@@ -1361,13 +1361,6 @@ osdState_e osdState = OSD_STATE_INIT;
 
 #define OSD_UPDATE_INTERVAL_US (1000000 / osdConfig()->framerate_hz)
 
-// TODO ***
-volatile uint32_t toCheck;
-volatile uint32_t toCheckD;
-volatile uint32_t toTransfer;
-extern uint32_t getCycleCounter(void);
-
-
 // Called periodically by the scheduler
 bool osdUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
 {
@@ -1378,9 +1371,6 @@ bool osdUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
         // If the OSD is due a refresh, mark that as being the case
         if (cmpTimeUs(currentTimeUs, osdUpdateDueUs) > 0) {
             osdState = OSD_STATE_CHECK;
-            // TODO ***
-            toCheck = getCycleCounter();
-            toCheckD = currentTimeUs - osdUpdateDueUs;
 
             // Determine time of next update
             if (osdUpdateDueUs) {
@@ -1609,7 +1599,6 @@ void osdUpdate(timeUs_t currentTimeUs)
         if (resumeRefreshAt) {
             osdState = OSD_STATE_IDLE;
         } else {
-            toTransfer = getCycleCounter();
             osdState = OSD_STATE_TRANSFER;
         }
         break;
