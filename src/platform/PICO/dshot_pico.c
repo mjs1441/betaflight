@@ -139,9 +139,6 @@ static void dshotUpdateComplete(void)
         }
     }
 
-    // stop SMs before sending data to SM, for simultaneous restart
-    pio_set_sm_mask_enabled(dshotPio, motorMask, false);
-
     if (useDshotTelemetry) {
         // For bidir DShot, the PIO program blocks at instruction 0 (pull block)
         // waiting for TX data. When the SM completes its cycle (transmit + receive),
@@ -182,6 +179,9 @@ static void dshotUpdateComplete(void)
                     while (!pio_sm_is_rx_fifo_empty(motor->pio, motor->pio_sm)) {
                         (void)pio_sm_get(motor->pio, motor->pio_sm);
                     }
+
+                    // stop SMs before sending data to SM, for simultaneous restart
+                    pio_sm_set_enabled(motor->pio, motor->pio_sm, false);
                     pio_sm_put(motor->pio, motor->pio_sm, outgoingPacket[motorIndex]);
                     waitCount[motorIndex] = 0;
                 } else if (atWaitInstr) {
@@ -195,6 +195,7 @@ static void dshotUpdateComplete(void)
                         pio_sm_clear_fifos(motor->pio, motor->pio_sm);
                         pio_sm_exec_wait_blocking(motor->pio, motor->pio_sm,
                             pio_encode_jmp(motor->offset + dshot_600_bidir_BIDIR_START));
+                        pio_sm_set_enabled(motor->pio, motor->pio_sm, false);
                         pio_sm_put(motor->pio, motor->pio_sm, outgoingPacket[motorIndex]);
                         waitCount[motorIndex] = 0;
                     }
@@ -210,6 +211,7 @@ static void dshotUpdateComplete(void)
         for (int motorIndex = 0; motorIndex < dshotMotorCount; ++motorIndex) {
             if (outgoingPacket[motorIndex] >= 0) {
                 const motorOutput_t *motor = &dshotMotors[motorIndex];
+                pio_sm_set_enabled(motor->pio, motor->pio_sm, false);
                 pio_sm_put(motor->pio, motor->pio_sm, outgoingPacket[motorIndex]);
             }
         }
