@@ -344,7 +344,7 @@ static uint32_t decodeOversampledTelemetry(int motorIndex, const uint32_t *buffe
     static uint32_t successCountM0;
     failCount += lastFailReason != FAIL_NONE;
     successCountM0 += motorIndex == 0 && lastFailReason == FAIL_NONE;
-    if ((failCount % 16384) == 1 || (motorIndex == 0 && ((successCountM0 % 65536) == 1))) {
+    if ((lastFailReason != FAIL_NONE && (failCount % 16384) == 1) || (motorIndex == 0 && ((successCountM0 % 65536) == 1))) {
         uint16_t eRPM = (decodedValue >> 4) & 0xFFF;
 
         bprintf("diffs (1->2 %d 2->3 %d) %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d  %d %d %d %d M%d %s: eRPM=%u (raw=%04x) edges=%d cal=%d",
