@@ -166,7 +166,6 @@ void cacheArtificialHorizonInfo(uint8_t x, uint8_t y)
 
     infoAH.cx = x * PICO_OSD_CHAR_WIDTH + PICO_OSD_CHAR_WIDTH / 2;
     infoAH.cy = y * PICO_OSD_CHAR_HEIGHT + PICO_OSD_CHAR_HEIGHT / 2;
-
     const int displacementScale = (fb_ny - 64) / 2;
     if (maxPitch > 0) {
         infoAH.pixelsPerDeciDeg = (float)displacementScale / maxPitch;

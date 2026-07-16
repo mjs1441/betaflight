@@ -32,6 +32,7 @@
 #define OSD_BYTES_PER_CHAR 2
 // 5x8 but embedded in mcm-style data structure at top left with transparent padding
 // so call it 8x8
+// _CHAR_ reflects the grid layout (as per Configurator)
 #define PICO_OSD_GLYPH_WIDTH 8
 #define PICO_OSD_GLYPH_HEIGHT 8
 #define PICO_OSD_CHAR_WIDTH  8
@@ -72,6 +73,7 @@ STATIC_ASSERT(PICO_OSD_BUF_HEIGHT_PAL == 288, pico_pal_lines_failed);
 #define PICO_OSD_DISPLAY_WORDS_PAL  (PICO_OSD_LINE_WORDS * PICO_OSD_BUF_HEIGHT_PAL)
 
 // 30 * 16 = 480
+// 46 * 24 = 1104
 #define OSD_CHAR_BUFFER_LENGTH (OSD_SD_COLS * OSD_SD_ROWS)
 
 // Limit time taken for an individual call to fbOsdDrawScreen.
@@ -119,6 +121,8 @@ void setBackgroundItemsPending(void);
 extern bool logoVisible;
 void cacheLogoInfo(uint16_t midX, uint16_t midY, uint16_t fontOffset, uint8_t logoCols, uint8_t logoRows);
 
+bool isWideChar(uint8_t ch);
+
 #ifdef OSD_FB_PICO_PIXEL_MODE
 void plot(int x, int y, int c);
 void hLine(int x, int y, int count, int col);
@@ -134,6 +138,7 @@ bool iterDashedDLineNext(void);
 void iterRectInit(int16_t x1, int16_t y1, int16_t x2, int16_t y2);
 bool iterBlackFillRectNext(void);
 
+void renderCharAt(uint8_t ch, int px, int py);
 void renderStringInit(const char *str, uint16_t initX, uint16_t y, int charAdvance);
 bool renderStringNext(void);
 #endif // OSD_FB_PICO_PIXEL_MODE

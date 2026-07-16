@@ -251,6 +251,11 @@ static uint32_t blinkBits[(OSD_ITEM_COUNT + 31) / 32];
 #define IS_BLINK(item) (blinkBits[(item) / 32] & (1 << ((item) % 32)))
 #define BLINK(item) (IS_BLINK(item) && blinkState)
 
+bool osdIsBlink(osd_items_e item)
+{
+    return BLINK(item);
+}
+
 // Current element and render status
 static osdElementParms_t activeElement;
 #ifdef UNIT_TEST
@@ -336,6 +341,7 @@ int osdConvertTemperatureToSelectedUnit(int tempInDegreesCelcius)
     }
 }
 
+#ifndef OSD_FB_ELEMENT_ALTITUDE
 static void osdFormatAltitudeString(char * buff, int32_t altitudeCm, osdElementType_e variantType)
 {
     static const struct {
@@ -359,6 +365,7 @@ static void osdFormatAltitudeString(char * buff, int32_t altitudeCm, osdElementT
 
     osdPrintFloat(buff, SYM_ALTITUDE, osdGetMetersToSelectedUnit(alt) / 100.0f, "", decimalPlaces, true, unitSymbol);
 }
+#endif
 
 #ifdef USE_GPS
 static void osdFormatCoordinate(char *buff, gpsCoordinateType_e coordinateType, osdElementType_e variantType)
@@ -400,11 +407,10 @@ static void osdFormatCoordinate(char *buff, gpsCoordinateType_e coordinateType, 
 #ifdef DEBUG_OSD_TEST_SMALLFONT
             UNUSED(leadingSymbol);
             if (coordinateType == GPS_LONGITUDE) {
-                tfp_sprintf(buff, "%c%c%c%c", SYM_SAT_L, SYM_SAT_R, SYM_LON, SYM_LON_2);
+                buff += tfp_sprintf(buff, "%c%c%c", SYM_SAT_L, SYM_SAT_R, SYM_LON);
             } else {
-                tfp_sprintf(buff, "%c%c%c%c", SYM_SAT_L, SYM_SAT_R, SYM_LAT, SYM_LAT_2);
+                buff += tfp_sprintf(buff, "%c%c%c", SYM_SAT_L, SYM_SAT_R, SYM_LAT);
             }
-            buff += 4;
 #else
             *buff++ = leadingSymbol;
 #endif
@@ -431,11 +437,10 @@ static void osdFormatCoordinate(char *buff, gpsCoordinateType_e coordinateType, 
     default:
 #ifdef DEBUG_OSD_TEST_SMALLFONT
             if (coordinateType == GPS_LONGITUDE) {
-                tfp_sprintf(buff, "%c%c%c%c", SYM_SAT_L, SYM_SAT_R, SYM_LON, SYM_LON_2);
+                buff += tfp_sprintf(buff, "%c%c%c", SYM_SAT_L, SYM_SAT_R, SYM_LON);
             } else {
-                tfp_sprintf(buff, "%c%c%c%c", SYM_SAT_L, SYM_SAT_R, SYM_LAT, SYM_LAT_2);
+                buff += tfp_sprintf(buff, "%c%c%c", SYM_SAT_L, SYM_SAT_R, SYM_LAT);
             }
-            buff += 4;
 #else
             *buff++ = leadingSymbol;
 #endif
@@ -511,7 +516,7 @@ bool osdFormatRtcDateTime(char *buffer)
     dateTimeUTCToLocal(&dateTime, &localDateTime);
 
     switch (activeElement.type) {
-    case OSD_ELEMENT_TYPE_3: 
+    case OSD_ELEMENT_TYPE_3:
         tfp_sprintf(buffer, "%02d:%02d:%02d", localDateTime.hours, localDateTime.minutes, localDateTime.seconds);
         break;
     case OSD_ELEMENT_TYPE_2:
@@ -604,6 +609,11 @@ void osdFormatTimer(char *buff, bool showSymbol, bool usePrecision, int timerInd
 
 static char osdGetBatterySymbol(int cellVoltage)
 {
+#ifdef DEBUG_OSD_BATTERY_TEST
+    if (micros() % 7300000 < 2000000) {
+        return SYM_MAIN_BATT;
+    }
+#endif
     if (getBatteryState() == BATTERY_CRITICAL) {
         return SYM_MAIN_BATT; // FIXME: currently the BAT- symbol, ideally replace with a battery with exclamation mark
     } else {
@@ -777,6 +787,9 @@ static void osdElementAdjustmentRange(osdElementParms_t *element)
 
 static void osdElementAltitude(osdElementParms_t *element)
 {
+#ifdef OSD_FB_ELEMENT_ALTITUDE
+    UNUSED(element);
+#else
     bool haveBaro = false;
     bool haveGps = false;
 #ifdef USE_BARO
@@ -798,21 +811,14 @@ static void osdElementAltitude(osdElementParms_t *element)
         element->buff[1] = SYM_HYPHEN; // We use this symbol when we don't have a valid measure
         element->buff[2] = '\0';
     }
+#endif
 }
 
 #ifdef USE_ACC
 static void osdElementAngleRollPitch(osdElementParms_t *element)
 {
     const float angle = ((element->item == OSD_PITCH_ANGLE) ? attitude.values.pitch : attitude.values.roll) / 10.0f;
-#ifdef DEBUG_OSD_TEST_SMALLFONT
-    if (angle < 0) {
-        osdPrintFloat(element->buff, SYM_NONE, fabsf(angle), element->item == OSD_PITCH_ANGLE ? "PIT: -%02u" : "ROL: -%02u", 1, true, SYM_NONE);
-    } else {
-        osdPrintFloat(element->buff, SYM_NONE, fabsf(angle), element->item == OSD_PITCH_ANGLE ? "PIT:  %02u" : "ROL:  %02u", 1, true, SYM_NONE);
-    }
-#else
     osdPrintFloat(element->buff, (element->item == OSD_PITCH_ANGLE) ? SYM_PITCH : SYM_ROLL, fabsf(angle), ((angle < 0) ? "-%02u" : " %02u"), 1, true, SYM_NONE);
-#endif
 }
 #endif
 
@@ -821,6 +827,9 @@ static void osdElementAntiGravity(osdElementParms_t *element)
     if (pidOsdAntiGravityActive()) {
         strcpy(element->buff, "AG");
     }
+#ifdef DEBUG_OSD_HALTS_ON_ANTIGRAV
+    element->rendered = false;
+#endif
 }
 
 #ifdef USE_ACC
@@ -1717,7 +1726,7 @@ static void osdElementRssi(osdElementParms_t *element)
     }
 
 #ifdef OSD_RSSI_WITH_SYMBOL
-    tfp_sprintf(element->buff, "%c%c%c %2d", SYM_HEADSET_L, SYM_HEADSET_R, SYM_RSSI, osdRssiPercent);
+    tfp_sprintf(element->buff, "%c%c %2d", SYM_HEADSET, SYM_RSSI, osdRssiPercent);
 #else
     tfp_sprintf(element->buff, "%c%2d", SYM_RSSI, osdRssiPercent);
 #endif
@@ -2298,12 +2307,18 @@ static bool osdDrawSingleElement(displayPort_t *osdDisplayPort, uint8_t item)
         // Element has no drawing function
         return true;
     }
-    if (!osdDisplayPort->useDeviceBlink && BLINK(item)) {
-        return true;
-    }
 
     uint8_t elemPosX = OSD_X(osdElementConfig()->item_pos[item]);
     uint8_t elemPosY = OSD_Y(osdElementConfig()->item_pos[item]);
+
+    if (displayExtended(osdDisplayPort, elemPosX, elemPosY, item, false /* not background */)) {
+        // Element has been handled by a specialised handler (e.g. artificial horizon by FBOSD framebuffer driver).
+        return true;
+    }
+
+    if (!osdDisplayPort->useDeviceBlink && BLINK(item)) {
+        return true;
+    }
 
     activeElement.item = item;
     activeElement.elemPosX = elemPosX;
@@ -2319,9 +2334,6 @@ static bool osdDrawSingleElement(displayPort_t *osdDisplayPort, uint8_t item)
     // Call the element drawing function
     if (IS_SYS_OSD_ELEMENT(item)) {
         displaySys(osdDisplayPort, elemPosX, elemPosY, (displayPortSystemElement_e)(item - OSD_SYS_GOGGLE_VOLTAGE + DISPLAYPORT_SYS_GOGGLE_VOLTAGE));
-    } else if (displayExtended(osdDisplayPort, elemPosX, elemPosY, item, false /* not background */)) {
-        // Element has been handled by a specialised handler (e.g. artificial horizon by FBOSD framebuffer driver).
-        activeElement.rendered = true;
     } else {
         osdElementDrawFunction[item](&activeElement);
         if (activeElement.drawElement) {
@@ -2655,11 +2667,20 @@ void osdUpdateAlarms(void)
         CLR_BLINK(OSD_REMAINING_TIME_ESTIMATE);
     }
 
+#ifdef DEBUG_OSD_ALT_TEST
+    alt = osdConfig()->alt_alarm * (0.65f * (1.0f + sinf(millis()*.0003f)) - 0.12f);
+    if ((alt >= osdConfig()->alt_alarm)) {
+        SET_BLINK(OSD_ALTITUDE);
+    } else {
+        CLR_BLINK(OSD_ALTITUDE);
+    }
+#else
     if ((alt >= osdConfig()->alt_alarm) && ARMING_FLAG(ARMED)) {
         SET_BLINK(OSD_ALTITUDE);
     } else {
         CLR_BLINK(OSD_ALTITUDE);
     }
+#endif
 
 #ifdef USE_GPS
     if (sensors(SENSOR_GPS) && ARMING_FLAG(ARMED) && STATE(GPS_FIX) && STATE(GPS_FIX_HOME)) {
