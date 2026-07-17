@@ -699,7 +699,7 @@ static bool drawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemP
     uint8_t elemType = OSD_TYPE(osdElementConfig()->item_pos[item]);
     switch (item) {
     // Cache information for rendering an osd item later on.
-#ifdef OSD_FB_ELEMENT_ARTIFICIAL_HORIZON
+#if OSD_FB_ELEMENT_ENABLE_ARTIFICIAL_HORIZON
     case OSD_ARTIFICIAL_HORIZON:
         cacheArtificialHorizonInfo(elemPosX, elemPosY);
         return true;
@@ -717,7 +717,7 @@ static bool drawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemP
         cacheCompassBarInfo(elemPosX, elemPosY);
         return true;
 
-#ifdef OSD_FB_ELEMENT_ALTITUDE
+#if OSD_FB_ELEMENT_ENABLE_ALTITUDE
     case OSD_ALTITUDE:
         cacheAltitudeInfo(elemPosX, elemPosY, elemType, osdIsBlink(item));
         return true;

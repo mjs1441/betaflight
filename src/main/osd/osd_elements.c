@@ -341,7 +341,7 @@ int osdConvertTemperatureToSelectedUnit(int tempInDegreesCelcius)
     }
 }
 
-#ifndef OSD_FB_ELEMENT_ALTITUDE
+#if !OSD_FB_ELEMENT_ENABLE_ALTITUDE
 static void osdFormatAltitudeString(char * buff, int32_t altitudeCm, osdElementType_e variantType)
 {
     static const struct {
@@ -782,7 +782,7 @@ static void osdElementAdjustmentRange(osdElementParms_t *element)
 
 static void osdElementAltitude(osdElementParms_t *element)
 {
-#ifdef OSD_FB_ELEMENT_ALTITUDE
+#if OSD_FB_ELEMENT_ENABLE_ALTITUDE
     UNUSED(element);
 #else
     bool haveBaro = false;
@@ -828,7 +828,7 @@ static void osdElementAntiGravity(osdElementParms_t *element)
 
 static void osdElementArtificialHorizon(osdElementParms_t *element)
 {
-#ifdef OSD_FB_ELEMENT_ARTIFICIAL_HORIZON
+#if OSD_FB_ELEMENT_ENABLE_ARTIFICIAL_HORIZON
     UNUSED(element);
 #else
     static int x = -4;
@@ -1360,7 +1360,7 @@ static void osdElementGpsLapTimeBest3(osdElementParms_t *element)
 
 static void osdBackgroundHorizonSidebars(osdElementParms_t *element)
 {
-#ifdef OSD_FB_ELEMENT_ARTIFICIAL_HORIZON
+#if OSD_FB_ELEMENT_ENABLE_ARTIFICIAL_HORIZON
     UNUSED(element);
 #else
     static bool renderLevel = false;
