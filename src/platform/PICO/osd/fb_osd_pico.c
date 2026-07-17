@@ -94,7 +94,7 @@ fbOsdInitStatus_e fbOsdInit(const struct fbOsdConfig_s *fbOsdConfig, const struc
     if (first) {
         if (!fbOsdLoadFont()) {
             bprintf("FB_OSD fbOsdInit font data not configured");
-            return FB_OSD_INIT_NOT_CONFIGURED;
+            // can't return as "not configured" here, otherwise never get a chance to upload a font!
         }
 
         if (!osdPioStartDetection()) {
