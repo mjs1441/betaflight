@@ -28,11 +28,11 @@
 #include "drivers/display.h"
 #include "osd/osd.h"
 
-#if defined(DEBUG_OSD_TEST_SMALLFONT) && !OSD_FB_PICO_ENABLE_PIXEL_MODE
-#error DEBUG_OSD_TEST_SMALLFONT requires OSD_FB_PICO_ENABLE_PIXEL_MODE
+#if OSD_FB_ENABLE_SMALLFONT && !OSD_FB_PICO_ENABLE_PIXEL_MODE
+#error OSD_FB_ENABLE_SMALLFONT requires OSD_FB_PICO_ENABLE_PIXEL_MODE
 #endif
 
-#ifdef DEBUG_OSD_TEST_SMALLFONT
+#if OSD_FB_ENABLE_SMALLFONT
 #define OSD_BYTES_PER_CHAR 2
 // 5x8 but embedded in mcm-style data structure at top left with transparent padding
 // so call it 8x8

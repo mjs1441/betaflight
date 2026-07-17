@@ -74,7 +74,7 @@ static void renderCharAtAlignedEx(uint8_t ch, int px, int py, int bpc, int rows)
 
 bool isWideChar(uint8_t ch)
 {
-#if defined DEBUG_OSD_TEST_SMALLFONT
+#if OSD_FB_ENABLE_SMALLFONT
     uint8_t mode4 = fontData[ch / 4];
     uint8_t mode = (mode4 >> (2 * (ch % 4))) & 0x3;
     return mode / 2;
@@ -165,7 +165,7 @@ static const radioControls_t radioModes[4] = {
 };
 
 // Stick overlay size
-#ifdef DEBUG_OSD_TEST_SMALLFONT
+#if OSD_FB_ENABLE_SMALLFONT
 static const int stickWidth = 48;
 static const int stickHeight = 48;
 #else
@@ -528,7 +528,7 @@ bool renderStickRightUntil(uint32_t limit_micros)
     return renderStickRightComplete;
 }
 
-#if defined DEBUG_OSD_TEST_SMALLFONT
+#if OSD_FB_ENABLE_SMALLFONT
 
 typedef struct {
     uint8_t bpc;
@@ -964,7 +964,7 @@ bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPo
 
 static bool renderCharsComplete = true;
 
-#ifdef DEBUG_OSD_TEST_SMALLFONT
+#if OSD_FB_ENABLE_SMALLFONT
 static void renderCharAtAlignedEx(uint8_t ch, int px, int py, int bpc, int rows)
 {
     // NOTE renderCharAtAligned assumes that the character at px, py willl fit into the frame buffer.
@@ -996,7 +996,7 @@ static void renderCharAtAligned(uint8_t ch, int px, int py)
     renderCharAtAlignedEx(ch, px, py - (charMode.rows - PICO_OSD_GLYPH_HEIGHT)/2, charMode.bpc, charMode.rows);
 }
 
-#else // DEBUG_OSD_TEST_SMALLFONT
+#else // OSD_FB_ENABLE_SMALLFONT
 
 static void renderCharAtAligned(uint8_t ch, int px, int py)
 {
@@ -1019,7 +1019,7 @@ static void renderCharAtAlignedEx(uint8_t ch, int px, int py, int bpc, int rows)
     renderCharAtAligned(ch, px, py);
 }
 
-#endif // DEBUG_OSD_TEST_SMALLFONT
+#endif // OSD_FB_ENABLE_SMALLFONT
 
 bool renderCharsUntil(uint32_t limit_micros)
 {

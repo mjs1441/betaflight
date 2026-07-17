@@ -44,14 +44,14 @@ extern const char * const osdTimerSourceNames[OSD_NUM_TIMER_TYPES];
 
 #define OSD_RCCHANNELS_COUNT 4
 
-#ifdef DEBUG_OSD_TEST_SMALLFONT
+#if OSD_FB_ENABLE_SMALLFONT
 #define OSD_CAMERA_FRAME_MIN_WIDTH  2
-#define OSD_CAMERA_FRAME_MAX_WIDTH  46    // Characters per row supportes by PICO FB OSD
+#define OSD_CAMERA_FRAME_MAX_WIDTH  46    // Characters per row supported by PICO FB OSD
 #define OSD_CAMERA_FRAME_MIN_HEIGHT 2
 #define OSD_CAMERA_FRAME_MAX_HEIGHT 24    // Rows supported by PICO FB OSD (PAL)
 #else
 #define OSD_CAMERA_FRAME_MIN_WIDTH  2
-#define OSD_CAMERA_FRAME_MAX_WIDTH  30    // Characters per row supportes by MAX7456
+#define OSD_CAMERA_FRAME_MAX_WIDTH  30    // Characters per row supported by MAX7456
 #define OSD_CAMERA_FRAME_MIN_HEIGHT 2
 #define OSD_CAMERA_FRAME_MAX_HEIGHT 16    // Rows supported by MAX7456 (PAL)
 #endif

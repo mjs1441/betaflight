@@ -404,7 +404,7 @@ static void osdFormatCoordinate(char *buff, gpsCoordinateType_e coordinateType, 
     case OSD_ELEMENT_TYPE_3: // degree, minutes, seconds style. ddd^mm'ss.00"W
         {
             char trailingSymbol;
-#ifdef DEBUG_OSD_TEST_SMALLFONT
+#if OSD_FB_ENABLE_SMALLFONT
             UNUSED(leadingSymbol);
             if (coordinateType == GPS_LONGITUDE) {
                 buff += tfp_sprintf(buff, "%c%c%c", SYM_SAT_L, SYM_SAT_R, SYM_LON);
@@ -435,7 +435,7 @@ static void osdFormatCoordinate(char *buff, gpsCoordinateType_e coordinateType, 
 
     case OSD_ELEMENT_TYPE_1:
     default:
-#ifdef DEBUG_OSD_TEST_SMALLFONT
+#if OSD_FB_ENABLE_SMALLFONT
             if (coordinateType == GPS_LONGITUDE) {
                 buff += tfp_sprintf(buff, "%c%c%c", SYM_SAT_L, SYM_SAT_R, SYM_LON);
             } else {

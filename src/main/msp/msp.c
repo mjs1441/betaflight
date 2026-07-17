@@ -1028,7 +1028,7 @@ static bool mspCommonProcessOutCommand(int16_t cmdMSP, sbuf_t *dst, mspPostProce
 
 #ifdef USE_OSD_SD
         // send video system (AUTO/PAL/NTSC/HD)
-#ifdef DEBUG_OSD_TEST_SMALLFONT
+#if OSD_FB_ENABLE_SMALLFONT
         // represent as HD to Configurator, enabling it to resize the grid appropriately.
         sbufWriteU8(dst, VIDEO_SYSTEM_HD);
 #else
