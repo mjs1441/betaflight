@@ -62,17 +62,17 @@ bool renderCrosshairsUntil(uint32_t limit_micros)
             renderCharAt(SYM_CROSSHAIRS_TL, infoCrosshairs.x, infoCrosshairs.y);
             index++;
             break;
-            
+
         case 1:
             renderCharAt(SYM_CROSSHAIRS_TR, infoCrosshairs.x + PICO_OSD_GLYPH_WIDTH, infoCrosshairs.y);
             index++;
             break;
-            
+
         case 2:
             renderCharAt(SYM_CROSSHAIRS_BL, infoCrosshairs.x, infoCrosshairs.y + PICO_OSD_GLYPH_HEIGHT);
             index++;
             break;
-            
+
         case 3:
             renderCharAt(SYM_CROSSHAIRS_BR, infoCrosshairs.x + PICO_OSD_GLYPH_WIDTH, infoCrosshairs.y + PICO_OSD_GLYPH_HEIGHT);
             index = 0;
