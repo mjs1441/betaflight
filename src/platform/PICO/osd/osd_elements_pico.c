@@ -74,7 +74,7 @@ static void renderCharAtAlignedEx(uint8_t ch, int px, int py, int bpc, int rows)
 
 bool isWideChar(uint8_t ch)
 {
-#if defined DEBUG_OSD_TEST_SMALLFONT && defined OSD_FB_FONT_LINEAR
+#if defined DEBUG_OSD_TEST_SMALLFONT
     uint8_t mode4 = fontData[ch / 4];
     uint8_t mode = (mode4 >> (2 * (ch % 4))) & 0x3;
     return mode / 2;
@@ -528,7 +528,7 @@ bool renderStickRightUntil(uint32_t limit_micros)
     return renderStickRightComplete;
 }
 
-#if defined DEBUG_OSD_TEST_SMALLFONT && defined OSD_FB_FONT_LINEAR
+#if defined DEBUG_OSD_TEST_SMALLFONT
 
 typedef struct {
     uint8_t bpc;
@@ -965,7 +965,6 @@ bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPo
 static bool renderCharsComplete = true;
 
 #ifdef DEBUG_OSD_TEST_SMALLFONT
-#ifdef OSD_FB_FONT_LINEAR
 static void renderCharAtAlignedEx(uint8_t ch, int px, int py, int bpc, int rows)
 {
     // NOTE renderCharAtAligned assumes that the character at px, py willl fit into the frame buffer.
@@ -990,29 +989,6 @@ static void renderCharAtAlignedEx(uint8_t ch, int px, int py, int bpc, int rows)
         bufPtr += PICO_OSD_BUF_WIDTH;
     }
 }
-#else
-static void renderCharAtAlignedEx(uint8_t ch, int px, int py, int bpc, int rows)
-{
-    // NOTE renderCharAtAligned assumes that the character at px, py willl fit into the frame buffer.
-    const uint8_t *fontp = &fontData[ch * FONTDATA_BYTES_PER_CHAR];
-    uint8_t *bufPtr = osdBufferA + py * PICO_OSD_BUF_WIDTH + (px / 4);
-    const int bpc2 = bpc/2;
-    for (int j=0; j<rows; ++j) {
-        const uint16_t *fontp16 = (uint16_t *)fontp;
-        uint16_t *bufPtr16 = (uint16_t *)bufPtr;
-        int i;
-        for (i=0; i<bpc2; ++i) {
-            bufPtr16[i] = fontp16[i];
-        }
-        i *= 2;
-        if (i < bpc) {
-            bufPtr[i] = fontp[i];
-        }
-        fontp += 3; // future: font data linear with correct length
-        bufPtr += PICO_OSD_BUF_WIDTH;
-    }
-}
-#endif
 
 static void renderCharAtAligned(uint8_t ch, int px, int py)
 {
