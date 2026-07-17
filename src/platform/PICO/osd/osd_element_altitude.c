@@ -75,12 +75,7 @@ void cacheAltitudeInfo(uint8_t x, uint8_t y, uint8_t elemType, bool isBlink)
 #endif
 
     int32_t altMax = osdConfig()->alt_alarm;
-#ifdef DEBUG_OSD_ALT_TEST
-    int32_t altInUnits = altMax * (0.65f * (1.0f + sinf(millis()*.0003f)) - 0.12f);
-    UNUSED(altCm);
-#else
     int32_t altInUnits = osdGetMetersToSelectedUnit(altCm) / 100;
-#endif
 
     if ((altInUnits >= altMax) ){ /* && ARMING_FLAG(ARMED)) {*/
         // element->attr = DISPLAYPORT_SEVERITY_CRITICAL;

@@ -609,11 +609,6 @@ void osdFormatTimer(char *buff, bool showSymbol, bool usePrecision, int timerInd
 
 static char osdGetBatterySymbol(int cellVoltage)
 {
-#ifdef DEBUG_OSD_BATTERY_TEST
-    if (micros() % 7300000 < 2000000) {
-        return SYM_MAIN_BATT;
-    }
-#endif
     if (getBatteryState() == BATTERY_CRITICAL) {
         return SYM_MAIN_BATT; // FIXME: currently the BAT- symbol, ideally replace with a battery with exclamation mark
     } else {
@@ -827,9 +822,6 @@ static void osdElementAntiGravity(osdElementParms_t *element)
     if (pidOsdAntiGravityActive()) {
         strcpy(element->buff, "AG");
     }
-#ifdef DEBUG_OSD_HALTS_ON_ANTIGRAV
-    element->rendered = false;
-#endif
 }
 
 #ifdef USE_ACC
@@ -1498,11 +1490,7 @@ static void osdElementMainBatteryUsage(osdElementParms_t *element)
     // Set length of indicator bar
     #define MAIN_BATT_USAGE_STEPS 11 // Use an odd number so the bar can be centered.
 
-#ifdef DEBUG_OSD_BATTERY_TEST
-    const int mAhDrawn = (sinf(((float)micros())/3000000) + 1.22f) * currentBatteryProfile->batteryCapacity * 0.45f;
-#else
     const int mAhDrawn = getMAhDrawn();
-#endif
     const int usedCapacity = mAhDrawn;
     int displayBasis = usedCapacity;
 
@@ -1712,11 +1700,7 @@ static void osdElementRemainingTimeEstimate(osdElementParms_t *element)
 
 static void osdElementRssi(osdElementParms_t *element)
 {
-#ifdef DEBUG_OSD_RSSI_TEST
-    uint16_t osdRssiPercent = 50+50*cosf((float)(micros())/8000000);
-#else
     uint16_t osdRssiPercent = getRssiPercent();
-#endif
     if (osdRssiPercent >= 100) {
         osdRssiPercent = 99;
     }
@@ -1806,13 +1790,6 @@ static void osdBackgroundStickOverlay(osdElementParms_t *element)
 static void osdElementStickOverlay(osdElementParms_t *element)
 {
     // Now draw the cursor
-#ifdef DEBUG_OSD_STICKS_TEST
-    // for quick testing of stick overlays without requiring any RC input
-    UNUSED(radioModes);
-    float tr = micros()*(6.283f/1000000.0f / 3);
-    uint8_t cursorX = OSD_STICK_OVERLAY_WIDTH/2 * (1 + cosf(tr));
-    uint8_t cursorY = OSD_STICK_OVERLAY_VERTICAL_POSITIONS/2 * (1 + sinf(tr));
-#else
     rc_alias_e vertical_channel, horizontal_channel;
 
     if (element->item == OSD_STICK_OVERLAY_LEFT) {
@@ -1825,7 +1802,6 @@ static void osdElementStickOverlay(osdElementParms_t *element)
 
     const uint8_t cursorX = scaleRange(constrain(rcData[horizontal_channel], PWM_RANGE_MIN, PWM_RANGE_MAX - 1), PWM_RANGE_MIN, PWM_RANGE_MAX, 0, OSD_STICK_OVERLAY_WIDTH);
     const uint8_t cursorY = OSD_STICK_OVERLAY_VERTICAL_POSITIONS - 1 - scaleRange(constrain(rcData[vertical_channel], PWM_RANGE_MIN, PWM_RANGE_MAX - 1), PWM_RANGE_MIN, PWM_RANGE_MAX, 0, OSD_STICK_OVERLAY_VERTICAL_POSITIONS);
-#endif // DEBUG_OSD_STICKS_TEST
 
     const char cursor = SYM_STICK_OVERLAY_SPRITE_HIGH + (cursorY % OSD_STICK_OVERLAY_SPRITE_HEIGHT);
 
@@ -2667,20 +2643,11 @@ void osdUpdateAlarms(void)
         CLR_BLINK(OSD_REMAINING_TIME_ESTIMATE);
     }
 
-#ifdef DEBUG_OSD_ALT_TEST
-    alt = osdConfig()->alt_alarm * (0.65f * (1.0f + sinf(millis()*.0003f)) - 0.12f);
-    if ((alt >= osdConfig()->alt_alarm)) {
-        SET_BLINK(OSD_ALTITUDE);
-    } else {
-        CLR_BLINK(OSD_ALTITUDE);
-    }
-#else
     if ((alt >= osdConfig()->alt_alarm) && ARMING_FLAG(ARMED)) {
         SET_BLINK(OSD_ALTITUDE);
     } else {
         CLR_BLINK(OSD_ALTITUDE);
     }
-#endif
 
 #ifdef USE_GPS
     if (sensors(SENSOR_GPS) && ARMING_FLAG(ARMED) && STATE(GPS_FIX) && STATE(GPS_FIX_HOME)) {

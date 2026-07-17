@@ -45,11 +45,6 @@
 #include "osd_element_compassbar.h"
 #include "osd_element_crosshairs.h"
 
-#ifdef DEBUG_OSD_BLACKBOX_TEST
-#include "common/bitarray.h"
-#include "fc/rc_modes.h"
-#endif
-
 // Current format for font data stored in memory is based on 12x18 glyphs.
 #define FONTDATA_CHAR_WIDTH  12
 #define FONTDATA_CHAR_HEIGHT 18
@@ -186,14 +181,6 @@ static void cacheStickBackgroundInfo(info_stick_t *infoPtr, uint8_t x, uint8_t y
 
 static void cacheStickInfo(info_stick_t *infoPtr, rc_alias_e vert, rc_alias_e horiz)
 {
-#ifdef DEBUG_OSD_STICKS_TEST
-    UNUSED(vert);
-    UNUSED(horiz);
-    float tr = micros()*(6.283f/1000000.0f / 3);
-    infoPtr->xStick = (int16_t)(infoPtr->xLeft + (stickWidth/2 - 3) * (1 + cosf(tr)) + 3);
-    infoPtr->yStick = (int16_t)(infoPtr->yTop + (stickHeight/2 - 3) * (1 + sinf(tr)) + 3);
-#else
-
     const float cursorX = constrainf(rcData[horiz], PWM_RANGE_MIN, PWM_RANGE_MAX);
     const float cursorY = constrainf(rcData[vert], PWM_RANGE_MIN, PWM_RANGE_MAX);
 
@@ -201,7 +188,6 @@ static void cacheStickInfo(info_stick_t *infoPtr, rc_alias_e vert, rc_alias_e ho
 
     // note y inverted, cf. osd_elements.c
     infoPtr->yStick = (int16_t)scaleRangef(cursorY, PWM_RANGE_MIN, PWM_RANGE_MAX, infoPtr->yTop + stickHeight, infoPtr->yTop);
-#endif // DEBUG_OSD_STICKS_TEST
 }
 
 static void cacheStickLeftBackgroundInfo(uint8_t x, uint8_t y)
@@ -961,41 +947,8 @@ bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPo
 #endif
 }
 
-#ifdef DEBUG_OSD_GPS_TEST
-#include "fc/runtime_config.h"
-#include "io/gps.h"
-#include "sensors/sensors.h"
-static void enforceSensorGPS(void)
-{
-    ENABLE_STATE(GPS_FIX_EVER | GPS_FIX | GPS_FIX_HOME);
-    sensorsSet(SENSOR_GPS);
-#ifdef USE_GPS
-    float tr = micros()*(6.283f/1000000.0f / 64);
-    float cf = cosf(tr);
-    gpsSol.llh.lon = cf * 1.5f * GPS_DEGREES_DIVIDER;
-    gpsSol.llh.lat = cf * 1.5f * GPS_DEGREES_DIVIDER;
-    gpsSol.llh.altCm = (0.8f + cf) * 8000;
-    extern uint16_t GPS_distanceToHome;        // distance to home point in meters
-    extern int16_t GPS_directionToHome;        // direction to home or hol point in degrees * 10
-    GPS_distanceToHome = (1.0f + cf)*64;
-    if (GPS_distanceToHome > 64) {
-        GPS_distanceToHome *= 50; // test m -> km,  ft -> miles
-    }
-
-    GPS_directionToHome = micros()/1024;
-#endif
-}
-#endif
-
 bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
-#ifdef DEBUG_OSD_GPS_TEST
-    enforceSensorGPS();
-#endif
-#ifdef DEBUG_OSD_BLACKBOX_TEST
-    extern boxBitmask_t rcModeActivationMask;
-    bitArraySet(&rcModeActivationMask, BOXBLACKBOX);
-#endif
 #ifdef OSD_FB_PICO_PIXEL_MODE
     DEBUG_COUNTER_INST(c1);
     bool ret = drawForegroundItem(item, elemPosX, elemPosY);
