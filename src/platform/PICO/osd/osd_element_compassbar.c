@@ -21,7 +21,7 @@
 
 #include "platform.h"
 
-#if ENABLE_FB_OSD && defined OSD_FB_PICO_PIXEL_MODE
+#if ENABLE_FB_OSD && OSD_FB_PICO_ENABLE_PIXEL_MODE
 
 #include <stdint.h>
 #include <string.h>
@@ -349,5 +349,5 @@ bool renderCompassBarUntil(uint32_t limit_micros)
 }
 
 
-#endif // #if ENABLE_FB_OSD && defined OSD_FB_PICO_PIXEL_MODE
+#endif // #if ENABLE_FB_OSD && OSD_FB_PICO_ENABLE_PIXEL_MODE
 

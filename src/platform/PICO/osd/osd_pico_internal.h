@@ -28,6 +28,10 @@
 #include "drivers/display.h"
 #include "osd/osd.h"
 
+#if defined(DEBUG_OSD_TEST_SMALLFONT) && !OSD_FB_PICO_ENABLE_PIXEL_MODE
+#error DEBUG_OSD_TEST_SMALLFONT requires OSD_FB_PICO_ENABLE_PIXEL_MODE
+#endif
+
 #ifdef DEBUG_OSD_TEST_SMALLFONT
 #define OSD_BYTES_PER_CHAR 2
 // 5x8 but embedded in mcm-style data structure at top left with transparent padding
@@ -123,7 +127,7 @@ void cacheLogoInfo(uint16_t midX, uint16_t midY, uint16_t fontOffset, uint8_t lo
 
 bool isWideChar(uint8_t ch);
 
-#ifdef OSD_FB_PICO_PIXEL_MODE
+#if OSD_FB_PICO_ENABLE_PIXEL_MODE
 void plot(int x, int y, int c);
 void hLine(int x, int y, int count, int col);
 void dhLine(int x, int y, int count);
@@ -141,7 +145,7 @@ bool iterBlackFillRectNext(void);
 void renderCharAt(uint8_t ch, int px, int py);
 void renderStringInit(const char *str, uint16_t initX, uint16_t y, int charAdvance);
 bool renderStringNext(void);
-#endif // OSD_FB_PICO_PIXEL_MODE
+#endif // #if OSD_FB_PICO_ENABLE_PIXEL_MODE
 
 // trace / debugging
 #ifdef DEBUG_OSD_FB_PICO

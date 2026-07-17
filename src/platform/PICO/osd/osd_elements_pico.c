@@ -84,7 +84,7 @@ bool isWideChar(uint8_t ch)
 #endif
 }
 
-#ifdef OSD_FB_PICO_PIXEL_MODE
+#if OSD_FB_PICO_ENABLE_PIXEL_MODE
 
 typedef struct {
     int16_t x1;
@@ -732,7 +732,7 @@ static bool drawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemP
         return false;
     }
 }
-#endif // #ifdef OSD_FB_PICO_PIXEL_MODE
+#endif // #if OSD_FB_PICO_ENABLE_PIXEL_MODE
 
 bool logoVisible;
 static bool renderLogoComplete = true;
@@ -934,7 +934,7 @@ static bool postProcessUntil(uint32_t limit_micros)
 
 bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
-#ifdef OSD_FB_PICO_PIXEL_MODE
+#if OSD_FB_PICO_ENABLE_PIXEL_MODE
     DEBUG_COUNTER_INST(c1);
     bool ret = drawBackgroundItem(item, elemPosX, elemPosY);
     DEBUG_COUNTER_ACC(drawBGTot, c1);
@@ -949,7 +949,7 @@ bool osdPioDrawBackgroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPo
 
 bool osdPioDrawForegroundItem(osd_items_e item, uint8_t elemPosX, uint8_t elemPosY)
 {
-#ifdef OSD_FB_PICO_PIXEL_MODE
+#if OSD_FB_PICO_ENABLE_PIXEL_MODE
     DEBUG_COUNTER_INST(c1);
     bool ret = drawForegroundItem(item, elemPosX, elemPosY);
     DEBUG_COUNTER_ACC(drawFGTot,c1);
@@ -1141,7 +1141,7 @@ bool osdPioRenderScreenUntil(uint32_t limit_micros)
 
     DEBUG_COUNTER_INST(c1);
 
-#ifdef OSD_FB_PICO_PIXEL_MODE
+#if OSD_FB_PICO_ENABLE_PIXEL_MODE
     // Proceed with rendering background elements if/as required, if not timed out.
     selectBackgroundBuffer();
     bool complete =

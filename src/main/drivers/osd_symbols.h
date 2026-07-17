@@ -103,7 +103,7 @@
 #define SYM_HEADSET                 0x82
 #endif
 
-#ifdef OSD_FB_PICO_PIXEL_MODE
+#if OSD_FB_PICO_ENABLE_PIXEL_MODE
 #define SYM_ALT_LADDER              SYM_AH_DECORATION // vertical ladder element
 #define SYM_ALT_ABOVEMAX            0x86
 #define SYM_ALT_BELOWZERO           0x87
@@ -113,7 +113,6 @@
 #define SYM_CROSSHAIRS_BR           0x88
 #endif
 
-#ifndef OSD_FB_ELEMENT_ARTIFICIAL_HORIZON
 // AH Bars
 #define SYM_AH_BAR9_0               0x80
 #define SYM_AH_BAR9_1               0x81
@@ -124,7 +123,6 @@
 #define SYM_AH_BAR9_6               0x86
 #define SYM_AH_BAR9_7               0x87
 #define SYM_AH_BAR9_8               0x88
-#endif
 
 // Progress bar
 #define SYM_PB_START                0x8A

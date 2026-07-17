@@ -21,7 +21,7 @@
 
 #include "platform.h"
 
-#if ENABLE_FB_OSD && defined OSD_FB_PICO_PIXEL_MODE
+#if ENABLE_FB_OSD && OSD_FB_PICO_ENABLE_PIXEL_MODE
 
 #include <math.h>
 #include <stdint.h>
@@ -372,5 +372,5 @@ bool renderAHUntil(uint32_t limit_micros)
 #error unknown AH_IMPLMENTATION
 #endif
 
-#endif // #if ENABLE_FB_OSD && defined OSD_FB_PICO_PIXEL_MODE
+#endif // #if ENABLE_FB_OSD && OSD_FB_PICO_ENABLE_PIXEL_MODE
 

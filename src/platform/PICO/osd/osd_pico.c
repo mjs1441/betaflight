@@ -665,7 +665,7 @@ void osdPioRedrawBackground(void)
     dmaClearBackgroundBuffer = true;
 }
 
-#ifdef OSD_FB_PICO_PIXEL_MODE
+#if OSD_FB_PICO_ENABLE_PIXEL_MODE
 
 #ifdef OSD_FB_PICO_POSTPROCESS
 // Only plotting white pixels, adding black pixels in post processing
@@ -1043,7 +1043,7 @@ bool iterDashedDLineNext(void)
     return iterLineData.ic >= iterLineData.maxIc;
 }
 
-#endif // OSD_FB_PICO_PIXEL_MODE
+#endif // #if OSD_FB_PICO_ENABLE_PIXEL_MODE
 
 void osdPioWriteChar(uint8_t x, uint8_t y, uint8_t c)
 {

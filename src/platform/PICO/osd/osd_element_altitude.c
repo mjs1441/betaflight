@@ -21,7 +21,7 @@
 
 #include "platform.h"
 
-#if ENABLE_FB_OSD && defined OSD_FB_PICO_PIXEL_MODE && defined OSD_FB_ELEMENT_ALTITUDE
+#if ENABLE_FB_OSD && OSD_FB_PICO_ENABLE_PIXEL_MODE && defined OSD_FB_ELEMENT_ALTITUDE
 
 #include <stdint.h>
 #include <string.h>
@@ -253,5 +253,5 @@ bool renderAltitudeUntil(uint32_t limit_micros)
 }
 
 
-#endif // #if ENABLE_FB_OSD && defined OSD_FB_PICO_PIXEL_MODE
+#endif // #if ENABLE_FB_OSD && OSD_FB_PICO_ENABLE_PIXEL_MODE
 
